@@ -1,0 +1,14 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "FXEjFwmJzi0B5M5OtP_rI"
+uri = "file://artifacts/lawfirm/public/hero-bg.png"
+type = "image"
+title = "Modern Indian law office hero"
+
+[[generated]]
+id = "7ObNK4WO3HmXkzHepurL5"
+uri = "file://artifacts/lawfirm/public/lawyers-team.png"
+type = "image"
+title = "Group of professional lawyers"

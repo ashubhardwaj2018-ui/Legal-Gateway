@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Legal Services Website"
+version = "1.0.0"
+id = "artifacts/lawfirm"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 24874
+
+[services.development]
+run = "pnpm --filter @workspace/lawfirm run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/lawfirm", "run", "build" ]
+publicDir = "artifacts/lawfirm/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "24874"
+BASE_PATH = "/"

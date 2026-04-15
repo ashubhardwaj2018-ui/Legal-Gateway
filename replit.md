@@ -25,3 +25,21 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - `pnpm --filter @workspace/api-server run dev` — run API server locally
 
 See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.
+
+## Artifacts
+
+### Legal Services Website (`artifacts/lawfirm`)
+- **Type**: react-vite (frontend only, no backend)
+- **Preview path**: `/`
+- **Description**: Professional Indian law firm website with full service listing
+- **Color palette**: Navy (#0f2044) and Gold (#c9a227)
+- **Services covered**: Trademark & IP, Documentation, Fundraising, NGO, Property & Personal, Lawyers & Experts
+- **Key files**:
+  - `src/App.tsx` — Router setup with wouter
+  - `src/pages/home.tsx` — Full homepage with all sections
+  - `src/pages/service-category.tsx` — Dynamic service category pages
+  - `src/data/services.ts` — All service data (categories, services, descriptions, prices)
+  - `src/components/navbar.tsx` — Navigation with dropdown menus
+  - `src/components/footer.tsx` — Footer with all service links
+  - `src/index.css` — Theme variables (navy/gold palette)
+- **Features**: Scroll animations (framer-motion), service cards, lawyer profiles, testimonials, FAQ accordion, consultation CTAs
