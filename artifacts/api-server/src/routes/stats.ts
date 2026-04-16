@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, count } from "drizzle-orm";
-import { db, consultationsTable, contactsTable, newsletterTable } from "@workspace/db";
+import { db, consultationsTable, contactsTable, newsletterTable, quotationsTable, companyDataTable } from "@workspace/db";
 
 const router: IRouter = Router();
 
@@ -12,12 +12,16 @@ router.get("/stats", async (_req, res): Promise<void> => {
     .select({ value: count() })
     .from(consultationsTable)
     .where(eq(consultationsTable.status, "pending"));
+  const [totalQuotations] = await db.select({ value: count() }).from(quotationsTable);
+  const [totalCompanyRecords] = await db.select({ value: count() }).from(companyDataTable);
 
   res.json({
     totalConsultations: totalConsultations?.value ?? 0,
     totalContacts: totalContacts?.value ?? 0,
     totalSubscribers: totalSubscribers?.value ?? 0,
     pendingConsultations: pendingConsultations?.value ?? 0,
+    totalQuotations: totalQuotations?.value ?? 0,
+    totalCompanyRecords: totalCompanyRecords?.value ?? 0,
   });
 });
 

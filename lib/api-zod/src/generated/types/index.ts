@@ -6,14 +6,37 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./bulkImportBody";
+export * from "./bulkImportResult";
+export * from "./companyDataList";
+export * from "./companyRecord";
 export * from "./consultation";
 export * from "./contact";
+export * from "./createCompanyRecordBody";
 export * from "./createConsultationBody";
 export * from "./createContactBody";
+export * from "./createLawyerProfileBody";
+export * from "./createQuotationBody";
+export * from "./createServiceConfigBody";
 export * from "./errorResponse";
 export * from "./healthStatus";
+export * from "./lawyerProfile";
+export * from "./listCompanyDataParams";
 export * from "./listConsultationsParams";
+export * from "./listServicesConfigParams";
 export * from "./newsletterSubscriber";
+export * from "./quotation";
+export * from "./quotationItem";
+export * from "./seoSetting";
+export * from "./serviceConfig";
+export * from "./siteSetting";
 export * from "./siteStats";
 export * from "./subscribeNewsletterBody";
 export * from "./updateConsultationBody";
+export * from "./updateContactBody";
+export * from "./updateLawyerProfileBody";
+export * from "./updateQuotationBody";
+export * from "./updateServiceConfigBody";
+export * from "./updateSettingsBody";
+export * from "./updateSettingsBodySettingsItem";
+export * from "./upsertSeoSettingBody";

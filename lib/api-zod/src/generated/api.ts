@@ -8,16 +8,12 @@
 import * as zod from "zod";
 
 /**
- * Returns server health status
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({
   status: zod.string(),
 });
 
-/**
- * @summary Book a free consultation
- */
 export const CreateConsultationBody = zod.object({
   name: zod.string(),
   email: zod.string(),
@@ -28,9 +24,6 @@ export const CreateConsultationBody = zod.object({
   preferredDate: zod.string().nullish(),
 });
 
-/**
- * @summary List all consultation requests
- */
 export const ListConsultationsQueryParams = zod.object({
   status: zod.coerce.string().optional(),
   page: zod.coerce.number().optional(),
@@ -55,9 +48,6 @@ export const ListConsultationsResponse = zod.array(
   ListConsultationsResponseItem,
 );
 
-/**
- * @summary Update consultation status
- */
 export const UpdateConsultationParams = zod.object({
   id: zod.coerce.number(),
 });
@@ -82,9 +72,6 @@ export const UpdateConsultationResponse = zod.object({
   updatedAt: zod.string(),
 });
 
-/**
- * @summary Submit a contact form
- */
 export const CreateContactBody = zod.object({
   name: zod.string(),
   email: zod.string(),
@@ -93,9 +80,6 @@ export const CreateContactBody = zod.object({
   message: zod.string(),
 });
 
-/**
- * @summary List all contact submissions
- */
 export const ListContactsResponseItem = zod.object({
   id: zod.number(),
   name: zod.string(),
@@ -109,20 +93,487 @@ export const ListContactsResponseItem = zod.object({
 });
 export const ListContactsResponse = zod.array(ListContactsResponseItem);
 
-/**
- * @summary Subscribe to newsletter
- */
+export const UpdateContactParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateContactBody = zod.object({
+  status: zod.string().optional(),
+});
+
+export const UpdateContactResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  email: zod.string(),
+  phone: zod.string().nullish(),
+  subject: zod.string(),
+  message: zod.string(),
+  status: zod.string(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+
 export const SubscribeNewsletterBody = zod.object({
   email: zod.string(),
   name: zod.string().nullish(),
 });
 
-/**
- * @summary Get site statistics
- */
+export const ListNewsletterSubscribersResponseItem = zod.object({
+  id: zod.number(),
+  email: zod.string(),
+  name: zod.string().nullish(),
+  subscribedAt: zod.string(),
+});
+export const ListNewsletterSubscribersResponse = zod.array(
+  ListNewsletterSubscribersResponseItem,
+);
+
 export const GetStatsResponse = zod.object({
   totalConsultations: zod.number(),
   totalContacts: zod.number(),
   totalSubscribers: zod.number(),
   pendingConsultations: zod.number(),
+  totalQuotations: zod.number(),
+  totalCompanyRecords: zod.number(),
 });
+
+export const ListSeoSettingsResponseItem = zod.object({
+  id: zod.number(),
+  page: zod.string(),
+  title: zod.string(),
+  description: zod.string(),
+  keywords: zod.string().nullish(),
+  ogTitle: zod.string().nullish(),
+  ogDescription: zod.string().nullish(),
+  ogImage: zod.string().nullish(),
+  robots: zod.string(),
+  updatedAt: zod.string(),
+});
+export const ListSeoSettingsResponse = zod.array(ListSeoSettingsResponseItem);
+
+export const GetSeoSettingParams = zod.object({
+  page: zod.coerce.string(),
+});
+
+export const GetSeoSettingResponse = zod.object({
+  id: zod.number(),
+  page: zod.string(),
+  title: zod.string(),
+  description: zod.string(),
+  keywords: zod.string().nullish(),
+  ogTitle: zod.string().nullish(),
+  ogDescription: zod.string().nullish(),
+  ogImage: zod.string().nullish(),
+  robots: zod.string(),
+  updatedAt: zod.string(),
+});
+
+export const UpsertSeoSettingParams = zod.object({
+  page: zod.coerce.string(),
+});
+
+export const UpsertSeoSettingBody = zod.object({
+  title: zod.string(),
+  description: zod.string(),
+  keywords: zod.string().nullish(),
+  ogTitle: zod.string().nullish(),
+  ogDescription: zod.string().nullish(),
+  ogImage: zod.string().nullish(),
+  robots: zod.string().optional(),
+});
+
+export const UpsertSeoSettingResponse = zod.object({
+  id: zod.number(),
+  page: zod.string(),
+  title: zod.string(),
+  description: zod.string(),
+  keywords: zod.string().nullish(),
+  ogTitle: zod.string().nullish(),
+  ogDescription: zod.string().nullish(),
+  ogImage: zod.string().nullish(),
+  robots: zod.string(),
+  updatedAt: zod.string(),
+});
+
+export const ListServicesConfigQueryParams = zod.object({
+  categoryId: zod.coerce.string().optional(),
+});
+
+export const ListServicesConfigResponseItem = zod.object({
+  id: zod.number(),
+  categoryId: zod.string(),
+  serviceName: zod.string(),
+  displayName: zod.string().nullish(),
+  description: zod.string().nullish(),
+  basePrice: zod.number().nullish(),
+  priceDisplay: zod.string().nullish(),
+  duration: zod.string().nullish(),
+  isPopular: zod.boolean(),
+  isActive: zod.boolean(),
+  updatedAt: zod.string(),
+});
+export const ListServicesConfigResponse = zod.array(
+  ListServicesConfigResponseItem,
+);
+
+export const CreateServiceConfigBody = zod.object({
+  categoryId: zod.string(),
+  serviceName: zod.string(),
+  displayName: zod.string().nullish(),
+  description: zod.string().nullish(),
+  basePrice: zod.number().nullish(),
+  priceDisplay: zod.string().nullish(),
+  duration: zod.string().nullish(),
+  isPopular: zod.boolean().optional(),
+  isActive: zod.boolean().optional(),
+});
+
+export const UpdateServiceConfigParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateServiceConfigBody = zod.object({
+  displayName: zod.string().nullish(),
+  description: zod.string().nullish(),
+  basePrice: zod.number().nullish(),
+  priceDisplay: zod.string().nullish(),
+  duration: zod.string().nullish(),
+  isPopular: zod.boolean().optional(),
+  isActive: zod.boolean().optional(),
+});
+
+export const UpdateServiceConfigResponse = zod.object({
+  id: zod.number(),
+  categoryId: zod.string(),
+  serviceName: zod.string(),
+  displayName: zod.string().nullish(),
+  description: zod.string().nullish(),
+  basePrice: zod.number().nullish(),
+  priceDisplay: zod.string().nullish(),
+  duration: zod.string().nullish(),
+  isPopular: zod.boolean(),
+  isActive: zod.boolean(),
+  updatedAt: zod.string(),
+});
+
+export const DeleteServiceConfigParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ListQuotationsResponseItem = zod.object({
+  id: zod.number(),
+  quotationNumber: zod.string(),
+  clientName: zod.string(),
+  clientEmail: zod.string(),
+  clientPhone: zod.string().nullish(),
+  clientCompany: zod.string().nullish(),
+  items: zod.array(
+    zod.object({
+      serviceName: zod.string(),
+      description: zod.string(),
+      quantity: zod.number(),
+      unitPrice: zod.number(),
+      total: zod.number(),
+    }),
+  ),
+  subtotal: zod.number(),
+  taxPercent: zod.number(),
+  taxAmount: zod.number(),
+  total: zod.number(),
+  notes: zod.string().nullish(),
+  validityDays: zod.number(),
+  status: zod.string(),
+  sentAt: zod.string().nullish(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+export const ListQuotationsResponse = zod.array(ListQuotationsResponseItem);
+
+export const CreateQuotationBody = zod.object({
+  clientName: zod.string(),
+  clientEmail: zod.string(),
+  clientPhone: zod.string().nullish(),
+  clientCompany: zod.string().nullish(),
+  items: zod.array(
+    zod.object({
+      serviceName: zod.string(),
+      description: zod.string(),
+      quantity: zod.number(),
+      unitPrice: zod.number(),
+      total: zod.number(),
+    }),
+  ),
+  taxPercent: zod.number().optional(),
+  notes: zod.string().nullish(),
+  validityDays: zod.number(),
+});
+
+export const GetQuotationParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetQuotationResponse = zod.object({
+  id: zod.number(),
+  quotationNumber: zod.string(),
+  clientName: zod.string(),
+  clientEmail: zod.string(),
+  clientPhone: zod.string().nullish(),
+  clientCompany: zod.string().nullish(),
+  items: zod.array(
+    zod.object({
+      serviceName: zod.string(),
+      description: zod.string(),
+      quantity: zod.number(),
+      unitPrice: zod.number(),
+      total: zod.number(),
+    }),
+  ),
+  subtotal: zod.number(),
+  taxPercent: zod.number(),
+  taxAmount: zod.number(),
+  total: zod.number(),
+  notes: zod.string().nullish(),
+  validityDays: zod.number(),
+  status: zod.string(),
+  sentAt: zod.string().nullish(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+
+export const UpdateQuotationParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateQuotationBody = zod.object({
+  clientName: zod.string().optional(),
+  clientEmail: zod.string().optional(),
+  clientPhone: zod.string().nullish(),
+  clientCompany: zod.string().nullish(),
+  items: zod
+    .array(
+      zod.object({
+        serviceName: zod.string(),
+        description: zod.string(),
+        quantity: zod.number(),
+        unitPrice: zod.number(),
+        total: zod.number(),
+      }),
+    )
+    .optional(),
+  taxPercent: zod.number().optional(),
+  notes: zod.string().nullish(),
+  validityDays: zod.number().optional(),
+  status: zod.string().optional(),
+});
+
+export const UpdateQuotationResponse = zod.object({
+  id: zod.number(),
+  quotationNumber: zod.string(),
+  clientName: zod.string(),
+  clientEmail: zod.string(),
+  clientPhone: zod.string().nullish(),
+  clientCompany: zod.string().nullish(),
+  items: zod.array(
+    zod.object({
+      serviceName: zod.string(),
+      description: zod.string(),
+      quantity: zod.number(),
+      unitPrice: zod.number(),
+      total: zod.number(),
+    }),
+  ),
+  subtotal: zod.number(),
+  taxPercent: zod.number(),
+  taxAmount: zod.number(),
+  total: zod.number(),
+  notes: zod.string().nullish(),
+  validityDays: zod.number(),
+  status: zod.string(),
+  sentAt: zod.string().nullish(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+
+export const SendQuotationParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const SendQuotationResponse = zod.object({
+  id: zod.number(),
+  quotationNumber: zod.string(),
+  clientName: zod.string(),
+  clientEmail: zod.string(),
+  clientPhone: zod.string().nullish(),
+  clientCompany: zod.string().nullish(),
+  items: zod.array(
+    zod.object({
+      serviceName: zod.string(),
+      description: zod.string(),
+      quantity: zod.number(),
+      unitPrice: zod.number(),
+      total: zod.number(),
+    }),
+  ),
+  subtotal: zod.number(),
+  taxPercent: zod.number(),
+  taxAmount: zod.number(),
+  total: zod.number(),
+  notes: zod.string().nullish(),
+  validityDays: zod.number(),
+  status: zod.string(),
+  sentAt: zod.string().nullish(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+
+export const ListCompanyDataQueryParams = zod.object({
+  search: zod.coerce.string().optional(),
+  state: zod.coerce.string().optional(),
+  status: zod.coerce.string().optional(),
+  page: zod.coerce.number().optional(),
+  limit: zod.coerce.number().optional(),
+});
+
+export const ListCompanyDataResponse = zod.object({
+  data: zod.array(
+    zod.object({
+      id: zod.number(),
+      companyName: zod.string(),
+      cin: zod.string().nullish(),
+      category: zod.string().nullish(),
+      state: zod.string().nullish(),
+      dateOfIncorporation: zod.string().nullish(),
+      authorizedCapital: zod.string().nullish(),
+      paidUpCapital: zod.string().nullish(),
+      email: zod.string().nullish(),
+      registeredAddress: zod.string().nullish(),
+      companyStatus: zod.string().nullish(),
+      createdAt: zod.string(),
+    }),
+  ),
+  total: zod.number(),
+  page: zod.number(),
+  limit: zod.number(),
+});
+
+export const CreateCompanyRecordBody = zod.object({
+  companyName: zod.string(),
+  cin: zod.string().nullish(),
+  category: zod.string().nullish(),
+  state: zod.string().nullish(),
+  dateOfIncorporation: zod.string().nullish(),
+  authorizedCapital: zod.string().nullish(),
+  paidUpCapital: zod.string().nullish(),
+  email: zod.string().nullish(),
+  registeredAddress: zod.string().nullish(),
+  companyStatus: zod.string().nullish(),
+});
+
+export const BulkImportCompanyDataBody = zod.object({
+  records: zod.array(
+    zod.object({
+      companyName: zod.string(),
+      cin: zod.string().nullish(),
+      category: zod.string().nullish(),
+      state: zod.string().nullish(),
+      dateOfIncorporation: zod.string().nullish(),
+      authorizedCapital: zod.string().nullish(),
+      paidUpCapital: zod.string().nullish(),
+      email: zod.string().nullish(),
+      registeredAddress: zod.string().nullish(),
+      companyStatus: zod.string().nullish(),
+    }),
+  ),
+});
+
+export const BulkImportCompanyDataResponse = zod.object({
+  imported: zod.number(),
+  skipped: zod.number(),
+  errors: zod.number(),
+});
+
+export const DeleteCompanyRecordParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ListLawyerProfilesResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  specialization: zod.string(),
+  experienceYears: zod.number(),
+  bio: zod.string().nullish(),
+  photoUrl: zod.string().nullish(),
+  languages: zod.string().nullish(),
+  barCouncilNo: zod.string().nullish(),
+  isActive: zod.boolean(),
+  updatedAt: zod.string(),
+});
+export const ListLawyerProfilesResponse = zod.array(
+  ListLawyerProfilesResponseItem,
+);
+
+export const CreateLawyerProfileBody = zod.object({
+  name: zod.string(),
+  specialization: zod.string(),
+  experienceYears: zod.number(),
+  bio: zod.string().nullish(),
+  photoUrl: zod.string().nullish(),
+  languages: zod.string().nullish(),
+  barCouncilNo: zod.string().nullish(),
+  isActive: zod.boolean().optional(),
+});
+
+export const UpdateLawyerProfileParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateLawyerProfileBody = zod.object({
+  name: zod.string().optional(),
+  specialization: zod.string().optional(),
+  experienceYears: zod.number().optional(),
+  bio: zod.string().nullish(),
+  photoUrl: zod.string().nullish(),
+  languages: zod.string().nullish(),
+  barCouncilNo: zod.string().nullish(),
+  isActive: zod.boolean().optional(),
+});
+
+export const UpdateLawyerProfileResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  specialization: zod.string(),
+  experienceYears: zod.number(),
+  bio: zod.string().nullish(),
+  photoUrl: zod.string().nullish(),
+  languages: zod.string().nullish(),
+  barCouncilNo: zod.string().nullish(),
+  isActive: zod.boolean(),
+  updatedAt: zod.string(),
+});
+
+export const DeleteLawyerProfileParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ListSettingsResponseItem = zod.object({
+  key: zod.string(),
+  value: zod.string(),
+  updatedAt: zod.string(),
+});
+export const ListSettingsResponse = zod.array(ListSettingsResponseItem);
+
+export const UpdateSettingsBody = zod.object({
+  settings: zod.array(
+    zod.object({
+      key: zod.string(),
+      value: zod.string(),
+    }),
+  ),
+});
+
+export const UpdateSettingsResponseItem = zod.object({
+  key: zod.string(),
+  value: zod.string(),
+  updatedAt: zod.string(),
+});
+export const UpdateSettingsResponse = zod.array(UpdateSettingsResponseItem);

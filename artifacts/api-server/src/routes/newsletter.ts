@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { desc } from "drizzle-orm";
 import { db, newsletterTable } from "@workspace/db";
 import { SubscribeNewsletterBody } from "@workspace/api-zod";
 
@@ -10,16 +11,11 @@ router.post("/newsletter", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-
   try {
     const [subscriber] = await db
       .insert(newsletterTable)
-      .values({
-        email: parsed.data.email,
-        name: parsed.data.name ?? null,
-      })
+      .values({ email: parsed.data.email, name: parsed.data.name ?? null })
       .returning();
-
     req.log.info({ email: subscriber.email }, "Newsletter subscriber added");
     res.status(201).json(subscriber);
   } catch (err: unknown) {
@@ -30,6 +26,11 @@ router.post("/newsletter", async (req, res): Promise<void> => {
     }
     throw err;
   }
+});
+
+router.get("/newsletter", async (_req, res): Promise<void> => {
+  const results = await db.select().from(newsletterTable).orderBy(desc(newsletterTable.subscribedAt));
+  res.json(results);
 });
 
 export default router;

@@ -11,4 +11,6 @@ export interface SiteStats {
   totalContacts: number;
   totalSubscribers: number;
   pendingConsultations: number;
+  totalQuotations: number;
+  totalCompanyRecords: number;
 }

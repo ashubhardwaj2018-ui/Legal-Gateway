@@ -9,15 +9,16 @@ servers:
     description: Base API path
 tags:
   - name: health
-    description: Health operations
   - name: consultations
-    description: Consultation booking operations
   - name: contacts
-    description: Contact form operations
   - name: newsletter
-    description: Newsletter subscription operations
   - name: stats
-    description: Site statistics
+  - name: admin-seo
+  - name: admin-services
+  - name: admin-quotations
+  - name: admin-company-data
+  - name: admin-lawyers
+  - name: admin-settings
 
 paths:
   /healthz:
@@ -25,7 +26,6 @@ paths:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -38,7 +38,6 @@ paths:
     post:
       operationId: createConsultation
       tags: [consultations]
-      summary: Book a free consultation
       requestBody:
         required: true
         content:
@@ -47,13 +46,13 @@ paths:
               $ref: "#/components/schemas/CreateConsultationBody"
       responses:
         "201":
-          description: Consultation booked successfully
+          description: Created
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Consultation"
         "400":
-          description: Invalid request body
+          description: Bad request
           content:
             application/json:
               schema:
@@ -61,7 +60,6 @@ paths:
     get:
       operationId: listConsultations
       tags: [consultations]
-      summary: List all consultation requests
       parameters:
         - name: status
           in: query
@@ -80,7 +78,7 @@ paths:
             type: integer
       responses:
         "200":
-          description: List of consultation requests
+          description: OK
           content:
             application/json:
               schema:
@@ -92,7 +90,6 @@ paths:
     patch:
       operationId: updateConsultation
       tags: [consultations]
-      summary: Update consultation status
       parameters:
         - name: id
           in: path
@@ -107,13 +104,13 @@ paths:
               $ref: "#/components/schemas/UpdateConsultationBody"
       responses:
         "200":
-          description: Consultation updated
+          description: Updated
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Consultation"
         "404":
-          description: Consultation not found
+          description: Not found
           content:
             application/json:
               schema:
@@ -123,7 +120,6 @@ paths:
     post:
       operationId: createContact
       tags: [contacts]
-      summary: Submit a contact form
       requestBody:
         required: true
         content:
@@ -132,13 +128,13 @@ paths:
               $ref: "#/components/schemas/CreateContactBody"
       responses:
         "201":
-          description: Contact submitted successfully
+          description: Created
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Contact"
         "400":
-          description: Invalid request body
+          description: Bad request
           content:
             application/json:
               schema:
@@ -146,10 +142,9 @@ paths:
     get:
       operationId: listContacts
       tags: [contacts]
-      summary: List all contact submissions
       responses:
         "200":
-          description: List of contact submissions
+          description: OK
           content:
             application/json:
               schema:
@@ -157,11 +152,40 @@ paths:
                 items:
                   $ref: "#/components/schemas/Contact"
 
+  /contacts/{id}:
+    patch:
+      operationId: updateContact
+      tags: [contacts]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateContactBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contact"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /newsletter:
     post:
       operationId: subscribeNewsletter
       tags: [newsletter]
-      summary: Subscribe to newsletter
       requestBody:
         required: true
         content:
@@ -170,30 +194,517 @@ paths:
               $ref: "#/components/schemas/SubscribeNewsletterBody"
       responses:
         "201":
-          description: Subscribed successfully
+          description: Created
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/NewsletterSubscriber"
         "400":
-          description: Invalid or already subscribed
+          description: Bad request
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+    get:
+      operationId: listNewsletterSubscribers
+      tags: [newsletter]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/NewsletterSubscriber"
 
   /stats:
     get:
       operationId: getStats
       tags: [stats]
-      summary: Get site statistics
       responses:
         "200":
-          description: Site statistics
+          description: OK
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/SiteStats"
+
+  # ─── Admin: SEO ────────────────────────────────────────────────────────────
+
+  /admin/seo:
+    get:
+      operationId: listSeoSettings
+      tags: [admin-seo]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SeoSetting"
+
+  /admin/seo/{page}:
+    get:
+      operationId: getSeoSetting
+      tags: [admin-seo]
+      parameters:
+        - name: page
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SeoSetting"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      operationId: upsertSeoSetting
+      tags: [admin-seo]
+      parameters:
+        - name: page
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertSeoSettingBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SeoSetting"
+
+  # ─── Admin: Services Config ─────────────────────────────────────────────────
+
+  /admin/services-config:
+    get:
+      operationId: listServicesConfig
+      tags: [admin-services]
+      parameters:
+        - name: categoryId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ServiceConfig"
+    post:
+      operationId: createServiceConfig
+      tags: [admin-services]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateServiceConfigBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceConfig"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /admin/services-config/{id}:
+    patch:
+      operationId: updateServiceConfig
+      tags: [admin-services]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateServiceConfigBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceConfig"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteServiceConfig
+      tags: [admin-services]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ─── Admin: Quotations ──────────────────────────────────────────────────────
+
+  /admin/quotations:
+    get:
+      operationId: listQuotations
+      tags: [admin-quotations]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Quotation"
+    post:
+      operationId: createQuotation
+      tags: [admin-quotations]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateQuotationBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Quotation"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /admin/quotations/{id}:
+    get:
+      operationId: getQuotation
+      tags: [admin-quotations]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Quotation"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateQuotation
+      tags: [admin-quotations]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateQuotationBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Quotation"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /admin/quotations/{id}/send:
+    post:
+      operationId: sendQuotation
+      tags: [admin-quotations]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Quotation"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ─── Admin: Company Data ────────────────────────────────────────────────────
+
+  /admin/company-data:
+    get:
+      operationId: listCompanyData
+      tags: [admin-company-data]
+      parameters:
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompanyDataList"
+    post:
+      operationId: createCompanyRecord
+      tags: [admin-company-data]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCompanyRecordBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompanyRecord"
+
+  /admin/company-data/bulk-import:
+    post:
+      operationId: bulkImportCompanyData
+      tags: [admin-company-data]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkImportBody"
+      responses:
+        "200":
+          description: Import result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkImportResult"
+
+  /admin/company-data/{id}:
+    delete:
+      operationId: deleteCompanyRecord
+      tags: [admin-company-data]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ─── Admin: Lawyer Profiles ─────────────────────────────────────────────────
+
+  /admin/lawyer-profiles:
+    get:
+      operationId: listLawyerProfiles
+      tags: [admin-lawyers]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LawyerProfile"
+    post:
+      operationId: createLawyerProfile
+      tags: [admin-lawyers]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLawyerProfileBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LawyerProfile"
+
+  /admin/lawyer-profiles/{id}:
+    patch:
+      operationId: updateLawyerProfile
+      tags: [admin-lawyers]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLawyerProfileBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LawyerProfile"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteLawyerProfile
+      tags: [admin-lawyers]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ─── Admin: Settings ────────────────────────────────────────────────────────
+
+  /admin/settings:
+    get:
+      operationId: listSettings
+      tags: [admin-settings]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SiteSetting"
+    put:
+      operationId: updateSettings
+      tags: [admin-settings]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSettingsBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SiteSetting"
 
 components:
   schemas:
@@ -212,6 +723,8 @@ components:
           type: string
       required:
         - error
+
+    # ── Consultation ──────────────────────────────────────────────────────────
 
     CreateConsultationBody:
       type: object
@@ -283,6 +796,8 @@ components:
         - createdAt
         - updatedAt
 
+    # ── Contact ───────────────────────────────────────────────────────────────
+
     CreateContactBody:
       type: object
       properties:
@@ -301,6 +816,12 @@ components:
         - email
         - subject
         - message
+
+    UpdateContactBody:
+      type: object
+      properties:
+        status:
+          type: string
 
     Contact:
       type: object
@@ -333,6 +854,8 @@ components:
         - createdAt
         - updatedAt
 
+    # ── Newsletter ────────────────────────────────────────────────────────────
+
     SubscribeNewsletterBody:
       type: object
       properties:
@@ -359,6 +882,8 @@ components:
         - email
         - subscribedAt
 
+    # ── Stats ─────────────────────────────────────────────────────────────────
+
     SiteStats:
       type: object
       properties:
@@ -370,8 +895,487 @@ components:
           type: integer
         pendingConsultations:
           type: integer
+        totalQuotations:
+          type: integer
+        totalCompanyRecords:
+          type: integer
       required:
         - totalConsultations
         - totalContacts
         - totalSubscribers
         - pendingConsultations
+        - totalQuotations
+        - totalCompanyRecords
+
+    # ── SEO Settings ──────────────────────────────────────────────────────────
+
+    SeoSetting:
+      type: object
+      properties:
+        id:
+          type: integer
+        page:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        keywords:
+          type: ["string", "null"]
+        ogTitle:
+          type: ["string", "null"]
+        ogDescription:
+          type: ["string", "null"]
+        ogImage:
+          type: ["string", "null"]
+        robots:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - page
+        - title
+        - description
+        - robots
+        - updatedAt
+
+    UpsertSeoSettingBody:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        keywords:
+          type: ["string", "null"]
+        ogTitle:
+          type: ["string", "null"]
+        ogDescription:
+          type: ["string", "null"]
+        ogImage:
+          type: ["string", "null"]
+        robots:
+          type: string
+      required:
+        - title
+        - description
+
+    # ── Services Config ───────────────────────────────────────────────────────
+
+    ServiceConfig:
+      type: object
+      properties:
+        id:
+          type: integer
+        categoryId:
+          type: string
+        serviceName:
+          type: string
+        displayName:
+          type: ["string", "null"]
+        description:
+          type: ["string", "null"]
+        basePrice:
+          type: ["integer", "null"]
+        priceDisplay:
+          type: ["string", "null"]
+        duration:
+          type: ["string", "null"]
+        isPopular:
+          type: boolean
+        isActive:
+          type: boolean
+        updatedAt:
+          type: string
+      required:
+        - id
+        - categoryId
+        - serviceName
+        - isPopular
+        - isActive
+        - updatedAt
+
+    CreateServiceConfigBody:
+      type: object
+      properties:
+        categoryId:
+          type: string
+        serviceName:
+          type: string
+        displayName:
+          type: ["string", "null"]
+        description:
+          type: ["string", "null"]
+        basePrice:
+          type: ["integer", "null"]
+        priceDisplay:
+          type: ["string", "null"]
+        duration:
+          type: ["string", "null"]
+        isPopular:
+          type: boolean
+        isActive:
+          type: boolean
+      required:
+        - categoryId
+        - serviceName
+
+    UpdateServiceConfigBody:
+      type: object
+      properties:
+        displayName:
+          type: ["string", "null"]
+        description:
+          type: ["string", "null"]
+        basePrice:
+          type: ["integer", "null"]
+        priceDisplay:
+          type: ["string", "null"]
+        duration:
+          type: ["string", "null"]
+        isPopular:
+          type: boolean
+        isActive:
+          type: boolean
+
+    # ── Quotations ────────────────────────────────────────────────────────────
+
+    QuotationItem:
+      type: object
+      properties:
+        serviceName:
+          type: string
+        description:
+          type: string
+        quantity:
+          type: integer
+        unitPrice:
+          type: integer
+        total:
+          type: integer
+      required:
+        - serviceName
+        - description
+        - quantity
+        - unitPrice
+        - total
+
+    Quotation:
+      type: object
+      properties:
+        id:
+          type: integer
+        quotationNumber:
+          type: string
+        clientName:
+          type: string
+        clientEmail:
+          type: string
+        clientPhone:
+          type: ["string", "null"]
+        clientCompany:
+          type: ["string", "null"]
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuotationItem"
+        subtotal:
+          type: integer
+        taxPercent:
+          type: integer
+        taxAmount:
+          type: integer
+        total:
+          type: integer
+        notes:
+          type: ["string", "null"]
+        validityDays:
+          type: integer
+        status:
+          type: string
+        sentAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - quotationNumber
+        - clientName
+        - clientEmail
+        - items
+        - subtotal
+        - taxPercent
+        - taxAmount
+        - total
+        - validityDays
+        - status
+        - createdAt
+        - updatedAt
+
+    CreateQuotationBody:
+      type: object
+      properties:
+        clientName:
+          type: string
+        clientEmail:
+          type: string
+        clientPhone:
+          type: ["string", "null"]
+        clientCompany:
+          type: ["string", "null"]
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuotationItem"
+        taxPercent:
+          type: integer
+        notes:
+          type: ["string", "null"]
+        validityDays:
+          type: integer
+      required:
+        - clientName
+        - clientEmail
+        - items
+        - validityDays
+
+    UpdateQuotationBody:
+      type: object
+      properties:
+        clientName:
+          type: string
+        clientEmail:
+          type: string
+        clientPhone:
+          type: ["string", "null"]
+        clientCompany:
+          type: ["string", "null"]
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuotationItem"
+        taxPercent:
+          type: integer
+        notes:
+          type: ["string", "null"]
+        validityDays:
+          type: integer
+        status:
+          type: string
+
+    # ── Company Data ──────────────────────────────────────────────────────────
+
+    CompanyRecord:
+      type: object
+      properties:
+        id:
+          type: integer
+        companyName:
+          type: string
+        cin:
+          type: ["string", "null"]
+        category:
+          type: ["string", "null"]
+        state:
+          type: ["string", "null"]
+        dateOfIncorporation:
+          type: ["string", "null"]
+        authorizedCapital:
+          type: ["string", "null"]
+        paidUpCapital:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        registeredAddress:
+          type: ["string", "null"]
+        companyStatus:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - companyName
+        - createdAt
+
+    CompanyDataList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/CompanyRecord"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+      required:
+        - data
+        - total
+        - page
+        - limit
+
+    CreateCompanyRecordBody:
+      type: object
+      properties:
+        companyName:
+          type: string
+        cin:
+          type: ["string", "null"]
+        category:
+          type: ["string", "null"]
+        state:
+          type: ["string", "null"]
+        dateOfIncorporation:
+          type: ["string", "null"]
+        authorizedCapital:
+          type: ["string", "null"]
+        paidUpCapital:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        registeredAddress:
+          type: ["string", "null"]
+        companyStatus:
+          type: ["string", "null"]
+      required:
+        - companyName
+
+    BulkImportBody:
+      type: object
+      properties:
+        records:
+          type: array
+          items:
+            $ref: "#/components/schemas/CreateCompanyRecordBody"
+      required:
+        - records
+
+    BulkImportResult:
+      type: object
+      properties:
+        imported:
+          type: integer
+        skipped:
+          type: integer
+        errors:
+          type: integer
+      required:
+        - imported
+        - skipped
+        - errors
+
+    # ── Lawyer Profiles ───────────────────────────────────────────────────────
+
+    LawyerProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        specialization:
+          type: string
+        experienceYears:
+          type: integer
+        bio:
+          type: ["string", "null"]
+        photoUrl:
+          type: ["string", "null"]
+        languages:
+          type: ["string", "null"]
+        barCouncilNo:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
+        updatedAt:
+          type: string
+      required:
+        - id
+        - name
+        - specialization
+        - experienceYears
+        - isActive
+        - updatedAt
+
+    CreateLawyerProfileBody:
+      type: object
+      properties:
+        name:
+          type: string
+        specialization:
+          type: string
+        experienceYears:
+          type: integer
+        bio:
+          type: ["string", "null"]
+        photoUrl:
+          type: ["string", "null"]
+        languages:
+          type: ["string", "null"]
+        barCouncilNo:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
+      required:
+        - name
+        - specialization
+        - experienceYears
+
+    UpdateLawyerProfileBody:
+      type: object
+      properties:
+        name:
+          type: string
+        specialization:
+          type: string
+        experienceYears:
+          type: integer
+        bio:
+          type: ["string", "null"]
+        photoUrl:
+          type: ["string", "null"]
+        languages:
+          type: ["string", "null"]
+        barCouncilNo:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
+
+    # ── Site Settings ─────────────────────────────────────────────────────────
+
+    SiteSetting:
+      type: object
+      properties:
+        key:
+          type: string
+        value:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - key
+        - value
+        - updatedAt
+
+    UpdateSettingsBody:
+      type: object
+      properties:
+        settings:
+          type: array
+          items:
+            type: object
+            properties:
+              key:
+                type: string
+              value:
+                type: string
+            required:
+              - key
+              - value
+      required:
+        - settings

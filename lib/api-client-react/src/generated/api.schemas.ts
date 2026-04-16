@@ -58,6 +58,10 @@ export interface CreateContactBody {
   message: string;
 }
 
+export interface UpdateContactBody {
+  status?: string;
+}
+
 export interface Contact {
   id: number;
   name: string;
@@ -90,9 +94,291 @@ export interface SiteStats {
   totalContacts: number;
   totalSubscribers: number;
   pendingConsultations: number;
+  totalQuotations: number;
+  totalCompanyRecords: number;
+}
+
+export interface SeoSetting {
+  id: number;
+  page: string;
+  title: string;
+  description: string;
+  /** @nullable */
+  keywords?: string | null;
+  /** @nullable */
+  ogTitle?: string | null;
+  /** @nullable */
+  ogDescription?: string | null;
+  /** @nullable */
+  ogImage?: string | null;
+  robots: string;
+  updatedAt: string;
+}
+
+export interface UpsertSeoSettingBody {
+  title: string;
+  description: string;
+  /** @nullable */
+  keywords?: string | null;
+  /** @nullable */
+  ogTitle?: string | null;
+  /** @nullable */
+  ogDescription?: string | null;
+  /** @nullable */
+  ogImage?: string | null;
+  robots?: string;
+}
+
+export interface ServiceConfig {
+  id: number;
+  categoryId: string;
+  serviceName: string;
+  /** @nullable */
+  displayName?: string | null;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  basePrice?: number | null;
+  /** @nullable */
+  priceDisplay?: string | null;
+  /** @nullable */
+  duration?: string | null;
+  isPopular: boolean;
+  isActive: boolean;
+  updatedAt: string;
+}
+
+export interface CreateServiceConfigBody {
+  categoryId: string;
+  serviceName: string;
+  /** @nullable */
+  displayName?: string | null;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  basePrice?: number | null;
+  /** @nullable */
+  priceDisplay?: string | null;
+  /** @nullable */
+  duration?: string | null;
+  isPopular?: boolean;
+  isActive?: boolean;
+}
+
+export interface UpdateServiceConfigBody {
+  /** @nullable */
+  displayName?: string | null;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  basePrice?: number | null;
+  /** @nullable */
+  priceDisplay?: string | null;
+  /** @nullable */
+  duration?: string | null;
+  isPopular?: boolean;
+  isActive?: boolean;
+}
+
+export interface QuotationItem {
+  serviceName: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+}
+
+export interface Quotation {
+  id: number;
+  quotationNumber: string;
+  clientName: string;
+  clientEmail: string;
+  /** @nullable */
+  clientPhone?: string | null;
+  /** @nullable */
+  clientCompany?: string | null;
+  items: QuotationItem[];
+  subtotal: number;
+  taxPercent: number;
+  taxAmount: number;
+  total: number;
+  /** @nullable */
+  notes?: string | null;
+  validityDays: number;
+  status: string;
+  /** @nullable */
+  sentAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateQuotationBody {
+  clientName: string;
+  clientEmail: string;
+  /** @nullable */
+  clientPhone?: string | null;
+  /** @nullable */
+  clientCompany?: string | null;
+  items: QuotationItem[];
+  taxPercent?: number;
+  /** @nullable */
+  notes?: string | null;
+  validityDays: number;
+}
+
+export interface UpdateQuotationBody {
+  clientName?: string;
+  clientEmail?: string;
+  /** @nullable */
+  clientPhone?: string | null;
+  /** @nullable */
+  clientCompany?: string | null;
+  items?: QuotationItem[];
+  taxPercent?: number;
+  /** @nullable */
+  notes?: string | null;
+  validityDays?: number;
+  status?: string;
+}
+
+export interface CompanyRecord {
+  id: number;
+  companyName: string;
+  /** @nullable */
+  cin?: string | null;
+  /** @nullable */
+  category?: string | null;
+  /** @nullable */
+  state?: string | null;
+  /** @nullable */
+  dateOfIncorporation?: string | null;
+  /** @nullable */
+  authorizedCapital?: string | null;
+  /** @nullable */
+  paidUpCapital?: string | null;
+  /** @nullable */
+  email?: string | null;
+  /** @nullable */
+  registeredAddress?: string | null;
+  /** @nullable */
+  companyStatus?: string | null;
+  createdAt: string;
+}
+
+export interface CompanyDataList {
+  data: CompanyRecord[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface CreateCompanyRecordBody {
+  companyName: string;
+  /** @nullable */
+  cin?: string | null;
+  /** @nullable */
+  category?: string | null;
+  /** @nullable */
+  state?: string | null;
+  /** @nullable */
+  dateOfIncorporation?: string | null;
+  /** @nullable */
+  authorizedCapital?: string | null;
+  /** @nullable */
+  paidUpCapital?: string | null;
+  /** @nullable */
+  email?: string | null;
+  /** @nullable */
+  registeredAddress?: string | null;
+  /** @nullable */
+  companyStatus?: string | null;
+}
+
+export interface BulkImportBody {
+  records: CreateCompanyRecordBody[];
+}
+
+export interface BulkImportResult {
+  imported: number;
+  skipped: number;
+  errors: number;
+}
+
+export interface LawyerProfile {
+  id: number;
+  name: string;
+  specialization: string;
+  experienceYears: number;
+  /** @nullable */
+  bio?: string | null;
+  /** @nullable */
+  photoUrl?: string | null;
+  /** @nullable */
+  languages?: string | null;
+  /** @nullable */
+  barCouncilNo?: string | null;
+  isActive: boolean;
+  updatedAt: string;
+}
+
+export interface CreateLawyerProfileBody {
+  name: string;
+  specialization: string;
+  experienceYears: number;
+  /** @nullable */
+  bio?: string | null;
+  /** @nullable */
+  photoUrl?: string | null;
+  /** @nullable */
+  languages?: string | null;
+  /** @nullable */
+  barCouncilNo?: string | null;
+  isActive?: boolean;
+}
+
+export interface UpdateLawyerProfileBody {
+  name?: string;
+  specialization?: string;
+  experienceYears?: number;
+  /** @nullable */
+  bio?: string | null;
+  /** @nullable */
+  photoUrl?: string | null;
+  /** @nullable */
+  languages?: string | null;
+  /** @nullable */
+  barCouncilNo?: string | null;
+  isActive?: boolean;
+}
+
+export interface SiteSetting {
+  key: string;
+  value: string;
+  updatedAt: string;
+}
+
+export type UpdateSettingsBodySettingsItem = {
+  key: string;
+  value: string;
+};
+
+export interface UpdateSettingsBody {
+  settings: UpdateSettingsBodySettingsItem[];
 }
 
 export type ListConsultationsParams = {
+  status?: string;
+  page?: number;
+  limit?: number;
+};
+
+export type ListServicesConfigParams = {
+  categoryId?: string;
+};
+
+export type ListCompanyDataParams = {
+  search?: string;
+  state?: string;
   status?: string;
   page?: number;
   limit?: number;

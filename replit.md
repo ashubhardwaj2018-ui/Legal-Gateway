@@ -35,11 +35,30 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
 - **Color palette**: Navy (#0f2044) and Gold (#c9a227)
 - **Services covered**: Trademark & IP, Documentation, Fundraising, NGO, Property & Personal, Lawyers & Experts
 - **Key files**:
-  - `src/App.tsx` — Router setup with wouter
+  - `src/App.tsx` — Router setup with wouter (public routes + admin routes)
   - `src/pages/home.tsx` — Full homepage with all sections
   - `src/pages/service-category.tsx` — Dynamic service category pages
   - `src/data/services.ts` — All service data (categories, services, descriptions, prices)
-  - `src/components/navbar.tsx` — Navigation with dropdown menus
-  - `src/components/footer.tsx` — Footer with all service links
+  - `src/components/layout/Navbar.tsx` — Navigation with dropdown menus
+  - `src/components/layout/Footer.tsx` — Footer with all service links
   - `src/index.css` — Theme variables (navy/gold palette)
 - **Features**: Scroll animations (framer-motion), service cards, lawyer profiles, testimonials, FAQ accordion, consultation CTAs
+- **Admin panel**: Comprehensive admin at `/admin` with 10 sections:
+  - Dashboard (stats + recent activity)
+  - Leads management (consultation requests, status update, CSV export)
+  - Contacts management (contact messages, mark read)
+  - Quotation builder (create with line items, GST, send to client)
+  - SEO Manager (meta title/desc/keywords/OG tags per page, preview mode)
+  - Services & Pricing editor (per-service config with pricing)
+  - Company Data (CSV bulk import, search, pagination)
+  - Newsletter subscribers (list, export, copy emails)
+  - Lawyer Profiles (add/edit/delete with full profile)
+  - Site Settings (firm identity, contact info, hours, social links)
+
+### API Server (`artifacts/api-server`)
+- **Type**: Express API
+- **Routes**: `/api/*`
+- **DB tables**: consultations, contacts, newsletter, seo_settings, services_config, quotations, company_data, lawyer_profiles, site_settings
+- **OpenAPI spec**: `lib/api-spec/openapi.yaml`
+- **Generated client**: `lib/api-client-react/` (React Query hooks via Orval)
+- **Generated Zod schemas**: `lib/api-zod/`

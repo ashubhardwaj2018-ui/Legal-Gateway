@@ -1,0 +1,27 @@
+import { pgTable, text, serial, integer, jsonb, timestamp } from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod/v4";
+
+export const quotationsTable = pgTable("quotations", {
+  id: serial("id").primaryKey(),
+  quotationNumber: text("quotation_number").notNull().unique(),
+  clientName: text("client_name").notNull(),
+  clientEmail: text("client_email").notNull(),
+  clientPhone: text("client_phone"),
+  clientCompany: text("client_company"),
+  items: jsonb("items").notNull().default([]),
+  subtotal: integer("subtotal").notNull().default(0),
+  taxPercent: integer("tax_percent").notNull().default(18),
+  taxAmount: integer("tax_amount").notNull().default(0),
+  total: integer("total").notNull().default(0),
+  notes: text("notes"),
+  validityDays: integer("validity_days").notNull().default(30),
+  status: text("status").notNull().default("draft"),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+});
+
+export const insertQuotationSchema = createInsertSchema(quotationsTable).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertQuotation = z.infer<typeof insertQuotationSchema>;
+export type Quotation = typeof quotationsTable.$inferSelect;
