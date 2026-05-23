@@ -1,18 +1,9 @@
 import { useRoute } from "wouter";
 import { motion } from "framer-motion";
-import { Shield, FileText, Landmark, Building, Heart, Users, ArrowRight, CheckCircle2, IndianRupee } from "lucide-react";
+import { ArrowRight, CheckCircle2, IndianRupee } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SERVICES_DATA, CATEGORIES } from "@/data/services";
 import NotFound from "./not-found";
-
-const categoryIcons: Record<string, React.ElementType> = {
-  "trademark-ip": Shield,
-  "documentation": FileText,
-  "fundraising": Landmark,
-  "ngo": Building,
-  "property-personal": Heart,
-  "lawyers": Users
-};
 
 export default function ServiceCategory() {
   const [match, params] = useRoute("/services/:id");
@@ -23,7 +14,6 @@ export default function ServiceCategory() {
   }
 
   const category = SERVICES_DATA[categoryId as keyof typeof SERVICES_DATA];
-  const Icon = categoryIcons[categoryId] || Shield;
 
   return (
     <div className="w-full pb-24">
@@ -37,8 +27,8 @@ export default function ServiceCategory() {
               animate={{ opacity: 1, y: 0 }}
               className="flex items-center gap-4 mb-6"
             >
-              <div className="w-16 h-16 rounded-2xl bg-secondary/20 flex items-center justify-center text-secondary border border-secondary/30 backdrop-blur-sm">
-                <Icon size={32} />
+              <div className="w-16 h-16 rounded-2xl bg-secondary/20 flex items-center justify-center border border-secondary/30 backdrop-blur-sm text-3xl">
+                {category.icon}
               </div>
               <h1 className="text-4xl md:text-5xl font-serif font-bold text-white">
                 {category.title}

@@ -34,21 +34,20 @@ export function Footer() {
             </div>
           </div>
 
-          {/* Quick Links */}
-          <div>
+          {/* Practice Areas — split two mini-columns */}
+          <div className="md:col-span-2 lg:col-span-1">
             <h3 className="font-serif font-semibold text-lg text-white mb-6">Practice Areas</h3>
-            <ul className="flex flex-col gap-3">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
               {CATEGORIES.map(category => (
-                <li key={category.id}>
-                  <Link 
-                    href={`/services/${category.id}`}
-                    className="text-primary-foreground/70 hover:text-secondary hover:translate-x-1 inline-flex transition-all text-sm"
-                  >
-                    {category.title}
-                  </Link>
-                </li>
+                <Link
+                  key={category.id}
+                  href={`/services/${category.id}`}
+                  className="text-primary-foreground/70 hover:text-secondary hover:translate-x-0.5 inline-flex transition-all text-sm truncate"
+                >
+                  {category.title}
+                </Link>
               ))}
-            </ul>
+            </div>
           </div>
 
           {/* Resources */}
