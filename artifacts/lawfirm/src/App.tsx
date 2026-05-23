@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Layout } from "@/components/layout/Layout";
 import Home from "@/pages/home";
 import ServiceCategory from "@/pages/service-category";
+import ServiceDetail from "@/pages/service-detail";
 import NotFound from "@/pages/not-found";
 import AdminDashboard from "@/pages/admin/dashboard";
 import AdminLeads from "@/pages/admin/leads";
@@ -43,6 +44,7 @@ function Router() {
         <Layout>
           <Switch>
             <Route path="/" component={Home} />
+            <Route path="/services/:catId/:slug" component={ServiceDetail} />
             <Route path="/services/:id" component={ServiceCategory} />
             <Route component={NotFound} />
           </Switch>

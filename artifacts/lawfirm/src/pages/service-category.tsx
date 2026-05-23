@@ -1,8 +1,9 @@
 import { useRoute } from "wouter";
 import { motion } from "framer-motion";
-import { ArrowRight, CheckCircle2, IndianRupee } from "lucide-react";
+import { ArrowRight, CheckCircle2, IndianRupee, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SERVICES_DATA, CATEGORIES } from "@/data/services";
+import { toSlug } from "@/lib/slug";
 import NotFound from "./not-found";
 
 export default function ServiceCategory() {
@@ -65,21 +66,24 @@ export default function ServiceCategory() {
                     transition={{ delay: i * 0.05 }}
                     className="flex flex-col p-6 rounded-xl border border-border bg-gray-50 hover:bg-white hover:shadow-lg hover:border-secondary/50 transition-all group"
                   >
-                    <div className="flex justify-between items-start mb-4">
-                      <h3 className="text-lg font-bold text-primary pr-4 group-hover:text-secondary transition-colors">
+                    <div className="flex justify-between items-start mb-3">
+                      <h3 className="text-base font-bold text-primary pr-4 group-hover:text-secondary transition-colors leading-snug">
                         {service.name}
                       </h3>
-                      <div className="shrink-0 bg-primary/5 px-2.5 py-1 rounded-md text-primary font-semibold text-sm flex items-center gap-1">
-                        {service.price !== "Custom" && service.price !== "Consultation" && !service.price.startsWith("$") && <IndianRupee size={12} className="opacity-70" />}
-                        {service.price.replace("₹", "")}
+                      <div className="shrink-0 bg-secondary/10 px-2.5 py-1 rounded-md text-secondary font-bold text-sm">
+                        {service.price}
                       </div>
                     </div>
-                    <p className="text-muted-foreground text-sm flex-1 mb-6">
+                    <p className="text-muted-foreground text-sm flex-1 mb-5 leading-relaxed">
                       {service.description}
                     </p>
-                    <Button className="w-full bg-white border border-input text-foreground hover:bg-primary hover:text-white group-hover:border-primary transition-all">
-                      Consult Now <ArrowRight size={16} className="ml-2" />
-                    </Button>
+                    <div className="flex gap-2">
+                      <Link href={`/services/${categoryId}/${toSlug(service.name)}`} className="flex-1">
+                        <Button className="w-full bg-primary text-white hover:bg-secondary hover:text-primary transition-all text-sm h-9">
+                          View Details <ArrowRight size={14} className="ml-1.5" />
+                        </Button>
+                      </Link>
+                    </div>
                   </motion.div>
                 ))}
               </div>
