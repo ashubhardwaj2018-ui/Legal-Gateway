@@ -1,0 +1,583 @@
+ou are a Senior Full Stack Developer, Senior Database Architect, Senior SEO Engineer, and UI/UX Engineer.
+
+Your task is to modify my existing website, not rebuild it.
+
+Before making any changes, analyze the entire project structure, understand the existing database, routing, admin panel, frontend, backend, and coding standards.
+
+Do NOT remove or break any existing functionality.
+
+Everything must remain fully functional.
+
+PROJECT GOAL
+
+I provide multiple professional services such as:
+
+GST Registration
+Company Registration
+Income Tax Return Filing
+Trademark Registration
+GST Notice Reply
+GST Audit
+Accounting
+ROC Compliance
+LLP Registration
+Private Limited Company Registration
+FSSAI Registration
+MSME Registration
+
+I want to convert my website into a Programmatic SEO Website capable of generating millions of location pages dynamically without creating physical HTML pages.
+
+Everything should be generated from the database.
+
+IMPORTANT
+
+DO NOT create static pages.
+
+DO NOT create duplicate code.
+
+DO NOT rebuild the project.
+
+Modify the existing website only.
+
+DATABASE
+
+Create a new MySQL table called
+
+locations
+
+Columns:
+
+id
+country
+state
+district
+city
+town
+village
+pincode
+latitude
+longitude
+slug
+parent_location
+population
+is_active
+created_at
+updated_at
+
+Create indexes on
+
+slug
+state
+district
+city
+
+for maximum performance.
+
+Create another table
+
+service_locations
+
+Columns
+
+id
+service_id
+location_id
+created_at
+
+This table will link every service with every location.
+
+ADMIN PANEL
+
+Create a new Admin Menu
+
+Locations
+
+Inside it create
+
+Dashboard
+
+Display
+
+Total States
+
+Total Districts
+
+Total Cities
+
+Total Towns
+
+Total Villages
+
+Total Records
+
+Latest Upload
+
+Upload Excel
+
+Supported formats
+
+xlsx
+
+xls
+
+csv
+
+Upload should
+
+✔ Read Excel
+
+✔ Validate columns
+
+✔ Ignore duplicate locations
+
+✔ Update existing locations
+
+✔ Insert new locations
+
+✔ Automatically generate slug
+
+✔ Show upload progress
+
+✔ Show upload summary
+
+Example
+
+Rows
+
+50000
+
+Inserted
+
+48000
+
+Updated
+
+1800
+
+Duplicates
+
+200
+
+Errors
+
+0
+
+Required Excel Columns
+
+Country
+
+State
+
+District
+
+City
+
+Town
+
+Village
+
+Pincode
+
+Latitude
+
+Longitude
+
+LOCATION MANAGEMENT
+
+Create pages
+
+View
+
+Edit
+
+Delete
+
+Bulk Delete
+
+Enable
+
+Disable
+
+Export Excel
+
+Search
+
+Filter by State
+
+Filter by District
+
+Filter by City
+
+DYNAMIC ROUTING
+
+Generate dynamic URLs
+
+/service-slug/location-slug
+
+Examples
+
+/gst-registration/gurugram
+
+/company-registration/delhi
+
+/trademark-registration/noida
+
+/gst-return-filing/mumbai
+
+No physical page should exist.
+
+Everything must come from MySQL.
+
+SERVICE PAGE
+
+Whenever a dynamic page opens
+
+Load
+
+Service
+
+Location
+
+Then automatically replace variables
+
+{{service}}
+
+{{city}}
+
+{{district}}
+
+{{state}}
+
+{{town}}
+
+{{village}}
+
+Example
+
+GST Registration in Gurugram
+
+Our Chartered Accountants provide GST Registration services throughout Gurugram, Haryana.
+
+AI CONTENT TEMPLATING
+
+Do NOT simply replace city names.
+
+Create dynamic content blocks that vary naturally.
+
+Include
+
+Introduction
+
+Benefits
+
+Why Choose Us
+
+Process
+
+Documents Required
+
+Eligibility
+
+Pricing
+
+Frequently Asked Questions
+
+Call To Action
+
+Location Information
+
+Nearby Areas
+
+Every page should feel unique.
+
+SEO
+
+Generate automatically
+
+Title
+
+GST Registration in Gurugram | Expert Chartered Accountant
+
+Meta Description
+
+Professional GST Registration Services in Gurugram, Haryana.
+
+Fast filing.
+
+Affordable fees.
+
+Expert CA support.
+
+Keywords
+
+Generate dynamically.
+
+H1
+
+GST Registration in Gurugram
+
+CANONICAL URL
+
+Automatically generate canonical tags.
+
+OPEN GRAPH
+
+Generate dynamic
+
+og:title
+
+og:description
+
+og:url
+
+og:image
+
+twitter cards
+
+SCHEMA
+
+Automatically generate
+
+Service Schema
+
+Breadcrumb Schema
+
+FAQ Schema
+
+Organization Schema
+
+WebPage Schema
+
+JSON-LD format.
+
+BREADCRUMB
+
+Home
+
+GST Registration
+
+Haryana
+
+Gurugram
+
+INTERNAL LINKING
+
+At bottom of every page automatically display
+
+Nearby Cities
+
+Related Districts
+
+Popular Cities in Same State
+
+Related Services in Same City
+
+Examples
+
+Company Registration in Gurugram
+
+Trademark Registration in Gurugram
+
+Income Tax Return Filing in Gurugram
+
+GST Audit in Gurugram
+
+MSME Registration in Gurugram
+
+LOCATION PAGES
+
+Every location page should also display
+
+Available Services
+
+Example
+
+If user opens
+
+/gurugram
+
+Show
+
+GST Registration
+
+Trademark Registration
+
+Company Registration
+
+Income Tax Return
+
+Accounting
+
+ROC Filing
+
+with links.
+
+XML SITEMAP
+
+Automatically generate
+
+/sitemap.xml
+
+Create
+
+Service Sitemap
+
+Location Sitemap
+
+Service + Location Sitemap
+
+Automatically regenerate after upload.
+
+SEARCH
+
+Create AJAX search
+
+When user types
+
+gur
+
+Suggestions
+
+Gurugram
+
+Gurdaspur
+
+Guraru
+
+Clicking opens
+
+/gst-registration/gurugram
+
+PERFORMANCE
+
+Cache pages
+
+Lazy load
+
+Database indexes
+
+Optimize queries
+
+Avoid duplicate queries
+
+Minimize server load
+
+SECURITY
+
+Validate uploads
+
+CSRF Protection
+
+Prepared Statements
+
+SQL Injection Protection
+
+File Type Validation
+
+Maximum Upload Size
+
+Role-based Admin Access
+
+LOGGING
+
+Maintain upload history
+
+Store
+
+File Name
+
+Date
+
+Rows
+
+Inserted
+
+Updated
+
+Duplicates
+
+Errors
+
+Admin User
+
+ADMIN SHORTCUT
+
+I want one button
+
+"Upload Excel"
+
+After uploading
+
+Everything should happen automatically
+
+No coding required.
+
+Excel → MySQL → URLs → Internal Links → Sitemap → Search Index
+
+Everything should update automatically.
+
+URL STRUCTURE
+
+/service/location
+
+NOT
+
+/service?id=10
+
+NOT
+
+/location?id=20
+
+Only SEO friendly URLs.
+
+FUTURE SCALABILITY
+
+The system must support
+
+200+ Services
+
+35 States
+
+800+ Districts
+
+8,000+ Cities
+
+7,000+ Towns
+
+650,000+ Villages
+
+More than 100 million dynamic URL combinations without creating physical pages.
+
+IMPORTANT SEO REQUIREMENT
+
+Do NOT generate millions of pages in advance.
+
+Generate pages dynamically when requested.
+
+Cache frequently visited pages.
+
+Only include high-priority pages in the sitemap.
+
+Prevent thin content.
+
+Avoid duplicate content.
+
+Follow Google's Programmatic SEO Best Practices.
+
+FINAL REQUIREMENTS
+
+After implementing everything:
+
+Test every feature.
+Fix all errors.
+Optimize database.
+Optimize performance.
+Preserve existing website design.
+Preserve all existing functionality.
+Add documentation explaining how I can upload new Excel files and manage locations.
+
+Do not stop after generating code. Continue until the feature is fully implemented, tested, and integrated into my existing project.
+
+One additional suggestion
+
+If your website uses Laravel, Next.js, React, Node.js, or PHP, tell Replit to first detect the existing framework and implement the solution using that framework's conventions instead of introducing a different architecture. This will produce cleaner, more maintainable code and reduce the risk of breaking your existing site.

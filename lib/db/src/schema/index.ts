@@ -7,3 +7,4 @@ export * from "./quotations";
 export * from "./company-data";
 export * from "./lawyer-profiles";
 export * from "./site-settings";
+export * from "./locations";
