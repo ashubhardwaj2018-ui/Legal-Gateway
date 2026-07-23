@@ -1,0 +1,554 @@
+I want you to modify the existing website instead of creating a new one.
+Create a complete ERP + CRM + Lead Management + Finance + Indian Companies Database system inside my existing website.
+Everything must use my existing database wherever possible and create new MySQL tables only where required.
+The code should be clean, modular, secure and responsive.
+Use AJAX wherever possible without page reload.
+Do not break any existing functionality. I also want to add whatpp api on link and logo on home page, contact us page so client can connect through whatsapp. Add this feature 
+________________________________________
+PART 1
+Indian Companies Database
+Create a new menu.
+Navbar
+Indian Companies
+Footer
+Indian Companies
+Clicking it opens
+/indian-companies
+The page should include
+Search by
+•	Company Name 
+•	CIN 
+•	State 
+•	District 
+•	City 
+•	Industry 
+•	ROC 
+•	Status 
+•	Company Type 
+Filters
+•	Active 
+•	Strike Off 
+•	LLP 
+•	Private Limited 
+•	Public Limited 
+•	OPC 
+•	Government Company 
+•	Foreign Company 
+Each company page should have SEO URL
+Example
+/company/reliance-industries-limited
+Each page should contain
+Company Name
+CIN
+Incorporation Date
+Company Status
+Company Type
+Authorized Capital
+Paid-up Capital
+Registered Office
+State
+District
+City
+Pincode
+Industry
+ROC
+Related Companies
+Schema Markup
+SEO Meta
+Breadcrumb
+Internal Linking
+________________________________________
+Excel Upload
+Create Excel upload feature.
+Supported
+xlsx
+xls
+csv
+Admin uploads Excel.
+System automatically imports data.
+Duplicate checking based on
+CIN
+If company exists
+Update.
+Else
+Insert.
+Display
+Imported
+Updated
+Skipped
+Errors
+with downloadable report.
+________________________________________
+Bulk Upload Queue
+For large files
+Use queue.
+Show progress bar.
+Allow
+Pause
+Resume
+Cancel
+________________________________________
+Export
+Allow export
+CSV
+Excel
+Filtered Export
+________________________________________
+PART 2
+Admin CRM
+Create modern admin panel.
+Left Sidebar
+Dashboard
+Leads
+Customers
+Companies Database
+Services
+Invoices
+Payments
+Tasks
+Projects
+Blogs
+SEO
+Team
+HR
+Documents
+Email
+WhatsApp
+Chat
+Reports
+Settings-  includeing website name , logo, contact, office address .
+Users
+Permissions
+Audit Logs
+Logout
+________________________________________
+Dashboard
+Dashboard should show
+Today's Leads
+New Leads
+Pending Leads
+Won Leads
+Lost Leads
+Revenue
+Monthly Revenue
+Outstanding Payments
+Invoices
+Pending Documents
+Tasks
+Team Activity
+Recent Chat
+Upcoming Follow Ups
+Charts
+Pie Charts
+Sales Graph
+Revenue Graph
+Lead Sources
+Conversion Ratio
+________________________________________
+Lead Management
+Create Lead
+Edit Lead
+Delete Lead
+Bulk Import Leads
+Bulk Export Leads
+Assign Lead
+Transfer Lead
+Duplicate Detection
+Lead Timeline
+Lead Notes
+Lead Attachments
+Lead Tags
+Lead Priority
+Lead Source
+Lead Status
+Lead Rating
+Expected Revenue
+Probability
+Expected Closing Date
+Reminder
+Follow Up
+Auto Reminder
+Custom Fields
+________________________________________
+Lead Status
+New
+Interested
+Contacted
+Meeting Scheduled
+Proposal Sent
+Negotiation
+Follow Up
+Won
+Lost
+Hold
+Documents Pending
+Payment Pending
+Completed
+________________________________________
+Each lead should contain
+Name
+Company
+GST
+Email
+Mobile
+Alternate Mobile
+WhatsApp
+Address
+City
+State
+Country
+Website
+Service Required
+Amount
+Assigned Employee
+Created By
+Remarks
+Documents
+Invoices
+Payments
+Communication History
+Chat
+Email History
+WhatsApp History
+________________________________________
+Team Management
+Create Team Member
+Department
+Designation
+Salary
+Role
+Permissions
+Attendance
+Leave
+Tasks
+Targets
+Performance
+Login
+Password
+________________________________________
+Permissions
+View Only
+Create
+Edit
+Delete
+Approve
+Admin
+Super Admin
+________________________________________
+Task Management
+Assign Tasks
+Deadline
+Priority
+Attachments
+Comments
+Status
+Notifications
+Recurring Tasks
+Calendar View
+Kanban View
+________________________________________
+Internal Team Chat
+Create Slack-like chat.
+Features
+Private Chat
+Group Chat
+Departments
+File Sharing
+Image Sharing
+Video
+PDF
+Excel
+Typing Indicator
+Read Receipts
+Online Status
+Voice Notes
+Emoji
+Search
+Pinned Messages
+Notification
+Desktop Notification
+________________________________________
+Document Management
+Store documents for leads.
+Folders
+Upload
+Download
+Preview
+Version History
+Search
+OCR Ready
+________________________________________
+Services
+Create
+Edit
+Delete
+Categories
+Price
+GST
+Description
+FAQs
+SEO
+Featured
+Popular
+Hidden
+________________________________________
+Service Pricing
+Multiple pricing
+Basic
+Standard
+Premium
+Enterprise
+Custom Quote
+Discount
+Coupon
+GST
+Recurring
+________________________________________
+Blog Management
+Create blogs manually.
+Also integrate ChatGPT API.
+Generate
+SEO Title
+Meta
+Slug
+FAQ
+Schema
+Internal Links
+Image Prompt
+Social Caption
+Keywords
+Content
+Also allow writing manually.
+AI should rewrite blogs.
+Grammar correction.
+Plagiarism check integration.
+________________________________________
+Invoice Module
+Generate Invoice
+Quotation
+Proforma
+Purchase Order
+Receipt
+Credit Note
+Debit Note
+GST Invoice
+Recurring Invoice
+________________________________________
+Invoice Features
+PDF
+Print
+Email
+WhatsApp
+Payment Link
+QR Code
+GST Calculation
+Discount
+Partial Payment
+Payment History
+Outstanding
+Reminder
+Late Fees
+________________________________________
+WhatsApp Integration
+Send
+Quotation
+Invoice
+Reminder
+Payment Reminder
+Documents
+Images
+PDF
+Templates
+Broadcast
+Follow Up
+Auto Reminder
+Logs
+________________________________________
+Email Module
+SMTP Settings
+Templates
+Send Quotation
+Invoice
+Reminder
+Welcome Email
+Marketing
+Bulk Email
+Attachments
+Tracking
+Open Tracking
+Click Tracking
+Reply Tracking
+History
+________________________________________
+________________________________________
+Customer Portal
+Customer Login
+Invoices
+Payments
+Documents
+Chat
+Tickets
+Profile
+Download Files
+Track Progress
+________________________________________
+Reports
+Lead Report
+Revenue Report
+Employee Report
+Performance
+Service Report
+Invoice Report
+GST Report
+TDS Report
+Payment Report
+Customer Report
+Source Report
+Conversion Report
+Daily
+Weekly
+Monthly
+Yearly
+Custom
+Export PDF
+Excel
+CSV
+________________________________________
+SEO
+Manage
+Meta
+Schema
+Sitemap
+Robots
+Canonical
+Redirects
+Broken Links
+Internal Linking
+Bulk SEO
+Open Graph
+Twitter Cards
+Breadcrumbs
+Auto Sitemap
+________________________________________
+Website CMS
+Homepage
+About
+Services
+Blogs
+Contact
+Testimonials
+FAQ
+Gallery
+Footer
+Navbar
+Privacy
+Terms
+Career
+All editable from admin.
+________________________________________
+User Roles
+Super Admin
+Admin
+Sales
+Marketing
+SEO
+Accounts
+HR
+Support
+Developer
+Customer
+Custom Roles
+________________________________________
+Notification System
+Email
+WhatsApp
+Browser
+SMS Ready
+In-App Notifications
+Task Alerts
+Lead Alerts
+Invoice Alerts
+Payment Alerts
+________________________________________
+Search
+Global Search
+Leads
+Customers
+Invoices
+Companies
+Services
+Blogs
+Documents
+Employees
+________________________________________
+Security
+CSRF Protection
+SQL Injection Protection
+XSS Protection
+Password Hashing
+Audit Logs
+Activity Logs
+IP Logs
+Login History
+2FA Ready
+Automatic Backup
+Restore
+________________________________________
+API
+Create REST API.
+JWT Authentication.
+API for
+Leads
+Invoices
+Companies
+Services
+Blogs
+Customers
+________________________________________
+Database
+Normalize all tables.
+Create indexes.
+Foreign Keys.
+Pagination.
+Caching.
+Fast search.
+________________________________________
+UI
+Bootstrap 5
+Dark Mode
+Light Mode
+Responsive
+Mobile Friendly
+DataTables
+AJAX
+Charts
+Icons
+Animations
+Modern Dashboard
+________________________________________
+Performance
+Lazy Loading
+Caching
+Compressed Images
+Optimized SQL
+Pagination
+Server-side Processing
+________________________________________
+Final Requirement
+Before making any changes:
+1.	Scan the entire existing project. 
+2.	Understand the current folder structure. 
+3.	Reuse existing code wherever possible. 
+4.	Do not overwrite existing functionality. 
+5.	Create database migration scripts. 
+6.	Automatically create missing MySQL tables. 
+7.	Document every new feature. 
+8.	Add role-based permissions to every page. 
+9.	Ensure the project remains fully responsive. 
+10.	Generate clean, production-ready code with comments and modular architecture. 
+11.	Add installation and upgrade scripts so future updates can be applied without affecting existing data. 
+12.	Ensure all modules are integrated (Leads ↔ Customers ↔ Services ↔ Invoices ↔ Finance ↔ Blogs ↔ Indian Companies ↔ Team Chat ↔ Email ↔ WhatsApp). 
+The final result should be a professional, enterprise-grade CRM/ERP comparable to Zoho CRM, Salesforce, HubSpot, and Odoo, while remaining lightweight, fast, secure, SEO-friendly, and fully integrated into my existing PHP/MySQL website.
+ 
+
+
