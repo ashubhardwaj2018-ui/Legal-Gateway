@@ -1,4 +1,4 @@
-import { useRoute } from "wouter";
+import { useRoute, Link } from "wouter";
 import { motion } from "framer-motion";
 import { ArrowRight, CheckCircle2, IndianRupee, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";

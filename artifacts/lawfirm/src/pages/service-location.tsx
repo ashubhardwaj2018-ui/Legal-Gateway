@@ -302,11 +302,11 @@ export default function ServiceLocation() {
             )}
 
             {/* Documents */}
-            {details?.documents && details.documents.length > 0 && (
+            {details?.documentsRequired && details.documentsRequired.length > 0 && (
               <section>
                 <h2 className="text-2xl font-serif font-bold text-[#0f2044] mb-5">Documents Required</h2>
                 <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {details.documents.map((doc, i) => (
+                  {details.documentsRequired.map((doc, i) => (
                     <li key={i} className="flex items-center gap-2.5 text-sm text-gray-700">
                       <FileText size={15} className="text-[#c9a227] shrink-0" />
                       {doc}
