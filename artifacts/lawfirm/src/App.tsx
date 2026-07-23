@@ -23,6 +23,7 @@ import AdminLocations from "@/pages/admin/locations";
 import AdminBlogs from "@/pages/admin/blogs";
 import AdminTeam from "@/pages/admin/team";
 import AdminIndianCompanies from "@/pages/admin/indian-companies";
+import AdminTasks from "@/pages/admin/tasks";
 import IndianCompanies from "@/pages/indian-companies";
 import CompanyDetail from "@/pages/company-detail";
 import BlogList from "@/pages/blog-list";
@@ -52,6 +53,7 @@ function Router() {
       <Route path="/admin/blogs" component={AdminBlogs} />
       <Route path="/admin/team" component={AdminTeam} />
       <Route path="/admin/indian-companies" component={AdminIndianCompanies} />
+      <Route path="/admin/tasks" component={AdminTasks} />
 
       {/* Public Routes — wrapped in Navbar/Footer layout */}
       <Route>

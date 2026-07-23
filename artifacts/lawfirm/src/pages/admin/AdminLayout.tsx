@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard, Users, MessageSquare, FileText, Search,
   Settings, Building2, Mail, User, Scale, Menu, X, ChevronRight,
-  Briefcase, ExternalLink, MapPin, BookOpen, UserCog,
+  Briefcase, ExternalLink, MapPin, BookOpen, UserCog, CheckSquare,
 } from "lucide-react";
 
 const navItems = [
@@ -11,6 +11,7 @@ const navItems = [
   { href: "/admin/leads", label: "CRM — Leads", icon: Users },
   { href: "/admin/team", label: "Team & HR", icon: UserCog },
   { href: "/admin/indian-companies", label: "Indian Companies DB", icon: Building2 },
+  { href: "/admin/tasks", label: "Task Management", icon: CheckSquare },
   { href: "/admin/contacts", label: "Contacts", icon: MessageSquare },
   { href: "/admin/quotations", label: "Quotations", icon: Briefcase },
   { href: "/admin/blogs", label: "Blog Manager", icon: BookOpen },
