@@ -12,12 +12,14 @@ import indianCompaniesRouter from "./indian-companies";
 import tasksRouter from "./tasks";
 import invoicesRouter from "./invoices";
 import chatRouter from "./chat";
+import dashboardRouter from "./dashboard";
 
 const router: IRouter = Router();
 
 router.use(leadsRouter);
 router.use(invoicesRouter);
 router.use(chatRouter);
+router.use(dashboardRouter);
 router.use(tasksRouter);
 router.use(teamRouter);
 router.use(indianCompaniesRouter);
