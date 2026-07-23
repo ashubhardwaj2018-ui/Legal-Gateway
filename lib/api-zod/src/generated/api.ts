@@ -8,6 +8,279 @@
 import * as zod from "zod";
 
 /**
+ * @summary List published blogs
+ */
+export const listBlogsQueryPageDefault = 1;
+export const listBlogsQueryLimitDefault = 12;
+
+export const ListBlogsQueryParams = zod.object({
+  category: zod.coerce.string().optional(),
+  search: zod.coerce.string().optional(),
+  page: zod.coerce.number().default(listBlogsQueryPageDefault),
+  limit: zod.coerce.number().default(listBlogsQueryLimitDefault),
+});
+
+export const ListBlogsResponse = zod.object({
+  data: zod.array(
+    zod.object({
+      id: zod.number(),
+      title: zod.string(),
+      slug: zod.string(),
+      excerpt: zod.string().nullish(),
+      featuredImage: zod.string().nullish(),
+      category: zod.string(),
+      tags: zod.string().nullish(),
+      authorName: zod.string(),
+      readingTime: zod.number(),
+      viewCount: zod.number(),
+      publishedAt: zod.string().nullish(),
+      createdAt: zod.string(),
+    }),
+  ),
+  total: zod.number(),
+  page: zod.number(),
+  pages: zod.number(),
+});
+
+/**
+ * @summary Get a single blog by slug
+ */
+export const GetBlogBySlugParams = zod.object({
+  slug: zod.coerce.string(),
+});
+
+export const GetBlogBySlugResponse = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  slug: zod.string(),
+  excerpt: zod.string().nullish(),
+  content: zod.string(),
+  featuredImage: zod.string().nullish(),
+  category: zod.string(),
+  tags: zod.string().nullish(),
+  status: zod.string(),
+  authorName: zod.string(),
+  metaTitle: zod.string().nullish(),
+  metaDescription: zod.string().nullish(),
+  metaKeywords: zod.string().nullish(),
+  ogImage: zod.string().nullish(),
+  schemaMarkup: zod.string().nullish(),
+  faqs: zod.string().nullish(),
+  readingTime: zod.number(),
+  viewCount: zod.number(),
+  publishedAt: zod.string().nullish(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+
+/**
+ * @summary List all blogs (admin)
+ */
+export const listAdminBlogsQueryPageDefault = 1;
+export const listAdminBlogsQueryLimitDefault = 20;
+
+export const ListAdminBlogsQueryParams = zod.object({
+  status: zod.coerce.string().optional(),
+  search: zod.coerce.string().optional(),
+  page: zod.coerce.number().default(listAdminBlogsQueryPageDefault),
+  limit: zod.coerce.number().default(listAdminBlogsQueryLimitDefault),
+});
+
+export const ListAdminBlogsResponse = zod.object({
+  data: zod.array(
+    zod.object({
+      id: zod.number(),
+      title: zod.string(),
+      slug: zod.string(),
+      excerpt: zod.string().nullish(),
+      content: zod.string(),
+      featuredImage: zod.string().nullish(),
+      category: zod.string(),
+      tags: zod.string().nullish(),
+      status: zod.string(),
+      authorName: zod.string(),
+      metaTitle: zod.string().nullish(),
+      metaDescription: zod.string().nullish(),
+      metaKeywords: zod.string().nullish(),
+      ogImage: zod.string().nullish(),
+      schemaMarkup: zod.string().nullish(),
+      faqs: zod.string().nullish(),
+      readingTime: zod.number(),
+      viewCount: zod.number(),
+      publishedAt: zod.string().nullish(),
+      createdAt: zod.string(),
+      updatedAt: zod.string(),
+    }),
+  ),
+  total: zod.number(),
+  page: zod.number(),
+  pages: zod.number(),
+});
+
+/**
+ * @summary Create a blog post
+ */
+export const CreateBlogBody = zod.object({
+  title: zod.string(),
+  slug: zod.string(),
+  excerpt: zod.string().nullish(),
+  content: zod.string(),
+  featuredImage: zod.string().nullish(),
+  category: zod.string().optional(),
+  tags: zod.string().nullish(),
+  status: zod.string().optional(),
+  authorName: zod.string().optional(),
+  metaTitle: zod.string().nullish(),
+  metaDescription: zod.string().nullish(),
+  metaKeywords: zod.string().nullish(),
+  ogImage: zod.string().nullish(),
+  faqs: zod.string().nullish(),
+});
+
+/**
+ * @summary Get a single blog by ID (admin)
+ */
+export const GetAdminBlogParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetAdminBlogResponse = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  slug: zod.string(),
+  excerpt: zod.string().nullish(),
+  content: zod.string(),
+  featuredImage: zod.string().nullish(),
+  category: zod.string(),
+  tags: zod.string().nullish(),
+  status: zod.string(),
+  authorName: zod.string(),
+  metaTitle: zod.string().nullish(),
+  metaDescription: zod.string().nullish(),
+  metaKeywords: zod.string().nullish(),
+  ogImage: zod.string().nullish(),
+  schemaMarkup: zod.string().nullish(),
+  faqs: zod.string().nullish(),
+  readingTime: zod.number(),
+  viewCount: zod.number(),
+  publishedAt: zod.string().nullish(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+
+/**
+ * @summary Update a blog post
+ */
+export const UpdateBlogParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateBlogBody = zod.object({
+  title: zod.string().optional(),
+  slug: zod.string().optional(),
+  excerpt: zod.string().nullish(),
+  content: zod.string().optional(),
+  featuredImage: zod.string().nullish(),
+  category: zod.string().optional(),
+  tags: zod.string().nullish(),
+  status: zod.string().optional(),
+  authorName: zod.string().optional(),
+  metaTitle: zod.string().nullish(),
+  metaDescription: zod.string().nullish(),
+  metaKeywords: zod.string().nullish(),
+  ogImage: zod.string().nullish(),
+  faqs: zod.string().nullish(),
+});
+
+export const UpdateBlogResponse = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  slug: zod.string(),
+  excerpt: zod.string().nullish(),
+  content: zod.string(),
+  featuredImage: zod.string().nullish(),
+  category: zod.string(),
+  tags: zod.string().nullish(),
+  status: zod.string(),
+  authorName: zod.string(),
+  metaTitle: zod.string().nullish(),
+  metaDescription: zod.string().nullish(),
+  metaKeywords: zod.string().nullish(),
+  ogImage: zod.string().nullish(),
+  schemaMarkup: zod.string().nullish(),
+  faqs: zod.string().nullish(),
+  readingTime: zod.number(),
+  viewCount: zod.number(),
+  publishedAt: zod.string().nullish(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+
+/**
+ * @summary Delete a blog post
+ */
+export const DeleteBlogParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary Generate blog content with AI
+ */
+export const AiGenerateBlogBody = zod.object({
+  topic: zod.string(),
+  serviceCategory: zod.string().nullish(),
+  targetCity: zod.string().nullish(),
+  tone: zod
+    .enum(["professional", "conversational", "authoritative"])
+    .optional(),
+  wordCount: zod.number().optional(),
+});
+
+export const AiGenerateBlogResponse = zod.object({
+  title: zod.string(),
+  slug: zod.string(),
+  excerpt: zod.string(),
+  content: zod.string(),
+  metaTitle: zod.string(),
+  metaDescription: zod.string(),
+  metaKeywords: zod.string(),
+  faqs: zod.string(),
+  tags: zod.string(),
+  category: zod.string(),
+});
+
+/**
+ * @summary Publish a blog post
+ */
+export const PublishBlogParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const PublishBlogResponse = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  slug: zod.string(),
+  excerpt: zod.string().nullish(),
+  content: zod.string(),
+  featuredImage: zod.string().nullish(),
+  category: zod.string(),
+  tags: zod.string().nullish(),
+  status: zod.string(),
+  authorName: zod.string(),
+  metaTitle: zod.string().nullish(),
+  metaDescription: zod.string().nullish(),
+  metaKeywords: zod.string().nullish(),
+  ogImage: zod.string().nullish(),
+  schemaMarkup: zod.string().nullish(),
+  faqs: zod.string().nullish(),
+  readingTime: zod.number(),
+  viewCount: zod.number(),
+  publishedAt: zod.string().nullish(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+
+/**
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({

@@ -351,6 +351,141 @@ export interface UpdateLawyerProfileBody {
   isActive?: boolean;
 }
 
+export interface BlogSummary {
+  id: number;
+  title: string;
+  slug: string;
+  /** @nullable */
+  excerpt?: string | null;
+  /** @nullable */
+  featuredImage?: string | null;
+  category: string;
+  /** @nullable */
+  tags?: string | null;
+  authorName: string;
+  readingTime: number;
+  viewCount: number;
+  /** @nullable */
+  publishedAt?: string | null;
+  createdAt: string;
+}
+
+export interface Blog {
+  id: number;
+  title: string;
+  slug: string;
+  /** @nullable */
+  excerpt?: string | null;
+  content: string;
+  /** @nullable */
+  featuredImage?: string | null;
+  category: string;
+  /** @nullable */
+  tags?: string | null;
+  status: string;
+  authorName: string;
+  /** @nullable */
+  metaTitle?: string | null;
+  /** @nullable */
+  metaDescription?: string | null;
+  /** @nullable */
+  metaKeywords?: string | null;
+  /** @nullable */
+  ogImage?: string | null;
+  /** @nullable */
+  schemaMarkup?: string | null;
+  /** @nullable */
+  faqs?: string | null;
+  readingTime: number;
+  viewCount: number;
+  /** @nullable */
+  publishedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateBlogBody {
+  title: string;
+  slug: string;
+  /** @nullable */
+  excerpt?: string | null;
+  content: string;
+  /** @nullable */
+  featuredImage?: string | null;
+  category?: string;
+  /** @nullable */
+  tags?: string | null;
+  status?: string;
+  authorName?: string;
+  /** @nullable */
+  metaTitle?: string | null;
+  /** @nullable */
+  metaDescription?: string | null;
+  /** @nullable */
+  metaKeywords?: string | null;
+  /** @nullable */
+  ogImage?: string | null;
+  /** @nullable */
+  faqs?: string | null;
+}
+
+export interface UpdateBlogBody {
+  title?: string;
+  slug?: string;
+  /** @nullable */
+  excerpt?: string | null;
+  content?: string;
+  /** @nullable */
+  featuredImage?: string | null;
+  category?: string;
+  /** @nullable */
+  tags?: string | null;
+  status?: string;
+  authorName?: string;
+  /** @nullable */
+  metaTitle?: string | null;
+  /** @nullable */
+  metaDescription?: string | null;
+  /** @nullable */
+  metaKeywords?: string | null;
+  /** @nullable */
+  ogImage?: string | null;
+  /** @nullable */
+  faqs?: string | null;
+}
+
+export type AiGenerateBlogBodyTone =
+  (typeof AiGenerateBlogBodyTone)[keyof typeof AiGenerateBlogBodyTone];
+
+export const AiGenerateBlogBodyTone = {
+  professional: "professional",
+  conversational: "conversational",
+  authoritative: "authoritative",
+} as const;
+
+export interface AiGenerateBlogBody {
+  topic: string;
+  /** @nullable */
+  serviceCategory?: string | null;
+  /** @nullable */
+  targetCity?: string | null;
+  tone?: AiGenerateBlogBodyTone;
+  wordCount?: number;
+}
+
+export interface AiGeneratedBlog {
+  title: string;
+  slug: string;
+  excerpt: string;
+  content: string;
+  metaTitle: string;
+  metaDescription: string;
+  metaKeywords: string;
+  faqs: string;
+  tags: string;
+  category: string;
+}
+
 export interface SiteSetting {
   key: string;
   value: string;
@@ -365,6 +500,34 @@ export type UpdateSettingsBodySettingsItem = {
 export interface UpdateSettingsBody {
   settings: UpdateSettingsBodySettingsItem[];
 }
+
+export type ListBlogsParams = {
+  category?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+};
+
+export type ListBlogs200 = {
+  data: BlogSummary[];
+  total: number;
+  page: number;
+  pages: number;
+};
+
+export type ListAdminBlogsParams = {
+  status?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+};
+
+export type ListAdminBlogs200 = {
+  data: Blog[];
+  total: number;
+  page: number;
+  pages: number;
+};
 
 export type ListConsultationsParams = {
   status?: string;

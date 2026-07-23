@@ -66,6 +66,9 @@ export function Navbar() {
             <Link href="/" className="px-3 py-2 text-sm font-medium text-foreground hover:text-secondary transition-colors shrink-0">
               Home
             </Link>
+            <Link href="/blog" className="px-3 py-2 text-sm font-medium text-foreground hover:text-secondary transition-colors shrink-0">
+              Blog
+            </Link>
 
             {NAV_ITEMS.map(item => {
               const isOpen = activeMenu === item.label;
@@ -187,6 +190,7 @@ export function Navbar() {
       )}>
         <div className="p-4 flex flex-col divide-y divide-gray-100">
           <Link href="/" className="font-medium py-3 text-[#0f2044]" onClick={() => setMobileOpen(false)}>Home</Link>
+          <Link href="/blog" className="font-medium py-3 text-[#0f2044]" onClick={() => setMobileOpen(false)}>Blog</Link>
 
           {[...NAV_ITEMS, { label: "Consult an Expert", categories: ["consult-expert"] as CategoryId[] }].map(item => {
             const isConsult = item.label === "Consult an Expert";

@@ -6,12 +6,18 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./aiGenerateBlogBody";
+export * from "./aiGenerateBlogBodyTone";
+export * from "./aiGeneratedBlog";
+export * from "./blog";
+export * from "./blogSummary";
 export * from "./bulkImportBody";
 export * from "./bulkImportResult";
 export * from "./companyDataList";
 export * from "./companyRecord";
 export * from "./consultation";
 export * from "./contact";
+export * from "./createBlogBody";
 export * from "./createCompanyRecordBody";
 export * from "./createConsultationBody";
 export * from "./createContactBody";
@@ -21,6 +27,10 @@ export * from "./createServiceConfigBody";
 export * from "./errorResponse";
 export * from "./healthStatus";
 export * from "./lawyerProfile";
+export * from "./listAdminBlogs200";
+export * from "./listAdminBlogsParams";
+export * from "./listBlogs200";
+export * from "./listBlogsParams";
 export * from "./listCompanyDataParams";
 export * from "./listConsultationsParams";
 export * from "./listServicesConfigParams";
@@ -32,6 +42,7 @@ export * from "./serviceConfig";
 export * from "./siteSetting";
 export * from "./siteStats";
 export * from "./subscribeNewsletterBody";
+export * from "./updateBlogBody";
 export * from "./updateConsultationBody";
 export * from "./updateContactBody";
 export * from "./updateLawyerProfileBody";

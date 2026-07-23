@@ -2,7 +2,7 @@ import { ReactNode, useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard, Users, MessageSquare, FileText, Search,
-  Settings, Building2, Mail, User, Scale, Menu, X, ChevronRight, Briefcase, ExternalLink, MapPin
+  Settings, Building2, Mail, User, Scale, Menu, X, ChevronRight, Briefcase, ExternalLink, MapPin, BookOpen
 } from "lucide-react";
 
 const navItems = [
@@ -10,6 +10,7 @@ const navItems = [
   { href: "/admin/leads", label: "Leads", icon: Users },
   { href: "/admin/contacts", label: "Contacts", icon: MessageSquare },
   { href: "/admin/quotations", label: "Quotations", icon: Briefcase },
+  { href: "/admin/blogs", label: "Blog Manager", icon: BookOpen },
   { href: "/admin/seo", label: "SEO Manager", icon: Search },
   { href: "/admin/services", label: "Services & Pricing", icon: FileText },
   { href: "/admin/company-data", label: "Company Data", icon: Building2 },

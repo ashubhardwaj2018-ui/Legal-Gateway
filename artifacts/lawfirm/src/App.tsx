@@ -20,6 +20,9 @@ import AdminNewsletter from "@/pages/admin/newsletter";
 import AdminLawyers from "@/pages/admin/lawyers";
 import AdminSettings from "@/pages/admin/settings";
 import AdminLocations from "@/pages/admin/locations";
+import AdminBlogs from "@/pages/admin/blogs";
+import BlogList from "@/pages/blog-list";
+import BlogPost from "@/pages/blog-post";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -42,12 +45,15 @@ function Router() {
       <Route path="/admin/lawyers" component={AdminLawyers} />
       <Route path="/admin/settings" component={AdminSettings} />
       <Route path="/admin/locations" component={AdminLocations} />
+      <Route path="/admin/blogs" component={AdminBlogs} />
 
       {/* Public Routes — wrapped in Navbar/Footer layout */}
       <Route>
         <Layout>
           <Switch>
             <Route path="/" component={Home} />
+            <Route path="/blog" component={BlogList} />
+            <Route path="/blog/:slug" component={BlogPost} />
             <Route path="/services/:catId/:slug" component={ServiceDetail} />
             <Route path="/services/:id" component={ServiceCategory} />
             {/* Programmatic SEO — must be last specific route */}

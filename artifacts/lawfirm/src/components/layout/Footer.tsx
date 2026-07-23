@@ -57,7 +57,7 @@ export function Footer() {
               <li><a href="#" className="text-primary-foreground/70 hover:text-secondary transition-colors text-sm">About Us</a></li>
               <li><a href="#" className="text-primary-foreground/70 hover:text-secondary transition-colors text-sm">Our Lawyers</a></li>
               <li><a href="#" className="text-primary-foreground/70 hover:text-secondary transition-colors text-sm">Careers</a></li>
-              <li><a href="#" className="text-primary-foreground/70 hover:text-secondary transition-colors text-sm">Legal Blog</a></li>
+              <li><Link href="/blog" className="text-primary-foreground/70 hover:text-secondary transition-colors text-sm">Legal Blog</Link></li>
               <li><a href="#" className="text-primary-foreground/70 hover:text-secondary transition-colors text-sm">Privacy Policy</a></li>
               <li><a href="#" className="text-primary-foreground/70 hover:text-secondary transition-colors text-sm">Terms of Service</a></li>
             </ul>

@@ -19,8 +19,218 @@ tags:
   - name: admin-company-data
   - name: admin-lawyers
   - name: admin-settings
+  - name: blogs
+  - name: admin-blogs
 
 paths:
+  # ── Public Blog Endpoints ──────────────────────────────────────────────────
+
+  /blogs:
+    get:
+      operationId: listBlogs
+      tags: [blogs]
+      summary: List published blogs
+      parameters:
+        - in: query
+          name: category
+          schema: { type: string }
+        - in: query
+          name: search
+          schema: { type: string }
+        - in: query
+          name: page
+          schema: { type: integer, default: 1 }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 12 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BlogSummary"
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  pages:
+                    type: integer
+                required: [data, total, page, pages]
+
+  /blogs/{slug}:
+    get:
+      operationId: getBlogBySlug
+      tags: [blogs]
+      summary: Get a single blog by slug
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Blog"
+        "404":
+          description: Not found
+
+  # ── Admin Blog Endpoints ───────────────────────────────────────────────────
+
+  /admin/blogs:
+    get:
+      operationId: listAdminBlogs
+      tags: [admin-blogs]
+      summary: List all blogs (admin)
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string }
+        - in: query
+          name: search
+          schema: { type: string }
+        - in: query
+          name: page
+          schema: { type: integer, default: 1 }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Blog"
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  pages:
+                    type: integer
+                required: [data, total, page, pages]
+    post:
+      operationId: createBlog
+      tags: [admin-blogs]
+      summary: Create a blog post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBlogBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Blog"
+
+  /admin/blogs/{id}:
+    get:
+      operationId: getAdminBlog
+      tags: [admin-blogs]
+      summary: Get a single blog by ID (admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Blog"
+        "404":
+          description: Not found
+    put:
+      operationId: updateBlog
+      tags: [admin-blogs]
+      summary: Update a blog post
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBlogBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Blog"
+    delete:
+      operationId: deleteBlog
+      tags: [admin-blogs]
+      summary: Delete a blog post
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Deleted
+
+  /admin/blogs/ai-generate:
+    post:
+      operationId: aiGenerateBlog
+      tags: [admin-blogs]
+      summary: Generate blog content with AI
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiGenerateBlogBody"
+      responses:
+        "200":
+          description: Generated content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiGeneratedBlog"
+
+  /admin/blogs/{id}/publish:
+    post:
+      operationId: publishBlog
+      tags: [admin-blogs]
+      summary: Publish a blog post
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Published
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Blog"
+
   /healthz:
     get:
       operationId: healthCheck
@@ -1345,6 +1555,190 @@ components:
           type: ["string", "null"]
         isActive:
           type: boolean
+
+    # ── Blog ──────────────────────────────────────────────────────────────────
+
+    BlogSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        slug:
+          type: string
+        excerpt:
+          type: ["string", "null"]
+        featuredImage:
+          type: ["string", "null"]
+        category:
+          type: string
+        tags:
+          type: ["string", "null"]
+        authorName:
+          type: string
+        readingTime:
+          type: integer
+        viewCount:
+          type: integer
+        publishedAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required: [id, title, slug, category, authorName, readingTime, viewCount, createdAt]
+
+    Blog:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        slug:
+          type: string
+        excerpt:
+          type: ["string", "null"]
+        content:
+          type: string
+        featuredImage:
+          type: ["string", "null"]
+        category:
+          type: string
+        tags:
+          type: ["string", "null"]
+        status:
+          type: string
+        authorName:
+          type: string
+        metaTitle:
+          type: ["string", "null"]
+        metaDescription:
+          type: ["string", "null"]
+        metaKeywords:
+          type: ["string", "null"]
+        ogImage:
+          type: ["string", "null"]
+        schemaMarkup:
+          type: ["string", "null"]
+        faqs:
+          type: ["string", "null"]
+        readingTime:
+          type: integer
+        viewCount:
+          type: integer
+        publishedAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required: [id, title, slug, content, category, status, authorName, readingTime, viewCount, createdAt, updatedAt]
+
+    CreateBlogBody:
+      type: object
+      properties:
+        title:
+          type: string
+        slug:
+          type: string
+        excerpt:
+          type: ["string", "null"]
+        content:
+          type: string
+        featuredImage:
+          type: ["string", "null"]
+        category:
+          type: string
+        tags:
+          type: ["string", "null"]
+        status:
+          type: string
+        authorName:
+          type: string
+        metaTitle:
+          type: ["string", "null"]
+        metaDescription:
+          type: ["string", "null"]
+        metaKeywords:
+          type: ["string", "null"]
+        ogImage:
+          type: ["string", "null"]
+        faqs:
+          type: ["string", "null"]
+      required: [title, slug, content]
+
+    UpdateBlogBody:
+      type: object
+      properties:
+        title:
+          type: string
+        slug:
+          type: string
+        excerpt:
+          type: ["string", "null"]
+        content:
+          type: string
+        featuredImage:
+          type: ["string", "null"]
+        category:
+          type: string
+        tags:
+          type: ["string", "null"]
+        status:
+          type: string
+        authorName:
+          type: string
+        metaTitle:
+          type: ["string", "null"]
+        metaDescription:
+          type: ["string", "null"]
+        metaKeywords:
+          type: ["string", "null"]
+        ogImage:
+          type: ["string", "null"]
+        faqs:
+          type: ["string", "null"]
+
+    AiGenerateBlogBody:
+      type: object
+      properties:
+        topic:
+          type: string
+        serviceCategory:
+          type: ["string", "null"]
+        targetCity:
+          type: ["string", "null"]
+        tone:
+          type: string
+          enum: [professional, conversational, authoritative]
+        wordCount:
+          type: integer
+      required: [topic]
+
+    AiGeneratedBlog:
+      type: object
+      properties:
+        title:
+          type: string
+        slug:
+          type: string
+        excerpt:
+          type: string
+        content:
+          type: string
+        metaTitle:
+          type: string
+        metaDescription:
+          type: string
+        metaKeywords:
+          type: string
+        faqs:
+          type: string
+        tags:
+          type: string
+        category:
+          type: string
+      required: [title, slug, excerpt, content, metaTitle, metaDescription, metaKeywords, faqs, tags, category]
 
     # ── Site Settings ─────────────────────────────────────────────────────────
 
