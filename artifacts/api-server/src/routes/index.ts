@@ -9,6 +9,7 @@ import locationsRouter from "./locations";
 import { blogsRouter } from "./blogs";
 import { adminBlogsRouter } from "./admin/blogs";
 import companiesRouter from "./companies";
+import portalRouter from "./portal";
 
 const router: IRouter = Router();
 
@@ -22,5 +23,6 @@ router.use(locationsRouter);
 router.use(blogsRouter);
 router.use(adminBlogsRouter);
 router.use(companiesRouter);
+router.use(portalRouter);
 
 export default router;

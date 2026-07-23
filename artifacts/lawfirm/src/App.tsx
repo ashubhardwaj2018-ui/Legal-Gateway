@@ -28,6 +28,8 @@ import AdminInvoices from "@/pages/admin/invoices";
 import AdminChat from "@/pages/admin/chat";
 import AdminEmail from "@/pages/admin/email";
 import AdminReports from "@/pages/admin/reports";
+import PortalLogin from "@/pages/portal/login";
+import PortalDashboard from "@/pages/portal/dashboard";
 import IndianCompanies from "@/pages/indian-companies";
 import CompanyDetail from "@/pages/company-detail";
 import BlogList from "@/pages/blog-list";
@@ -62,6 +64,10 @@ function Router() {
       <Route path="/admin/chat" component={AdminChat} />
       <Route path="/admin/email" component={AdminEmail} />
       <Route path="/admin/reports" component={AdminReports} />
+
+      {/* Customer Portal */}
+      <Route path="/portal" component={PortalLogin} />
+      <Route path="/portal/dashboard" component={PortalDashboard} />
 
       {/* Public Routes — wrapped in Navbar/Footer layout */}
       <Route>
