@@ -8,11 +8,13 @@ import settingsRouter from "./settings";
 import locationsRouter from "./locations";
 import leadsRouter from "./leads";
 import teamRouter from "./team";
+import indianCompaniesRouter from "./indian-companies";
 
 const router: IRouter = Router();
 
 router.use(leadsRouter);
 router.use(teamRouter);
+router.use(indianCompaniesRouter);
 router.use(seoRouter);
 router.use(servicesRouter);
 router.use(quotationsRouter);

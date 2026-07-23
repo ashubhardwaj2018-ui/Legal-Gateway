@@ -22,6 +22,9 @@ import AdminSettings from "@/pages/admin/settings";
 import AdminLocations from "@/pages/admin/locations";
 import AdminBlogs from "@/pages/admin/blogs";
 import AdminTeam from "@/pages/admin/team";
+import AdminIndianCompanies from "@/pages/admin/indian-companies";
+import IndianCompanies from "@/pages/indian-companies";
+import CompanyDetail from "@/pages/company-detail";
 import BlogList from "@/pages/blog-list";
 import BlogPost from "@/pages/blog-post";
 
@@ -48,12 +51,15 @@ function Router() {
       <Route path="/admin/locations" component={AdminLocations} />
       <Route path="/admin/blogs" component={AdminBlogs} />
       <Route path="/admin/team" component={AdminTeam} />
+      <Route path="/admin/indian-companies" component={AdminIndianCompanies} />
 
       {/* Public Routes — wrapped in Navbar/Footer layout */}
       <Route>
         <Layout>
           <Switch>
             <Route path="/" component={Home} />
+            <Route path="/indian-companies" component={IndianCompanies} />
+            <Route path="/company/:slug" component={CompanyDetail} />
             <Route path="/blog" component={BlogList} />
             <Route path="/blog/:slug" component={BlogPost} />
             <Route path="/services/:catId/:slug" component={ServiceDetail} />

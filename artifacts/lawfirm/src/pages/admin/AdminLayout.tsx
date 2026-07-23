@@ -10,6 +10,7 @@ const navItems = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { href: "/admin/leads", label: "CRM — Leads", icon: Users },
   { href: "/admin/team", label: "Team & HR", icon: UserCog },
+  { href: "/admin/indian-companies", label: "Indian Companies DB", icon: Building2 },
   { href: "/admin/contacts", label: "Contacts", icon: MessageSquare },
   { href: "/admin/quotations", label: "Quotations", icon: Briefcase },
   { href: "/admin/blogs", label: "Blog Manager", icon: BookOpen },

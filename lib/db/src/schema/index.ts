@@ -12,3 +12,4 @@ export * from "./blogs";
 export * from "./conversations";
 export * from "./messages";
 export * from "./team";
+export * from "./indian-companies";

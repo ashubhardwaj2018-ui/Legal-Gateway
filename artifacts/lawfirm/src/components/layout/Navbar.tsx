@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { useState, useEffect, useRef } from "react";
-import { Menu, X, ChevronDown, ChevronRight, Scale, Phone, MessageCircle } from "lucide-react";
+import { Menu, X, ChevronDown, ChevronRight, Scale, Phone, MessageCircle, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SERVICES_DATA } from "@/data/services";
 import { toSlug } from "@/lib/slug";
@@ -68,6 +68,10 @@ export function Navbar() {
             </Link>
             <Link href="/blog" className="px-3 py-2 text-sm font-medium text-foreground hover:text-secondary transition-colors shrink-0">
               Blog
+            </Link>
+            <Link href="/indian-companies" className="px-3 py-2 text-sm font-medium text-foreground hover:text-secondary transition-colors shrink-0 flex items-center gap-1">
+              <Building2 size={13} className="text-secondary" />
+              Indian Companies
             </Link>
 
             {NAV_ITEMS.map(item => {
@@ -191,6 +195,9 @@ export function Navbar() {
         <div className="p-4 flex flex-col divide-y divide-gray-100">
           <Link href="/" className="font-medium py-3 text-[#0f2044]" onClick={() => setMobileOpen(false)}>Home</Link>
           <Link href="/blog" className="font-medium py-3 text-[#0f2044]" onClick={() => setMobileOpen(false)}>Blog</Link>
+          <Link href="/indian-companies" className="font-medium py-3 text-[#0f2044] flex items-center gap-1.5" onClick={() => setMobileOpen(false)}>
+            <Building2 size={14} className="text-[#c9a227]" /> Indian Companies
+          </Link>
 
           {[...NAV_ITEMS, { label: "Consult an Expert", categories: ["consult-expert"] as CategoryId[] }].map(item => {
             const isConsult = item.label === "Consult an Expert";
