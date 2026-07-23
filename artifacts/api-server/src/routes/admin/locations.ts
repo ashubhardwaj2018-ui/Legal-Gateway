@@ -1,7 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, ilike, or, count, desc, sql, and, inArray } from "drizzle-orm";
 import { db, locationsTable, locationUploadLogsTable } from "@workspace/db";
-import { z } from "zod/v4";
 
 const router: IRouter = Router();
 
@@ -110,32 +109,31 @@ router.get("/admin/locations/states", async (req, res): Promise<void> => {
 });
 
 // Bulk upsert (from frontend Excel parse)
-const BulkUpsertBody = z.object({
-  fileName: z.string(),
-  records: z.array(
-    z.object({
-      country: z.string().optional(),
-      state: z.string(),
-      district: z.string().optional(),
-      city: z.string().optional(),
-      town: z.string().optional(),
-      village: z.string().optional(),
-      pincode: z.string().optional(),
-      latitude: z.number().optional(),
-      longitude: z.number().optional(),
-      population: z.number().optional(),
-    }),
-  ),
-});
+interface LocationRecord {
+  country?: string;
+  state: string;
+  district?: string;
+  city?: string;
+  town?: string;
+  village?: string;
+  pincode?: string;
+  latitude?: number;
+  longitude?: number;
+  population?: number;
+}
 
 router.post("/admin/locations/bulk-upsert", async (req, res): Promise<void> => {
-  const parsed = BulkUpsertBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: "Invalid request body" });
+  const body = req.body as { fileName?: unknown; records?: unknown };
+  const fileName = typeof body.fileName === "string" ? body.fileName : "upload.xlsx";
+  if (!Array.isArray(body.records)) {
+    res.status(400).json({ error: "records array required" });
     return;
   }
-
-  const { fileName, records } = parsed.data;
+  const records = body.records as LocationRecord[];
+  if (records.some((r) => !r.state)) {
+    res.status(400).json({ error: "Each record must have a state" });
+    return;
+  }
   let inserted = 0;
   let updated = 0;
   let duplicates = 0;

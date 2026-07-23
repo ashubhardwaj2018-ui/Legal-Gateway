@@ -5,6 +5,7 @@ import contactsRouter from "./contacts";
 import newsletterRouter from "./newsletter";
 import statsRouter from "./stats";
 import adminRouter from "./admin/index";
+import locationsRouter from "./locations";
 
 const router: IRouter = Router();
 
@@ -14,5 +15,6 @@ router.use(contactsRouter);
 router.use(newsletterRouter);
 router.use(statsRouter);
 router.use(adminRouter);
+router.use(locationsRouter);
 
 export default router;

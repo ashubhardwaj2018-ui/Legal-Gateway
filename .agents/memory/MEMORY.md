@@ -1,0 +1,4 @@
+- [pSEO routing](pseo-routing.md) — /:serviceSlug/:locationSlug must be LAST inside the public Layout Switch to avoid shadowing /services/* routes
+- [API server zod](api-server-zod.md) — never import from zod/v4 directly in api-server routes; esbuild cannot resolve it. Use @workspace/api-zod or plain type assertions instead
+- [DB index syntax](db-index-syntax.md) — Drizzle index in pgTable uses object notation (table) => ({ nameIdx: index(...).on(...) }) not array syntax
+- [Service details export](service-details-export.md) — getServiceDetail(categoryId, slug, name, price, description) — singular, 5 args; not getServiceDetails

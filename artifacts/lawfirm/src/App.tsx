@@ -1,11 +1,13 @@
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { HelmetProvider } from "react-helmet-async";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Layout } from "@/components/layout/Layout";
 import Home from "@/pages/home";
 import ServiceCategory from "@/pages/service-category";
 import ServiceDetail from "@/pages/service-detail";
+import ServiceLocation from "@/pages/service-location";
 import NotFound from "@/pages/not-found";
 import AdminDashboard from "@/pages/admin/dashboard";
 import AdminLeads from "@/pages/admin/leads";
@@ -17,6 +19,7 @@ import AdminCompanyData from "@/pages/admin/company-data";
 import AdminNewsletter from "@/pages/admin/newsletter";
 import AdminLawyers from "@/pages/admin/lawyers";
 import AdminSettings from "@/pages/admin/settings";
+import AdminLocations from "@/pages/admin/locations";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -38,6 +41,7 @@ function Router() {
       <Route path="/admin/newsletter" component={AdminNewsletter} />
       <Route path="/admin/lawyers" component={AdminLawyers} />
       <Route path="/admin/settings" component={AdminSettings} />
+      <Route path="/admin/locations" component={AdminLocations} />
 
       {/* Public Routes — wrapped in Navbar/Footer layout */}
       <Route>
@@ -46,6 +50,8 @@ function Router() {
             <Route path="/" component={Home} />
             <Route path="/services/:catId/:slug" component={ServiceDetail} />
             <Route path="/services/:id" component={ServiceCategory} />
+            {/* Programmatic SEO — must be last specific route */}
+            <Route path="/:serviceSlug/:locationSlug" component={ServiceLocation} />
             <Route component={NotFound} />
           </Switch>
         </Layout>
@@ -56,14 +62,16 @@ function Router() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
-        </WouterRouter>
-        <Toaster />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <HelmetProvider>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <Router />
+          </WouterRouter>
+          <Toaster />
+        </TooltipProvider>
+      </QueryClientProvider>
+    </HelmetProvider>
   );
 }
 
