@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard, Users, MessageSquare, FileText, Search,
   Settings, Building2, Mail, User, Scale, Menu, X, ChevronRight,
-  Briefcase, ExternalLink, MapPin, BookOpen, UserCog, CheckSquare,
+  Briefcase, ExternalLink, MapPin, BookOpen, UserCog, CheckSquare, TrendingUp,
 } from "lucide-react";
 
 const navItems = [
@@ -15,6 +15,7 @@ const navItems = [
   { href: "/admin/invoices", label: "Invoice & Finance", icon: FileText },
   { href: "/admin/chat", label: "Team Chat", icon: MessageSquare },
   { href: "/admin/email", label: "Email", icon: Mail },
+  { href: "/admin/reports", label: "Reports", icon: TrendingUp },
   { href: "/admin/contacts", label: "Contacts", icon: MessageSquare },
   { href: "/admin/quotations", label: "Quotations", icon: Briefcase },
   { href: "/admin/blogs", label: "Blog Manager", icon: BookOpen },
