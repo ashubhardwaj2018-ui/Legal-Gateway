@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -11,8 +11,51 @@ export const consultationsTable = pgTable("consultations", {
   serviceInterest: text("service_interest").notNull(),
   message: text("message"),
   preferredDate: text("preferred_date"),
-  status: text("status").notNull().default("pending"),
+  status: text("status").notNull().default("new"),
   notes: text("notes"),
+  // CRM fields
+  company: text("company"),
+  whatsapp: text("whatsapp"),
+  city: text("city"),
+  state: text("state"),
+  priority: text("priority").default("medium"),
+  source: text("source").default("website"),
+  rating: integer("rating"),
+  assignedTo: text("assigned_to"),
+  expectedRevenue: text("expected_revenue"),
+  probability: integer("probability"),
+  expectedClosingDate: text("expected_closing_date"),
+  nextFollowUp: timestamp("next_follow_up", { withTimezone: true }),
+  tags: text("tags"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+});
+
+export const leadNotesTable = pgTable("lead_notes", {
+  id: serial("id").primaryKey(),
+  leadId: integer("lead_id").notNull(),
+  content: text("content").notNull(),
+  createdBy: text("created_by").default("Admin"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const leadActivitiesTable = pgTable("lead_activities", {
+  id: serial("id").primaryKey(),
+  leadId: integer("lead_id").notNull(),
+  type: text("type").notNull(),
+  description: text("description").notNull(),
+  metadata: text("metadata"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const leadTasksTable = pgTable("lead_tasks", {
+  id: serial("id").primaryKey(),
+  leadId: integer("lead_id").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  dueDate: text("due_date"),
+  status: text("status").notNull().default("pending"),
+  priority: text("priority").default("medium"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
@@ -24,3 +67,6 @@ export const insertConsultationSchema = createInsertSchema(consultationsTable).o
 });
 export type InsertConsultation = z.infer<typeof insertConsultationSchema>;
 export type Consultation = typeof consultationsTable.$inferSelect;
+export type LeadNote = typeof leadNotesTable.$inferSelect;
+export type LeadActivity = typeof leadActivitiesTable.$inferSelect;
+export type LeadTask = typeof leadTasksTable.$inferSelect;

@@ -6,9 +6,11 @@ import companyDataRouter from "./company-data";
 import lawyersRouter from "./lawyers";
 import settingsRouter from "./settings";
 import locationsRouter from "./locations";
+import leadsRouter from "./leads";
 
 const router: IRouter = Router();
 
+router.use(leadsRouter);
 router.use(seoRouter);
 router.use(servicesRouter);
 router.use(quotationsRouter);
