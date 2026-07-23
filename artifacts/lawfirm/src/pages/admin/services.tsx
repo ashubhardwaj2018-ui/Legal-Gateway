@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   useListServicesConfig, useCreateServiceConfig, useUpdateServiceConfig, useDeleteServiceConfig,
-  getListServicesConfigQueryKey
+  getListServicesConfigQueryKey, type ServiceConfig
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { AdminLayout } from "./AdminLayout";
@@ -14,7 +14,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Pencil, Trash2, Star, Check, X } from "lucide-react";
 
-type ServiceConfig = NonNullable<ReturnType<typeof useListServicesConfig>["data"]>[number];
 
 const CATEGORIES = [
   { id: "trademark-ip", label: "Trademark & IP" },

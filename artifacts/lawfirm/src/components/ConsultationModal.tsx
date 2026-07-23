@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { CATEGORIES, type Category } from "@/data/services";
+import { CATEGORIES, SERVICES_DATA, type ServiceCategory } from "@/data/services";
 import { CheckCircle, Loader2 } from "lucide-react";
 
 interface Props {
@@ -42,7 +42,7 @@ export function ConsultationModal({ open, onOpenChange, defaultCategory, default
 
   const mutation = useCreateConsultation();
 
-  const selectedCategory: Category | undefined = CATEGORIES.find(c => c.id === form.serviceCategory);
+  const selectedCategory: ServiceCategory | undefined = Object.values(SERVICES_DATA).find(c => c.id === form.serviceCategory);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -173,8 +173,8 @@ export function ConsultationModal({ open, onOpenChange, defaultCategory, default
                       <SelectValue placeholder="Select service" />
                     </SelectTrigger>
                     <SelectContent>
-                      {(selectedCategory?.services ?? []).map(s => (
-                        <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>
+                      {(selectedCategory?.services ?? []).map((s) => (
+                        <SelectItem key={s.name} value={s.name}>{s.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

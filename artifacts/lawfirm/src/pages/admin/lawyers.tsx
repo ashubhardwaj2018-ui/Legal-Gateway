@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   useListLawyerProfiles, useCreateLawyerProfile, useUpdateLawyerProfile, useDeleteLawyerProfile,
-  getListLawyerProfilesQueryKey
+  getListLawyerProfilesQueryKey, type LawyerProfile
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { AdminLayout } from "./AdminLayout";
@@ -14,7 +14,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Pencil, Trash2, User, Briefcase, Award } from "lucide-react";
 
-type LawyerProfile = NonNullable<ReturnType<typeof useListLawyerProfiles>["data"]>[number];
 
 type FormData = {
   name: string;

@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import {
   useListCompanyData, useBulkImportCompanyData, useDeleteCompanyRecord,
-  getListCompanyDataQueryKey
+  getListCompanyDataQueryKey, type CompanyRecord
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { AdminLayout } from "./AdminLayout";
@@ -11,7 +11,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, Trash2, Search, RefreshCw, FileUp, ChevronLeft, ChevronRight, Building2 } from "lucide-react";
 
-type CompanyRecord = NonNullable<ReturnType<typeof useListCompanyData>["data"]>["data"][number];
 
 function parseCSV(text: string): Record<string, string>[] {
   const lines = text.trim().split(/\r?\n/);
@@ -50,8 +49,7 @@ export default function AdminCompanyData() {
   const [fileName, setFileName] = useState("");
 
   const { data, isLoading, refetch } = useListCompanyData(
-    { search: search || undefined, page, limit: 50 },
-    { query: { enabled: true } }
+    { search: search || undefined, page, limit: 50 }
   );
 
   const bulkMutation = useBulkImportCompanyData();
@@ -98,7 +96,7 @@ export default function AdminCompanyData() {
       }
 
       bulkMutation.mutate(
-        { data: { records: records as Parameters<typeof bulkMutation.mutate>[0]["data"]["records"] } },
+        { data: { records: records as unknown as CompanyRecord[] } },
         {
           onSuccess: (result) => {
             queryClient.invalidateQueries({ queryKey: getListCompanyDataQueryKey() });

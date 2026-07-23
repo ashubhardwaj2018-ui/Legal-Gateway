@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useListConsultations, useUpdateConsultation, getListConsultationsQueryKey } from "@workspace/api-client-react";
+import { useListConsultations, useUpdateConsultation, getListConsultationsQueryKey, type Consultation } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { AdminLayout } from "./AdminLayout";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,6 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Search, Download, Eye, Filter } from "lucide-react";
 
-type Consultation = NonNullable<ReturnType<typeof useListConsultations>["data"]>[number];
 
 const STATUS_OPTIONS = ["all", "pending", "contacted", "completed", "closed"];
 const STATUS_COLORS: Record<string, string> = {

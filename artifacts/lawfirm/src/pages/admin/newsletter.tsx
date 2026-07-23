@@ -1,4 +1,4 @@
-import { useListNewsletterSubscribers } from "@workspace/api-client-react";
+import { useListNewsletterSubscribers, type NewsletterSubscriber } from "@workspace/api-client-react";
 import { AdminLayout } from "./AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
 import { Download, Search, Mail, Users } from "lucide-react";
 
-type Subscriber = NonNullable<ReturnType<typeof useListNewsletterSubscribers>["data"]>[number];
+type Subscriber = NewsletterSubscriber;
 
 function exportCSV(data: Subscriber[]) {
   const headers = ["ID", "Email", "Name", "Subscribed At"];

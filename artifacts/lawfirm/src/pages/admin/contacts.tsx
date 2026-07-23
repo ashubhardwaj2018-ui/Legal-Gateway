@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useListContacts, useUpdateContact, getListContactsQueryKey } from "@workspace/api-client-react";
+import { useListContacts, useUpdateContact, getListContactsQueryKey, type Contact } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { AdminLayout } from "./AdminLayout";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Search, Eye, Check, Download, Filter } from "lucide-react";
 
-type Contact = NonNullable<ReturnType<typeof useListContacts>["data"]>[number];
 
 function DetailModal({ contact, onClose, onMarkRead }: { contact: Contact; onClose: () => void; onMarkRead: () => void }) {
   return (

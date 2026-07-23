@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   useListQuotations, useCreateQuotation, useUpdateQuotation, useSendQuotation,
-  getListQuotationsQueryKey, useGetQuotation
+  getListQuotationsQueryKey, useGetQuotation, type Quotation
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { AdminLayout } from "./AdminLayout";
@@ -15,7 +15,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Trash2, Send, Eye, FileText, PlusCircle, Printer } from "lucide-react";
 
 type QuotationItem = { serviceName: string; description: string; quantity: number; unitPrice: number; total: number };
-type Quotation = NonNullable<ReturnType<typeof useListQuotations>["data"]>[number];
 
 const STATUS_COLORS: Record<string, string> = {
   draft: "bg-gray-100 text-gray-700",
