@@ -12,6 +12,7 @@ const navItems = [
   { href: "/admin/team", label: "Team & HR", icon: UserCog },
   { href: "/admin/indian-companies", label: "Indian Companies DB", icon: Building2 },
   { href: "/admin/tasks", label: "Task Management", icon: CheckSquare },
+  { href: "/admin/invoices", label: "Invoice & Finance", icon: FileText },
   { href: "/admin/contacts", label: "Contacts", icon: MessageSquare },
   { href: "/admin/quotations", label: "Quotations", icon: Briefcase },
   { href: "/admin/blogs", label: "Blog Manager", icon: BookOpen },

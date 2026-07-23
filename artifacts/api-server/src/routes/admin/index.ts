@@ -10,10 +10,12 @@ import leadsRouter from "./leads";
 import teamRouter from "./team";
 import indianCompaniesRouter from "./indian-companies";
 import tasksRouter from "./tasks";
+import invoicesRouter from "./invoices";
 
 const router: IRouter = Router();
 
 router.use(leadsRouter);
+router.use(invoicesRouter);
 router.use(tasksRouter);
 router.use(teamRouter);
 router.use(indianCompaniesRouter);
