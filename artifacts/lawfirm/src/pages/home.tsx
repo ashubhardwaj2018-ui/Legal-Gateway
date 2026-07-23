@@ -2,11 +2,19 @@ import { motion } from "framer-motion";
 import { Link } from "wouter";
 import { 
   ArrowRight, ShieldCheck, Clock, Award, Users, FileText, 
-  Building2, Scale, Building, Heart, Shield, Landmark, MapPin, Star, MessageSquare, Phone
+  Building2, Scale, Building, Heart, Shield, Landmark, MapPin, Star, MessageSquare, Phone, BookOpen, Eye
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CATEGORIES } from "@/data/services";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { useListBlogs } from "@workspace/api-client-react";
+
+const CATEGORY_LABELS: Record<string, string> = {
+  "legal-advice": "Legal Advice", "business-setup": "Business Setup",
+  "tax-compliance": "Tax & Compliance", "trademark-ip": "Trademark & IP",
+  "property": "Property Law", "ngo": "NGO & Non-Profit",
+  "fundraising": "Fundraising", "general": "General",
+};
 
 const stats = [
   { value: "5000+", label: "Clients Served" },
@@ -36,6 +44,77 @@ const lawyers = [
   { name: "Adv. Vikram Singh", spec: "Real Estate & Property", exp: "22 Yrs Exp.", img: "https://api.dicebear.com/7.x/notionists/svg?seed=Vikram&backgroundColor=f1f5f9" },
   { name: "Adv. Neha Gupta", spec: "Family & Civil Law", exp: "15 Yrs Exp.", img: "https://api.dicebear.com/7.x/notionists/svg?seed=Neha&backgroundColor=f1f5f9" }
 ];
+
+function LatestBlogSection() {
+  const { data } = useListBlogs({ limit: 3 });
+  const posts = data?.data ?? [];
+  if (posts.length === 0) return null;
+  return (
+    <section className="py-20 bg-gray-50">
+      <div className="container mx-auto px-4 md:px-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5 }}
+          className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-12"
+        >
+          <div>
+            <div className="inline-flex items-center gap-2 text-secondary text-sm font-semibold mb-3">
+              <BookOpen size={14} /> Legal Knowledge Hub
+            </div>
+            <h2 className="text-3xl md:text-4xl font-serif font-bold text-primary">Latest Articles &amp; Insights</h2>
+            <p className="text-muted-foreground mt-2 max-w-lg">Expert analysis on Indian law, compliance updates, and practical legal guidance for businesses and individuals.</p>
+          </div>
+          <Link href="/blog">
+            <Button variant="outline" className="border-primary text-primary hover:bg-primary hover:text-white shrink-0 gap-1.5">
+              View All Articles <ArrowRight size={14} />
+            </Button>
+          </Link>
+        </motion.div>
+
+        <div className="grid md:grid-cols-3 gap-6">
+          {posts.map((post, i) => (
+            <motion.div
+              key={post.slug}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.4, delay: i * 0.1 }}
+            >
+              <Link href={`/blog/${post.slug}`}>
+                <div className="group bg-white rounded-2xl overflow-hidden border hover:shadow-lg transition-all duration-300 h-full flex flex-col cursor-pointer">
+                  {post.featuredImage
+                    ? <img src={post.featuredImage} alt={post.title} className="w-full h-44 object-cover group-hover:scale-105 transition-transform duration-500" />
+                    : <div className="w-full h-44 bg-primary/5 flex items-center justify-center"><BookOpen size={36} className="text-primary/20" /></div>
+                  }
+                  <div className="p-5 flex flex-col flex-1">
+                    <span className="text-secondary text-xs font-semibold uppercase tracking-wide mb-2">
+                      {CATEGORY_LABELS[post.category] ?? post.category}
+                    </span>
+                    <h3 className="font-serif font-bold text-primary text-base leading-snug group-hover:text-secondary transition-colors line-clamp-2 flex-1">
+                      {post.title}
+                    </h3>
+                    {post.excerpt && (
+                      <p className="text-muted-foreground text-sm mt-2 line-clamp-2 leading-relaxed">{post.excerpt}</p>
+                    )}
+                    <div className="flex items-center justify-between mt-4 pt-4 border-t text-xs text-muted-foreground">
+                      <span>{post.authorName}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="flex items-center gap-1"><Clock size={10} /> {post.readingTime} min</span>
+                        <span className="flex items-center gap-1"><Eye size={10} /> {post.viewCount}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </Link>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
 
 export default function Home() {
   return (
@@ -369,6 +448,9 @@ export default function Home() {
           </Accordion>
         </div>
       </section>
+
+      {/* Latest Blog Posts */}
+      <LatestBlogSection />
 
       {/* CTA */}
       <section className="py-20 bg-secondary relative overflow-hidden">

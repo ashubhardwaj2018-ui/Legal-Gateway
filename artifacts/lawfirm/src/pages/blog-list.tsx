@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { useListBlogs } from "@workspace/api-client-react";
@@ -6,6 +6,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, Clock, Eye, Tag, ChevronLeft, ChevronRight, BookOpen } from "lucide-react";
+
+function useDebounce<T>(value: T, delay = 400): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(id);
+  }, [value, delay]);
+  return debounced;
+}
 
 const CATEGORIES = [
   { value: "", label: "All" },
@@ -23,9 +32,10 @@ export default function BlogList() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
   const [page, setPage] = useState(1);
+  const debouncedSearch = useDebounce(search, 400);
 
   const { data, isLoading } = useListBlogs({
-    search: search || undefined,
+    search: debouncedSearch || undefined,
     category: category || undefined,
     page, limit: 9,
   });
