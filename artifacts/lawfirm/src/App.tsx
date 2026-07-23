@@ -25,6 +25,7 @@ import AdminTeam from "@/pages/admin/team";
 import AdminIndianCompanies from "@/pages/admin/indian-companies";
 import AdminTasks from "@/pages/admin/tasks";
 import AdminInvoices from "@/pages/admin/invoices";
+import AdminChat from "@/pages/admin/chat";
 import IndianCompanies from "@/pages/indian-companies";
 import CompanyDetail from "@/pages/company-detail";
 import BlogList from "@/pages/blog-list";
@@ -56,6 +57,7 @@ function Router() {
       <Route path="/admin/indian-companies" component={AdminIndianCompanies} />
       <Route path="/admin/tasks" component={AdminTasks} />
       <Route path="/admin/invoices" component={AdminInvoices} />
+      <Route path="/admin/chat" component={AdminChat} />
 
       {/* Public Routes — wrapped in Navbar/Footer layout */}
       <Route>

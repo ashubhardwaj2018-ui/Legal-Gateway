@@ -11,11 +11,13 @@ import teamRouter from "./team";
 import indianCompaniesRouter from "./indian-companies";
 import tasksRouter from "./tasks";
 import invoicesRouter from "./invoices";
+import chatRouter from "./chat";
 
 const router: IRouter = Router();
 
 router.use(leadsRouter);
 router.use(invoicesRouter);
+router.use(chatRouter);
 router.use(tasksRouter);
 router.use(teamRouter);
 router.use(indianCompaniesRouter);

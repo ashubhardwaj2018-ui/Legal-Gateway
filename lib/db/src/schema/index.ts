@@ -15,3 +15,4 @@ export * from "./team";
 export * from "./indian-companies";
 export * from "./tasks";
 export * from "./invoices";
+export * from "./chat";
