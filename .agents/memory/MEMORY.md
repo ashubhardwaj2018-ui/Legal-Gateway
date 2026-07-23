@@ -3,3 +3,4 @@
 - [DB index syntax](db-index-syntax.md) — Drizzle index in pgTable uses object notation (table) => ({ nameIdx: index(...).on(...) }) not array syntax
 - [Service details export](service-details-export.md) — getServiceDetail(categoryId, slug, name, price, description) — singular, 5 args; not getServiceDetails
 - [api-zod duplicate exports](api-zod-exports.md) — after codegen, api-zod/src/index.ts must export ONLY ./generated/api (not ./generated/types); both files export same names causing TS2308 ambiguity errors
+- [Admin CRM/Team routes](admin-routes.md) — CRM and Team routes live at /api/admin/leads/* and /api/admin/team/* — NOT codegen'd; use plain fetch/useQuery with manual queryFn in frontend, not generated hooks

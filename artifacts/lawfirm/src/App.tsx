@@ -21,6 +21,7 @@ import AdminLawyers from "@/pages/admin/lawyers";
 import AdminSettings from "@/pages/admin/settings";
 import AdminLocations from "@/pages/admin/locations";
 import AdminBlogs from "@/pages/admin/blogs";
+import AdminTeam from "@/pages/admin/team";
 import BlogList from "@/pages/blog-list";
 import BlogPost from "@/pages/blog-post";
 
@@ -46,6 +47,7 @@ function Router() {
       <Route path="/admin/settings" component={AdminSettings} />
       <Route path="/admin/locations" component={AdminLocations} />
       <Route path="/admin/blogs" component={AdminBlogs} />
+      <Route path="/admin/team" component={AdminTeam} />
 
       {/* Public Routes — wrapped in Navbar/Footer layout */}
       <Route>
@@ -66,12 +68,12 @@ function Router() {
   );
 }
 
-function App() {
+export default function App() {
   return (
     <HelmetProvider>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+          <WouterRouter>
             <Router />
           </WouterRouter>
           <Toaster />
@@ -80,5 +82,3 @@ function App() {
     </HelmetProvider>
   );
 }
-
-export default App;

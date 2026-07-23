@@ -2,12 +2,14 @@ import { ReactNode, useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard, Users, MessageSquare, FileText, Search,
-  Settings, Building2, Mail, User, Scale, Menu, X, ChevronRight, Briefcase, ExternalLink, MapPin, BookOpen
+  Settings, Building2, Mail, User, Scale, Menu, X, ChevronRight,
+  Briefcase, ExternalLink, MapPin, BookOpen, UserCog,
 } from "lucide-react";
 
 const navItems = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
-  { href: "/admin/leads", label: "Leads", icon: Users },
+  { href: "/admin/leads", label: "CRM — Leads", icon: Users },
+  { href: "/admin/team", label: "Team & HR", icon: UserCog },
   { href: "/admin/contacts", label: "Contacts", icon: MessageSquare },
   { href: "/admin/quotations", label: "Quotations", icon: Briefcase },
   { href: "/admin/blogs", label: "Blog Manager", icon: BookOpen },
