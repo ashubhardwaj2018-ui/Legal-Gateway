@@ -13,6 +13,7 @@ import tasksRouter from "./tasks";
 import invoicesRouter from "./invoices";
 import chatRouter from "./chat";
 import dashboardRouter from "./dashboard";
+import emailRouter from "./email";
 
 const router: IRouter = Router();
 
@@ -20,6 +21,7 @@ router.use(leadsRouter);
 router.use(invoicesRouter);
 router.use(chatRouter);
 router.use(dashboardRouter);
+router.use(emailRouter);
 router.use(tasksRouter);
 router.use(teamRouter);
 router.use(indianCompaniesRouter);

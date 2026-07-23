@@ -16,3 +16,4 @@ export * from "./indian-companies";
 export * from "./tasks";
 export * from "./invoices";
 export * from "./chat";
+export * from "./email";
