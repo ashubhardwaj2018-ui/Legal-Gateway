@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, and } from "drizzle-orm";
-import { db, teamMembersTable, attendanceTable, leaveRequestsTable } from "@workspace/db";
+import { eq, desc, and, sql } from "drizzle-orm";
+import { db, teamMembersTable, attendanceTable, leaveRequestsTable, workingHoursTable } from "@workspace/db";
 
 const router: IRouter = Router();
 
@@ -156,6 +156,136 @@ router.delete("/admin/leaves/:id", async (req, res): Promise<void> => {
   const id = parseInt(req.params.id as string, 10);
   await db.delete(leaveRequestsTable).where(eq(leaveRequestsTable.id, id));
   res.status(204).end();
+});
+
+// ── Working Hours ─────────────────────────────────────────────────────────────
+
+router.get("/admin/team/:id/working-hours", async (req, res): Promise<void> => {
+  const employeeId = parseInt(req.params.id as string, 10);
+  const { month } = req.query as { month?: string };
+  let records;
+  if (month) {
+    const { ilike } = await import("drizzle-orm");
+    records = await db.select().from(workingHoursTable)
+      .where(and(eq(workingHoursTable.employeeId, employeeId), ilike(workingHoursTable.date, `${month}%`)))
+      .orderBy(desc(workingHoursTable.date));
+  } else {
+    records = await db.select().from(workingHoursTable)
+      .where(eq(workingHoursTable.employeeId, employeeId))
+      .orderBy(desc(workingHoursTable.date)).limit(31);
+  }
+  res.json(records);
+});
+
+router.post("/admin/team/:id/clock-in", async (req, res): Promise<void> => {
+  const employeeId = parseInt(req.params.id as string, 10);
+  const today = new Date().toISOString().split("T")[0];
+  const now = new Date();
+  const status = (req.body as { status?: string }).status ?? "present";
+
+  const [existing] = await db.select().from(workingHoursTable)
+    .where(and(eq(workingHoursTable.employeeId, employeeId), eq(workingHoursTable.date, today)));
+
+  if (existing) {
+    if (existing.clockIn) { res.status(409).json({ error: "Already clocked in today" }); return; }
+    const [updated] = await db.update(workingHoursTable).set({ clockIn: now, status })
+      .where(eq(workingHoursTable.id, existing.id)).returning();
+    res.json(updated);
+  } else {
+    const [record] = await db.insert(workingHoursTable).values({ employeeId, date: today, clockIn: now, status }).returning();
+    res.status(201).json(record);
+  }
+});
+
+router.post("/admin/team/:id/clock-out", async (req, res): Promise<void> => {
+  const employeeId = parseInt(req.params.id as string, 10);
+  const today = new Date().toISOString().split("T")[0];
+  const now = new Date();
+
+  const [existing] = await db.select().from(workingHoursTable)
+    .where(and(eq(workingHoursTable.employeeId, employeeId), eq(workingHoursTable.date, today)));
+
+  if (!existing || !existing.clockIn) { res.status(400).json({ error: "Not clocked in yet today" }); return; }
+  if (existing.clockOut) { res.status(409).json({ error: "Already clocked out today" }); return; }
+
+  const workedMs = now.getTime() - existing.clockIn.getTime();
+  const totalMinutes = Math.max(0, Math.round(workedMs / 60000) - (existing.breakMinutes ?? 0));
+  const notes = (req.body as { notes?: string }).notes ?? existing.notes;
+
+  const [updated] = await db.update(workingHoursTable)
+    .set({ clockOut: now, totalMinutes, notes })
+    .where(eq(workingHoursTable.id, existing.id)).returning();
+  res.json(updated);
+});
+
+// Manual override (admin sets clock-in/out for any date)
+router.put("/admin/team/:id/working-hours/:date", async (req, res): Promise<void> => {
+  const employeeId = parseInt(req.params.id as string, 10);
+  const date = req.params.date as string;
+  const { clockIn, clockOut, status, notes, breakMinutes } = req.body as Record<string, string | number | undefined>;
+
+  const clockInDate = clockIn ? new Date(String(clockIn)) : null;
+  const clockOutDate = clockOut ? new Date(String(clockOut)) : null;
+  let totalMinutes: number | null = null;
+  if (clockInDate && clockOutDate) {
+    totalMinutes = Math.max(0, Math.round((clockOutDate.getTime() - clockInDate.getTime()) / 60000) - Number(breakMinutes ?? 0));
+  }
+
+  const [existing] = await db.select().from(workingHoursTable)
+    .where(and(eq(workingHoursTable.employeeId, employeeId), eq(workingHoursTable.date, date)));
+
+  if (existing) {
+    const [updated] = await db.update(workingHoursTable).set({
+      clockIn: clockInDate, clockOut: clockOutDate, totalMinutes,
+      status: status ? String(status) : existing.status,
+      notes: notes ? String(notes) : existing.notes,
+      breakMinutes: breakMinutes ? Number(breakMinutes) : existing.breakMinutes,
+    }).where(eq(workingHoursTable.id, existing.id)).returning();
+    res.json(updated);
+  } else {
+    const [record] = await db.insert(workingHoursTable).values({
+      employeeId, date, clockIn: clockInDate, clockOut: clockOutDate,
+      totalMinutes, status: status ? String(status) : "present",
+      notes: notes ? String(notes) : null, breakMinutes: breakMinutes ? Number(breakMinutes) : 0,
+    }).returning();
+    res.status(201).json(record);
+  }
+});
+
+// Today's working summary for all employees
+router.get("/admin/working-hours/today", async (_req, res): Promise<void> => {
+  const today = new Date().toISOString().split("T")[0];
+  const rows = await db.select({
+    id: workingHoursTable.id,
+    employeeId: workingHoursTable.employeeId,
+    date: workingHoursTable.date,
+    clockIn: workingHoursTable.clockIn,
+    clockOut: workingHoursTable.clockOut,
+    totalMinutes: workingHoursTable.totalMinutes,
+    status: workingHoursTable.status,
+    name: teamMembersTable.name,
+    department: teamMembersTable.department,
+    designation: teamMembersTable.designation,
+  }).from(workingHoursTable)
+    .innerJoin(teamMembersTable, eq(workingHoursTable.employeeId, teamMembersTable.id))
+    .where(eq(workingHoursTable.date, today));
+  res.json(rows);
+});
+
+// Monthly summary per employee
+router.get("/admin/team/:id/working-hours/summary", async (req, res): Promise<void> => {
+  const employeeId = parseInt(req.params.id as string, 10);
+  const month = (req.query as { month?: string }).month ?? new Date().toISOString().slice(0, 7);
+  const { ilike } = await import("drizzle-orm");
+  const rows = await db.select({
+    totalDays: sql<number>`count(*)`,
+    totalMinutes: sql<number>`coalesce(sum(total_minutes), 0)`,
+    presentDays: sql<number>`count(*) filter (where status = 'present')`,
+    wfhDays: sql<number>`count(*) filter (where status = 'work_from_home')`,
+    halfDays: sql<number>`count(*) filter (where status = 'half_day')`,
+  }).from(workingHoursTable)
+    .where(and(eq(workingHoursTable.employeeId, employeeId), ilike(workingHoursTable.date, `${month}%`)));
+  res.json(rows[0] ?? { totalDays: 0, totalMinutes: 0, presentDays: 0, wfhDays: 0, halfDays: 0 });
 });
 
 export default router;

@@ -1,5 +1,11 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { eq, desc, asc, lt, and, gt } from "drizzle-orm";
+import fs from "fs";
+import path from "path";
+import crypto from "crypto";
+
+const UPLOADS_DIR = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 import { db, chatChannelsTable, chatMessagesTable, chatTypingTable, teamMembersTable } from "@workspace/db";
 
 const router: IRouter = Router();
@@ -171,8 +177,38 @@ router.get("/admin/chat/channels/:id/stream", (req: Request, res: Response): voi
 // ─── Team members for chat ───────────────────────────────────────────────────
 
 router.get("/admin/chat/members", async (_req, res): Promise<void> => {
-  const members = await db.select({ id: teamMembersTable.id, name: teamMembersTable.name, department: teamMembersTable.department, designation: teamMembersTable.designation }).from(teamMembersTable).where(eq(teamMembersTable.status, "active")).orderBy(asc(teamMembersTable.name));
+  const members = await db.select({
+    id: teamMembersTable.id, name: teamMembersTable.name,
+    department: teamMembersTable.department, designation: teamMembersTable.designation,
+    username: teamMembersTable.username,
+  }).from(teamMembersTable).where(eq(teamMembersTable.status, "active")).orderBy(asc(teamMembersTable.name));
   res.json(members);
+});
+
+// ─── File upload (base64) ─────────────────────────────────────────────────────
+
+router.post("/admin/chat/upload", async (req, res): Promise<void> => {
+  const { filename, data } = req.body as { filename?: string; data?: string };
+  if (!data || !filename) { res.status(400).json({ error: "filename and data required" }); return; }
+  const base64 = data.replace(/^data:[^;]+;base64,/, "");
+  const ext = path.extname(filename) || ".bin";
+  const safeName = `${Date.now()}-${crypto.randomBytes(4).toString("hex")}${ext}`;
+  const filePath = path.join(UPLOADS_DIR, safeName);
+  try {
+    fs.writeFileSync(filePath, Buffer.from(base64, "base64"));
+    res.json({ url: `/api/admin/chat/files/${safeName}`, filename });
+  } catch {
+    res.status(500).json({ error: "Upload failed" });
+  }
+});
+
+// ─── Serve uploaded files ─────────────────────────────────────────────────────
+
+router.get("/admin/chat/files/:filename", (req: Request, res: Response): void => {
+  const filename = String(req.params["filename"]).replace(/\.\./g, "");
+  const filePath = path.join(UPLOADS_DIR, filename);
+  if (!fs.existsSync(filePath)) { res.status(404).json({ error: "Not found" }); return; }
+  res.sendFile(filePath);
 });
 
 export default router;

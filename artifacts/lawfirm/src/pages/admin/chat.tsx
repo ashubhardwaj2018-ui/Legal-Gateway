@@ -13,7 +13,19 @@ interface Msg {
   reactions: string; replyToId: number | null; replyPreview: string | null;
   isEdited: boolean; isDeleted: boolean; isPinned: boolean; createdAt: string;
 }
-interface Member { id: number; name: string; department: string; designation: string; }
+interface Member { id: number; name: string; department: string; designation: string; username?: string; }
+
+function fileTypeInfo(filename: string) {
+  const ext = filename.split(".").pop()?.toLowerCase() ?? "";
+  if (ext === "pdf") return { emoji: "📄", label: "PDF", bg: "bg-red-50 border-red-200", text: "text-red-700" };
+  if (["xlsx","xls"].includes(ext)) return { emoji: "📊", label: "Excel", bg: "bg-green-50 border-green-200", text: "text-green-700" };
+  if (ext === "csv") return { emoji: "📊", label: "CSV", bg: "bg-green-50 border-green-200", text: "text-green-700" };
+  if (["docx","doc"].includes(ext)) return { emoji: "📝", label: "Word", bg: "bg-blue-50 border-blue-200", text: "text-blue-700" };
+  if (["pptx","ppt"].includes(ext)) return { emoji: "📑", label: "PowerPoint", bg: "bg-orange-50 border-orange-200", text: "text-orange-700" };
+  if (["jpg","jpeg","png","gif","webp"].includes(ext)) return { emoji: "🖼️", label: "Image", bg: "bg-purple-50 border-purple-200", text: "text-purple-700" };
+  if (["zip","rar","7z"].includes(ext)) return { emoji: "🗜️", label: "Archive", bg: "bg-gray-50 border-gray-200", text: "text-gray-700" };
+  return { emoji: "📎", label: "File", bg: "bg-gray-50 border-gray-200", text: "text-gray-700" };
+}
 
 const MEMBER_COLORS = ["#7c3aed","#2563eb","#059669","#dc2626","#ea580c","#0891b2","#be185d","#d97706","#16a34a","#7c3aed"];
 const EMOJIS = ["👍","❤️","😂","😮","🎉","🔥","🙏","👏","✅","🚀","😢","💯"];
@@ -75,6 +87,11 @@ export default function AdminChat() {
   const sseRef = useRef<EventSource | null>(null);
   const typingTimer = useRef<NodeJS.Timeout | null>(null);
   const typingPoll = useRef<NodeJS.Timeout | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // File upload state
+  const [pendingFile, setPendingFile] = useState<{ name: string; url: string; size: string } | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   const scrollToBottom = useCallback((smooth = true) => {
     messagesEndRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "auto" });
@@ -95,6 +112,7 @@ export default function AdminChat() {
       fetch("/api/admin/chat/members").then(r => r.json()),
     ]);
     const chs: Channel[] = Array.isArray(chR) ? chR : [];
+    const mbs: Member[] = Array.isArray(mbR) ? mbR : [];
     // Seed defaults if empty
     if (chs.length === 0) {
       for (const seed of DEFAULT_CHANNELS_SEED) {
@@ -107,7 +125,22 @@ export default function AdminChat() {
       setChannels(chs);
       if (!activeChannel) setActiveChannel(chs[0] ?? null);
     }
-    setMembers(Array.isArray(mbR) ? mbR : []);
+    setMembers(mbs);
+    // Auto-detect identity from session if not set
+    const savedName = localStorage.getItem("chat_name");
+    if (!savedName) {
+      try {
+        const me = await fetch("/api/admin/auth/me").then(r => r.ok ? r.json() : null);
+        if (me?.user?.username) {
+          const uname = me.user.username as string;
+          const match = mbs.find(m => m.username === uname || m.name.toLowerCase().replace(/\s+/g, "") === uname.toLowerCase());
+          const resolvedName = match ? match.name : uname === "admin" ? "Admin" : uname;
+          const color = nameColor(resolvedName);
+          setMyName(resolvedName); setMyColor(color);
+          localStorage.setItem("chat_name", resolvedName); localStorage.setItem("chat_color", color);
+        }
+      } catch { /* ignore */ }
+    }
   }, [activeChannel]);
 
   useEffect(() => { loadChannels(); }, []);
@@ -162,15 +195,58 @@ export default function AdminChat() {
     typingTimer.current = setTimeout(() => {}, 3000);
   };
 
+  const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const data = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
+      const r = await fetch("/api/admin/chat/upload", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename: file.name, mimetype: file.type, data }),
+      }).then(res => res.json());
+      const bytes = file.size;
+      const size = bytes < 1024 ? `${bytes}B` : bytes < 1048576 ? `${(bytes / 1024).toFixed(1)}KB` : `${(bytes / 1048576).toFixed(1)}MB`;
+      setPendingFile({ name: file.name, url: r.url, size });
+    } catch {
+      alert("File upload failed. Please try again.");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }, []);
+
   const sendMessage = async () => {
     if (!activeChannel || !myName) { setShowNamePicker(true); return; }
+    const color = myColor || nameColor(myName);
+
+    // Send pending file if any
+    if (pendingFile) {
+      await fetch(`/api/admin/chat/channels/${activeChannel.id}/messages`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          senderName: myName, senderColor: color,
+          content: pendingFile.name, msgType: "file",
+          fileName: pendingFile.name, fileUrl: pendingFile.url,
+          replyToId: replyTo?.id ?? null,
+          replyPreview: replyTo ? `${replyTo.senderName}: ${replyTo.content.slice(0, 80)}` : null,
+        }),
+      });
+      setPendingFile(null);
+      if (!text.trim()) { setReplyTo(null); setTimeout(() => scrollToBottom(), 100); return; }
+    }
+
     const content = text.trim();
     if (!content) return;
     setText("");
     setReplyTo(null);
     await fetch(`/api/admin/chat/channels/${activeChannel.id}/messages`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ senderName: myName, senderColor: myColor || nameColor(myName), content, replyToId: replyTo?.id ?? null, replyPreview: replyTo ? `${replyTo.senderName}: ${replyTo.content.slice(0, 80)}` : null }),
+      body: JSON.stringify({ senderName: myName, senderColor: color, content, replyToId: replyTo?.id ?? null, replyPreview: replyTo ? `${replyTo.senderName}: ${replyTo.content.slice(0, 80)}` : null }),
     });
     setTimeout(() => scrollToBottom(), 100);
   };
@@ -386,15 +462,22 @@ export default function AdminChat() {
                               <button onClick={saveEdit} className="text-xs px-2 py-1.5 bg-[#0f2044] text-white rounded-lg hover:bg-[#c9a227] hover:text-[#0f2044] transition-colors">Save</button>
                               <button onClick={() => setEditingMsg(null)} className="text-xs px-2 py-1.5 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors">Cancel</button>
                             </div>
-                          ) : (
-                            <div className={`text-sm leading-relaxed whitespace-pre-wrap break-words ${msg.isDeleted ? "italic text-gray-400" : "text-gray-800"}`}>
-                              {msg.msgType === "file" && !msg.isDeleted ? (
-                                <div className="inline-flex items-center gap-2 bg-gray-100 border border-gray-200 rounded-xl px-3 py-2 mt-1">
-                                  <div className="w-8 h-8 bg-[#0f2044] rounded-lg flex items-center justify-center shrink-0"><Paperclip size={14} className="text-[#c9a227]" /></div>
-                                  <div><div className="text-xs font-semibold text-gray-700">{msg.fileName ?? "attachment"}</div><div className="text-[10px] text-gray-400">File attachment</div></div>
+                          ) : msg.isDeleted ? (
+                            <span className="text-sm italic text-gray-400">This message was deleted.</span>
+                          ) : msg.msgType === "file" && msg.fileUrl ? (() => {
+                            const fi = fileTypeInfo(msg.fileName ?? msg.content);
+                            return (
+                              <a href={msg.fileUrl} target="_blank" rel="noopener noreferrer" download={msg.fileName ?? undefined}
+                                className={`inline-flex items-center gap-3 border rounded-xl px-3 py-2.5 mt-1 max-w-xs hover:shadow-md transition-shadow cursor-pointer no-underline ${fi.bg}`}>
+                                <span className="text-2xl shrink-0">{fi.emoji}</span>
+                                <div className="min-w-0">
+                                  <p className={`text-xs font-semibold truncate ${fi.text}`}>{msg.fileName ?? msg.content}</p>
+                                  <p className="text-[10px] text-gray-400 mt-0.5">{fi.label} · Click to download</p>
                                 </div>
-                              ) : msg.content}
-                            </div>
+                              </a>
+                            );
+                          })() : (
+                            <span className="text-sm leading-relaxed whitespace-pre-wrap break-words text-gray-800">{msg.content}</span>
                           )}
 
                           {/* Reactions */}
@@ -455,6 +538,24 @@ export default function AdminChat() {
                   <button onClick={() => setReplyTo(null)} className="text-blue-400 hover:text-blue-600 shrink-0"><X size={12} /></button>
                 </div>
               )}
+              {/* Pending file preview */}
+              {pendingFile && (
+                <div className="flex items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-xl px-3 py-2">
+                  <span className="text-base">{fileTypeInfo(pendingFile.name).emoji}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-blue-800 truncate">{pendingFile.name}</p>
+                    <p className="text-[10px] text-blue-500">{pendingFile.size} · Ready to send</p>
+                  </div>
+                  <button onClick={() => setPendingFile(null)} className="text-blue-400 hover:text-blue-600 shrink-0"><X size={12} /></button>
+                </div>
+              )}
+              {uploading && (
+                <div className="flex items-center gap-2 mb-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">
+                  <div className="w-3 h-3 border-2 border-[#0f2044] border-t-transparent rounded-full animate-spin" />
+                  <span className="text-xs text-gray-500">Uploading file…</span>
+                </div>
+              )}
+              <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} />
               <div className="flex items-end gap-2 bg-gray-100 rounded-2xl px-4 py-2.5">
                 <textarea
                   ref={inputRef}
@@ -467,8 +568,12 @@ export default function AdminChat() {
                   style={{ minHeight: "24px" }}
                 />
                 <div className="flex items-center gap-1 shrink-0">
+                  <button onClick={() => fileInputRef.current?.click()} disabled={uploading} title="Attach file"
+                    className={`p-1.5 rounded-lg transition-colors ${pendingFile ? "text-blue-500 bg-blue-50" : "text-gray-400 hover:text-[#0f2044] hover:bg-white"}`}>
+                    <Paperclip size={16} />
+                  </button>
                   <button onClick={() => setEmojiTarget(emojiTarget === -1 ? null : -1)} className="p-1.5 text-gray-400 hover:text-yellow-500 rounded-lg transition-colors"><Smile size={16} /></button>
-                  <button onClick={sendMessage} disabled={!text.trim()} className="w-8 h-8 bg-[#0f2044] disabled:opacity-40 text-white rounded-xl flex items-center justify-center hover:bg-[#c9a227] hover:text-[#0f2044] transition-all disabled:hover:bg-[#0f2044] disabled:hover:text-white">
+                  <button onClick={sendMessage} disabled={!text.trim() && !pendingFile} className="w-8 h-8 bg-[#0f2044] disabled:opacity-40 text-white rounded-xl flex items-center justify-center hover:bg-[#c9a227] hover:text-[#0f2044] transition-all disabled:hover:bg-[#0f2044] disabled:hover:text-white">
                     <Send size={14} />
                   </button>
                 </div>

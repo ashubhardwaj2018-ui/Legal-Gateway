@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, integer, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, integer, boolean, unique } from "drizzle-orm/pg-core";
 
 export const teamMembersTable = pgTable("team_members", {
   id: serial("id").primaryKey(),
@@ -53,6 +53,23 @@ export const leaveRequestsTable = pgTable("leave_requests", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
 
+export const workingHoursTable = pgTable("working_hours", {
+  id: serial("id").primaryKey(),
+  employeeId: integer("employee_id").notNull(),
+  date: text("date").notNull(),
+  clockIn: timestamp("clock_in", { withTimezone: true }),
+  clockOut: timestamp("clock_out", { withTimezone: true }),
+  totalMinutes: integer("total_minutes"),
+  breakMinutes: integer("break_minutes").default(0),
+  notes: text("notes"),
+  status: text("status").notNull().default("present"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+}, (t) => ({
+  empDateUniq: unique("wh_emp_date_uniq").on(t.employeeId, t.date),
+}));
+
 export type TeamMember = typeof teamMembersTable.$inferSelect;
 export type Attendance = typeof attendanceTable.$inferSelect;
 export type LeaveRequest = typeof leaveRequestsTable.$inferSelect;
+export type WorkingHours = typeof workingHoursTable.$inferSelect;

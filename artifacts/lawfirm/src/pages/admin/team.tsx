@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AdminLayout } from "./AdminLayout";
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -12,6 +13,7 @@ import {
   Users, Plus, Pencil, Trash2, X, CheckCircle2, XCircle,
   Clock, Calendar, ChevronRight, Search, Building2, Mail,
   Phone, Shield, Banknote, UserCheck, Award, CalendarCheck, FileText,
+  Timer, LogIn, LogOut, ExternalLink, TrendingUp,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -35,6 +37,11 @@ interface LeaveRequest {
   reason?: string; status: string; approvedBy?: string; createdAt: string;
 }
 
+interface WorkingHours {
+  id: number; employeeId: number; date: string;
+  clockIn: string | null; clockOut: string | null; totalMinutes: number | null;
+  breakMinutes: number | null; notes: string | null; status: string; createdAt: string;
+}
 interface MemberDetail extends TeamMember { attendance: Attendance[]; leaves: LeaveRequest[]; }
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -348,16 +355,47 @@ function LeaveDialog({ member, onClose, onSaved }: { member: TeamMember; onClose
 
 // ── Member Detail Drawer ───────────────────────────────────────────────────────
 
+function fmtHm(minutes: number | null | undefined): string {
+  if (!minutes || minutes <= 0) return "—";
+  const h = Math.floor(minutes / 60), m = minutes % 60;
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
+function fmtTimestamp(ts: string | null): string {
+  if (!ts) return "—";
+  return new Date(ts).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+}
+
 function MemberDrawer({ member, onClose, onUpdated }: { member: TeamMember; onClose: () => void; onUpdated: () => void }) {
-  const [tab, setTab] = useState<"profile" | "attendance" | "leaves">("profile");
+  const [tab, setTab] = useState<"profile" | "attendance" | "leaves" | "workingHours">("profile");
   const [editOpen, setEditOpen] = useState(false);
   const [attendanceOpen, setAttendanceOpen] = useState(false);
   const [leaveOpen, setLeaveOpen] = useState(false);
+  const [whMonth, setWhMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const qc = useQueryClient();
 
   const { data: detail, isLoading } = useQuery<MemberDetail>({
     queryKey: ["team-member", member.id],
     queryFn: () => api(`/admin/team/${member.id}`),
+  });
+
+  const { data: whRecords = [], isLoading: whLoading } = useQuery<WorkingHours[]>({
+    queryKey: ["working-hours", member.id, whMonth],
+    queryFn: () => api(`/admin/team/${member.id}/working-hours?month=${whMonth}`),
+    enabled: tab === "workingHours",
+  });
+
+  const todayStr = new Date().toISOString().split("T")[0];
+  const todayWH = whRecords.find(w => w.date === todayStr);
+  const monthTotal = whRecords.reduce((sum, w) => sum + (w.totalMinutes ?? 0), 0);
+
+  const clockInMutation = useMutation({
+    mutationFn: (status: string) => api(`/admin/team/${member.id}/clock-in`, { method: "POST", body: JSON.stringify({ status }) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["working-hours", member.id] }),
+  });
+
+  const clockOutMutation = useMutation({
+    mutationFn: () => api(`/admin/team/${member.id}/clock-out`, { method: "POST", body: JSON.stringify({}) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["working-hours", member.id] }),
   });
 
   const updateLeaveMutation = useMutation({
@@ -441,11 +479,16 @@ function MemberDrawer({ member, onClose, onUpdated }: { member: TeamMember; onCl
           </div>
 
           {/* Tabs */}
-          <div className="flex border-b px-6 bg-white">
-            {(["profile", "attendance", "leaves"] as const).map(t => (
-              <button key={t} onClick={() => setTab(t)}
-                className={`px-4 py-2.5 text-xs font-medium capitalize border-b-2 transition-colors ${tab === t ? "border-[#c9a227] text-[#0f2044]" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
-                {t}
+          <div className="flex border-b px-6 bg-white overflow-x-auto">
+            {([
+              { id: "profile", label: "Profile" },
+              { id: "attendance", label: "Attendance" },
+              { id: "leaves", label: "Leaves" },
+              { id: "workingHours", label: "Working Hours" },
+            ] as const).map(t => (
+              <button key={t.id} onClick={() => setTab(t.id)}
+                className={`px-4 py-2.5 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${tab === t.id ? "border-[#c9a227] text-[#0f2044]" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
+                {t.label}
               </button>
             ))}
           </div>
@@ -556,6 +599,107 @@ function MemberDrawer({ member, onClose, onUpdated }: { member: TeamMember; onCl
                         </div>
                       </div>
                     ))}
+                  </div>
+                )}
+
+                {/* WORKING HOURS */}
+                {tab === "workingHours" && (
+                  <div className="space-y-4">
+                    {/* Header + month picker */}
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-[#0f2044] flex items-center gap-2"><Timer size={14} />Working Hours Tracker</h3>
+                      <input type="month" value={whMonth} onChange={e => setWhMonth(e.target.value)}
+                        className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-[#0f2044]/20" />
+                    </div>
+
+                    {/* Today's clock-in/out card */}
+                    <div className={`rounded-xl border-2 p-4 ${!todayWH?.clockIn ? "border-gray-200 bg-gray-50" : todayWH.clockOut ? "border-green-200 bg-green-50" : "border-[#c9a227] bg-amber-50"}`}>
+                      <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Today · {todayStr}</p>
+                      {todayWH?.clockIn ? (
+                        <div className="space-y-1 mb-3">
+                          <div className="flex items-center gap-2 text-sm">
+                            <LogIn size={13} className="text-green-600" />
+                            <span className="text-gray-700">Clocked in: <span className="font-semibold">{fmtTimestamp(todayWH.clockIn)}</span></span>
+                          </div>
+                          {todayWH.clockOut ? (
+                            <>
+                              <div className="flex items-center gap-2 text-sm">
+                                <LogOut size={13} className="text-red-500" />
+                                <span className="text-gray-700">Clocked out: <span className="font-semibold">{fmtTimestamp(todayWH.clockOut)}</span></span>
+                              </div>
+                              <div className="flex items-center gap-2 text-sm">
+                                <Timer size={13} className="text-[#c9a227]" />
+                                <span className="font-bold text-[#0f2044]">Total: {fmtHm(todayWH.totalMinutes)}</span>
+                              </div>
+                            </>
+                          ) : (
+                            <p className="text-xs text-amber-700 flex items-center gap-1"><Clock size={11} /> Currently working…</p>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-500 mb-3">Not clocked in yet today.</p>
+                      )}
+                      <div className="flex gap-2">
+                        {!todayWH?.clockIn ? (
+                          <>
+                            <Button size="sm" onClick={() => clockInMutation.mutate("present")} disabled={clockInMutation.isPending}
+                              className="h-7 text-xs gap-1 bg-green-600 hover:bg-green-700 text-white">
+                              <LogIn size={11} />Clock In (Present)
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => clockInMutation.mutate("work_from_home")} disabled={clockInMutation.isPending}
+                              className="h-7 text-xs gap-1 border-blue-300 text-blue-700 hover:bg-blue-50">
+                              <LogIn size={11} />WFH
+                            </Button>
+                          </>
+                        ) : !todayWH?.clockOut ? (
+                          <Button size="sm" onClick={() => clockOutMutation.mutate()} disabled={clockOutMutation.isPending}
+                            className="h-7 text-xs gap-1 bg-red-600 hover:bg-red-700 text-white">
+                            <LogOut size={11} />Clock Out
+                          </Button>
+                        ) : (
+                          <span className="text-xs font-medium text-green-700 bg-green-100 px-3 py-1 rounded-full flex items-center gap-1">
+                            <CheckCircle2 size={12} /> Shift complete
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Monthly summary */}
+                    {whRecords.length > 0 && (
+                      <div className="grid grid-cols-3 gap-2">
+                        {[
+                          { label: "Present", value: whRecords.filter(w => w.status === "present").length, icon: <UserCheck size={12} className="text-green-500" /> },
+                          { label: "WFH", value: whRecords.filter(w => w.status === "work_from_home").length, icon: <Clock size={12} className="text-blue-500" /> },
+                          { label: "Total Hours", value: fmtHm(monthTotal), icon: <TrendingUp size={12} className="text-[#c9a227]" /> },
+                        ].map(s => (
+                          <div key={s.label} className="text-center bg-gray-50 rounded-lg p-3 border border-gray-100">
+                            <div className="flex justify-center mb-1">{s.icon}</div>
+                            <div className="text-base font-bold text-[#0f2044]">{s.value}</div>
+                            <div className="text-[9px] text-gray-400 uppercase tracking-wide">{s.label}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* History table */}
+                    {whLoading ? (
+                      <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
+                    ) : whRecords.filter(w => w.date !== todayStr).length === 0 ? (
+                      <div className="text-center py-6 text-gray-400 text-sm">No other records for {whMonth}.</div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-2">History</p>
+                        {whRecords.filter(w => w.date !== todayStr).map(w => (
+                          <div key={w.id} className="flex items-center gap-2 py-2 px-3 bg-gray-50 rounded-lg border border-gray-100">
+                            <span className={`w-2 h-2 rounded-full shrink-0 ${w.status === "present" ? "bg-green-500" : w.status === "work_from_home" ? "bg-blue-400" : w.status === "half_day" ? "bg-yellow-400" : "bg-gray-300"}`} />
+                            <span className="text-xs font-medium text-gray-700 w-24 shrink-0">{w.date}</span>
+                            <span className="text-xs text-gray-500 capitalize flex-1 hidden sm:block">{w.status.replace(/_/g, " ")}</span>
+                            <span className="text-xs text-gray-400 shrink-0">{fmtTimestamp(w.clockIn)} → {fmtTimestamp(w.clockOut)}</span>
+                            <span className="text-xs font-semibold text-[#0f2044] w-14 text-right shrink-0">{fmtHm(w.totalMinutes)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </>
@@ -720,9 +864,14 @@ export default function AdminTeam() {
   return (
     <AdminLayout
       title="Team & HR"
-      subtitle={`${members.length} member${members.length !== 1 ? "s" : ""}`}
+      subtitle={`${members.length} member${members.length !== 1 ? "s" : ""} · HR Operations`}
       actions={
         <div className="flex gap-2">
+          <Link href="/admin/employees">
+            <Button size="sm" variant="outline" className="gap-1.5 h-8 text-xs border-[#c9a227] text-[#c9a227] hover:bg-[#c9a227]/10">
+              <ExternalLink size={12} /> Employees & Accounts
+            </Button>
+          </Link>
           <Button size="sm" variant="outline" onClick={() => setLeavesOpen(true)} className="gap-1.5 h-8 text-xs">
             <Calendar size={12} /> Leave Requests
           </Button>
