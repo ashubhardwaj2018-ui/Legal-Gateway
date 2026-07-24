@@ -1,6 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { eq, desc, ilike, and } from "drizzle-orm";
 import nodemailer from "nodemailer";
+import { requirePermission } from "./auth";
 import { db, emailTemplatesTable, emailLogsTable, siteSettingsTable, consultationsTable, invoicesTable } from "@workspace/db";
 
 const router: IRouter = Router();
@@ -291,7 +292,7 @@ async function sendEmail(opts: { toEmail: string; toName?: string; subject: stri
   }
 }
 
-router.post("/admin/email/send", async (req, res): Promise<void> => {
+router.post("/admin/email/send", requirePermission("email", "send"), async (req, res): Promise<void> => {
   const { toEmail, toName, subject, htmlBody, type, templateId, leadId, invoiceId } = req.body as Record<string, string | number | undefined>;
   if (!toEmail || !subject) { res.status(400).json({ error: "toEmail and subject are required" }); return; }
 
@@ -314,7 +315,7 @@ router.post("/admin/email/send", async (req, res): Promise<void> => {
   }
 });
 
-router.post("/admin/email/send-invoice/:id", async (req, res): Promise<void> => {
+router.post("/admin/email/send-invoice/:id", requirePermission("email", "send"), async (req, res): Promise<void> => {
   const invoiceId = parseInt(req.params.id, 10);
   const [inv] = await db.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
   if (!inv || !inv.clientEmail) { res.status(400).json({ error: "Invoice not found or no client email" }); return; }

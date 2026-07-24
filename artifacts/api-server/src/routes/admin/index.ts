@@ -47,6 +47,7 @@ router.use(makeModulePermissionMiddleware([
   ["/admin/indian-companies",   "indian_companies"],
   ["/admin/working-hours",      "team"],
   ["/admin/company-data",       "company_data"],
+  ["/admin/dashboard",          "dashboard"],
   ["/admin/quotations",         "quotations"],
   ["/admin/newsletter",         "newsletter"],
   ["/admin/locations",          "locations"],

@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, ilike, or, count, desc, sql } from "drizzle-orm";
 import { db, companyDataTable } from "@workspace/db";
+import { requirePermission } from "./auth";
 import {
   CreateCompanyRecordBody,
   BulkImportCompanyDataBody,
@@ -57,7 +58,7 @@ router.post("/admin/company-data", async (req, res): Promise<void> => {
   res.status(201).json(result);
 });
 
-router.post("/admin/company-data/bulk-import", async (req, res): Promise<void> => {
+router.post("/admin/company-data/bulk-import", requirePermission("company_data", "import"), async (req, res): Promise<void> => {
   const parsed = BulkImportCompanyDataBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });

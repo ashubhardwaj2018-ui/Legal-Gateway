@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, desc } from "drizzle-orm";
 import { db, quotationsTable } from "@workspace/db";
+import { requirePermission } from "./auth";
 import {
   CreateQuotationBody,
   UpdateQuotationBody,
@@ -112,7 +113,7 @@ router.patch("/admin/quotations/:id", async (req, res): Promise<void> => {
   res.json(result);
 });
 
-router.post("/admin/quotations/:id/send", async (req, res): Promise<void> => {
+router.post("/admin/quotations/:id/send", requirePermission("quotations", "send"), async (req, res): Promise<void> => {
   const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const paramsParsed = SendQuotationParams.safeParse({ id: parseInt(rawId, 10) });
   if (!paramsParsed.success) {
