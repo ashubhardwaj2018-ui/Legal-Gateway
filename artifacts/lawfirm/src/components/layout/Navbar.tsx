@@ -1,7 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { useState, useEffect, useRef } from "react";
-import { Menu, X, ChevronDown, ChevronRight, Scale, Phone, MessageCircle, Building2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Menu, X, ChevronDown, ChevronRight, Scale, Phone, LogIn } from "lucide-react";
 import { SERVICES_DATA } from "@/data/services";
 import { toSlug } from "@/lib/slug";
 import { cn } from "@/lib/utils";
@@ -65,14 +64,6 @@ export function Navbar() {
           <div className="hidden lg:flex items-center flex-1 min-w-0 overflow-hidden">
             <Link href="/" className="px-2.5 py-2 text-sm font-medium text-foreground hover:text-secondary hover:bg-secondary/10 rounded-lg transition-all shrink-0">
               Home
-            </Link>
-            <Link href="/blog" className="px-2.5 py-2 text-sm font-medium text-foreground hover:text-secondary hover:bg-secondary/10 rounded-lg transition-all shrink-0">
-              Blog
-            </Link>
-            <Link href="/indian-companies" className="px-2.5 py-2 text-sm font-medium text-foreground hover:text-secondary hover:bg-secondary/10 rounded-lg transition-all shrink-0 flex items-center gap-1">
-              <Building2 size={13} className="text-secondary" />
-              <span className="hidden xl:inline">Indian Companies</span>
-              <span className="xl:hidden">Companies</span>
             </Link>
 
             {NAV_ITEMS.map(item => {
@@ -167,18 +158,15 @@ export function Navbar() {
             })}
           </div>
 
-          {/* Phone + CTA — only show phone on xl */}
-          <div className="hidden lg:flex items-center gap-2 ml-auto shrink-0">
+          {/* Right side: Phone + Login */}
+          <div className="hidden lg:flex items-center gap-3 ml-auto shrink-0">
             <a href="tel:18001234567" className="hidden xl:flex items-center gap-1.5 text-primary text-sm font-medium hover:text-secondary transition-colors whitespace-nowrap">
               <Phone size={14} className="text-secondary shrink-0" />
               1800-123-4567
             </a>
-            <Link href="/services/consult-expert">
-              <Button className="bg-secondary text-primary hover:bg-secondary/90 font-bold h-9 px-3 xl:px-4 text-sm flex items-center gap-1.5 whitespace-nowrap">
-                <MessageCircle size={14} />
-                <span className="hidden xl:inline">Consult an Expert</span>
-                <span className="xl:hidden">Consult</span>
-              </Button>
+            <Link href="/portal" className="flex items-center gap-1.5 text-sm font-semibold text-primary border border-primary/30 hover:border-secondary hover:text-secondary rounded-lg px-3 py-1.5 transition-all whitespace-nowrap">
+              <LogIn size={14} />
+              Client Login
             </Link>
           </div>
 
@@ -196,28 +184,9 @@ export function Navbar() {
       )}>
         <div className="p-4 flex flex-col divide-y divide-gray-100">
           <Link href="/" className="font-medium py-3 text-[#0f2044]" onClick={() => setMobileOpen(false)}>Home</Link>
-          <Link href="/blog" className="font-medium py-3 text-[#0f2044]" onClick={() => setMobileOpen(false)}>Blog</Link>
-          <Link href="/indian-companies" className="font-medium py-3 text-[#0f2044] flex items-center gap-1.5" onClick={() => setMobileOpen(false)}>
-            <Building2 size={14} className="text-[#c9a227]" /> Indian Companies
-          </Link>
 
-          {[...NAV_ITEMS, { label: "Consult an Expert", categories: ["consult-expert"] as CategoryId[] }].map(item => {
-            const isConsult = item.label === "Consult an Expert";
+          {NAV_ITEMS.map(item => {
             const isOthers = item.label === "Others";
-
-            if (isConsult) {
-              return (
-                <Link
-                  key="consult"
-                  href="/services/consult-expert"
-                  className="font-bold py-3 text-[#c9a227] flex items-center gap-2"
-                  onClick={() => setMobileOpen(false)}
-                >
-                  <MessageCircle size={15} /> Consult an Expert
-                </Link>
-              );
-            }
-
             return (
               <div key={item.label}>
                 <button
@@ -265,9 +234,10 @@ export function Navbar() {
               <Phone size={16} className="text-secondary" />
               1800-123-4567
             </a>
-            <Button className="w-full bg-primary text-white hover:bg-secondary hover:text-primary transition-colors font-bold">
-              Book Free Consultation
-            </Button>
+            <Link href="/portal" onClick={() => setMobileOpen(false)} className="flex items-center justify-center gap-2 border border-primary/30 text-primary font-semibold rounded-lg py-2.5 text-sm hover:border-secondary hover:text-secondary transition-all">
+              <LogIn size={15} />
+              Client Login
+            </Link>
           </div>
         </div>
       </div>

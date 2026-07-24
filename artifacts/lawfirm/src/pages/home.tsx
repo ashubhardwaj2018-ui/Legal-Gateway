@@ -1,8 +1,9 @@
 import { motion } from "framer-motion";
+import { useState } from "react";
 import { Link } from "wouter";
 import { 
   ArrowRight, ShieldCheck, Clock, Award, Users, FileText, 
-  Building2, Scale, Building, Heart, Shield, Landmark, MapPin, Star, MessageSquare, Phone, BookOpen, Eye
+  Building2, Scale, Building, Heart, Shield, Landmark, MapPin, Star, MessageSquare, Phone, BookOpen, Eye, CheckCircle2, ChevronDown as ChevronDownIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CATEGORIES } from "@/data/services";
@@ -117,47 +118,159 @@ function LatestBlogSection() {
 }
 
 export default function Home() {
+  const [form, setForm] = useState({ name: "", email: "", phone: "", serviceCategory: "", message: "" });
+  const [consultStatus, setConsultStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
+
+  const handleConsult = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.name || !form.email || !form.phone) return;
+    setConsultStatus("loading");
+    try {
+      await fetch("/api/consultations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.name,
+          email: form.email,
+          phone: form.phone,
+          serviceCategory: form.serviceCategory || "General",
+          serviceInterest: form.serviceCategory || "General Consultation",
+          message: form.message || undefined,
+        }),
+      });
+      setConsultStatus("done");
+    } catch {
+      setConsultStatus("error");
+    }
+  };
+
   return (
     <div className="w-full overflow-x-hidden">
       {/* Hero Section */}
-      <section className="relative min-h-[90vh] flex items-center justify-center pt-10 pb-20">
+      <section className="relative min-h-[92vh] flex items-center py-20 pt-24">
         <div className="absolute inset-0 z-0">
-          <img 
-            src="/hero-bg.png" 
-            alt="Law office" 
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-primary/90 via-primary/80 to-primary/40 backdrop-blur-[2px]" />
+          <img src="/hero-bg.png" alt="Law office" className="w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-r from-primary/95 via-primary/85 to-primary/60" />
         </div>
 
         <div className="container relative z-10 mx-auto px-4 md:px-6">
-          <div className="max-w-3xl">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 xl:gap-16 items-center">
+
+            {/* Left: Hero text */}
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 24 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6 }}
             >
-              <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-secondary/20 text-secondary font-medium text-sm mb-6 backdrop-blur-md border border-secondary/30">
+              <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-secondary/20 text-secondary font-medium text-sm mb-6 border border-secondary/30">
                 <Scale size={14} /> India's Premium Legal Network
               </span>
-              <h1 className="text-4xl md:text-6xl lg:text-7xl font-serif font-bold text-white leading-[1.1] mb-6">
-                Expert Legal Counsel, <br/>
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-serif font-bold text-white leading-[1.1] mb-5">
+                Expert Legal Counsel,<br />
                 <span className="text-secondary">Made Accessible.</span>
               </h1>
-              <p className="text-lg md:text-xl text-white/80 mb-10 max-w-2xl leading-relaxed">
-                From protecting your intellectual property to complex corporate litigation, 
+              <p className="text-base md:text-lg text-white/80 mb-8 max-w-xl leading-relaxed">
+                From protecting your intellectual property to complex corporate litigation,
                 our network of top-tier attorneys delivers decisive results with complete transparency.
               </p>
-              
-              <div className="flex flex-col sm:flex-row gap-4">
-                <Button size="lg" className="bg-secondary text-primary hover:bg-secondary/90 text-base font-semibold h-14 px-8">
-                  Book Free Consultation
-                </Button>
-                <Button size="lg" variant="outline" className="bg-white/10 text-white border-white/30 hover:bg-white/20 hover:text-white text-base font-medium h-14 px-8 backdrop-blur-md">
-                  Explore Services
-                </Button>
-              </div>
+              <button
+                onClick={() => document.getElementById("services")?.scrollIntoView({ behavior: "smooth" })}
+                className="inline-flex items-center gap-2 text-white/80 hover:text-secondary border border-white/20 hover:border-secondary/50 rounded-lg px-5 py-2.5 text-sm font-medium transition-all backdrop-blur-md"
+              >
+                Explore Our Services <ChevronDownIcon size={15} />
+              </button>
             </motion.div>
+
+            {/* Right: Consultation form */}
+            <motion.div
+              initial={{ opacity: 0, x: 30 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.6, delay: 0.15 }}
+              className="bg-white rounded-2xl shadow-2xl overflow-hidden"
+            >
+              <div className="bg-primary px-6 py-4">
+                <h2 className="text-white font-serif font-bold text-lg">Get Free Consultation</h2>
+                <p className="text-white/60 text-xs mt-0.5">Talk to an expert today — no obligation.</p>
+              </div>
+
+              {consultStatus === "done" ? (
+                <div className="px-6 py-12 text-center">
+                  <CheckCircle2 size={48} className="text-green-500 mx-auto mb-4" />
+                  <h3 className="font-bold text-primary text-lg mb-1">Request Received!</h3>
+                  <p className="text-gray-500 text-sm">Our team will call you within 2 business hours.</p>
+                  <button onClick={() => { setConsultStatus("idle"); setForm({ name: "", phone: "", service: "", message: "" }); }} className="mt-5 text-sm text-secondary hover:underline">
+                    Submit another request
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleConsult} className="px-6 py-5 space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Full Name *</label>
+                    <input
+                      required
+                      value={form.name}
+                      onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                      placeholder="e.g. Rahul Mehta"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-secondary/40 focus:border-secondary transition"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Email *</label>
+                      <input
+                        required
+                        type="email"
+                        value={form.email}
+                        onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                        placeholder="you@example.com"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-secondary/40 focus:border-secondary transition"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Phone *</label>
+                      <input
+                        required
+                        value={form.phone}
+                        onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+                        placeholder="Mobile number"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-secondary/40 focus:border-secondary transition"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">I need help with</label>
+                    <select
+                      value={form.serviceCategory}
+                      onChange={e => setForm(f => ({ ...f, serviceCategory: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-secondary/40 focus:border-secondary transition bg-white"
+                    >
+                      <option value="">-- Select a service area --</option>
+                      {CATEGORIES.map(c => (
+                        <option key={c.id} value={c.title}>{c.title}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Brief description (optional)</label>
+                    <textarea
+                      value={form.message}
+                      onChange={e => setForm(f => ({ ...f, message: e.target.value }))}
+                      placeholder="Briefly describe your legal matter…"
+                      rows={2}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-secondary/40 focus:border-secondary transition resize-none"
+                    />
+                  </div>
+                  {consultStatus === "error" && (
+                    <p className="text-red-500 text-xs">Something went wrong. Please try again or call us.</p>
+                  )}
+                  <Button type="submit" disabled={consultStatus === "loading"} className="w-full bg-secondary text-primary hover:bg-secondary/90 font-bold h-11">
+                    {consultStatus === "loading" ? "Sending…" : "Book Free Consultation →"}
+                  </Button>
+                  <p className="text-center text-xs text-gray-400">Or call us: <a href="tel:18001234567" className="text-primary font-medium hover:text-secondary">1800-123-4567</a></p>
+                </form>
+              )}
+            </motion.div>
+
           </div>
         </div>
       </section>
@@ -184,7 +297,7 @@ export default function Home() {
       </section>
 
       {/* Services Grid */}
-      <section className="py-24 bg-gray-50">
+      <section id="services" className="py-24 bg-gray-50">
         <div className="container mx-auto px-4 md:px-6">
           <div className="text-center max-w-3xl mx-auto mb-16">
             <h2 className="text-3xl md:text-5xl font-serif font-bold text-primary mb-4">Practice Areas</h2>
