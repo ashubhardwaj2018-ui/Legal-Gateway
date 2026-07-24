@@ -148,6 +148,12 @@ export async function adminAuthMiddleware(req: AuthenticatedRequest, res: Respon
   if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
   const payload = verifyToken(token);
   if (!payload) { res.status(401).json({ error: "Session expired" }); return; }
+
+  // Block all protected routes when password change is required
+  if (payload.forcePasswordChange === true) {
+    res.status(403).json({ error: "password_change_required" }); return;
+  }
+
   req.adminUser = payload;
 
   const role = typeof payload.role === "string" ? payload.role : "";
@@ -287,6 +293,39 @@ authRouter.post("/admin/auth/logout", async (req, res): Promise<void> => {
     }
   }
   res.clearCookie(TOKEN_COOKIE, { path: "/" });
+  res.json({ ok: true });
+});
+
+authRouter.post("/admin/auth/change-password", async (req, res): Promise<void> => {
+  const token = req.cookies?.[TOKEN_COOKIE] as string | undefined;
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const payload = verifyToken(token);
+  if (!payload) { res.status(401).json({ error: "Session expired" }); return; }
+
+  const { newPassword } = req.body as { newPassword?: string };
+  if (!newPassword || newPassword.length < 6) {
+    res.status(400).json({ error: "Password must be at least 6 characters" }); return;
+  }
+
+  const userId = typeof payload.userId === "number" ? payload.userId : null;
+  if (!userId) { res.status(401).json({ error: "Invalid session" }); return; }
+
+  if (payload.userType === "employee") {
+    await db.update(teamMembersTable)
+      .set({ passwordHash: hashPassword(newPassword), forcePasswordChange: false })
+      .where(eq(teamMembersTable.id, userId));
+  } else {
+    await db.update(adminUsersTable)
+      .set({ passwordHash: hashPassword(newPassword) })
+      .where(eq(adminUsersTable.id, userId));
+  }
+
+  // Re-issue token with forcePasswordChange cleared
+  const { forcePasswordChange: _fc, exp: _exp, ...rest } = payload;
+  const newToken = signToken({ ...rest, forcePasswordChange: false, exp: Date.now() + TOKEN_TTL_MS });
+  res.cookie(TOKEN_COOKIE, newToken, { httpOnly: true, sameSite: "lax", maxAge: TOKEN_TTL_MS, path: "/" });
+  await logActivity(userId, typeof payload.username === "string" ? payload.username : "unknown",
+    payload.userType === "employee" ? "employee" : "admin", "auth", "password_change");
   res.json({ ok: true });
 });
 

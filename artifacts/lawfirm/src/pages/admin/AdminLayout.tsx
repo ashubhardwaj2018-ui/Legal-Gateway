@@ -68,6 +68,10 @@ export function AdminLayout({ children, title, subtitle, actions }: Props) {
   const [authChecked, setAuthChecked] = useState(false);
   const [adminUser, setAdminUser] = useState<{ username: string; role: string; userType?: string } | null>(null);
   const [permissions, setPermissions] = useState<PermissionSet | null>(null);
+  const [forceChangePwd, setForceChangePwd] = useState(false);
+  const [changePwdInput, setChangePwdInput] = useState("");
+  const [changePwdError, setChangePwdError] = useState("");
+  const [changePwdPending, setChangePwdPending] = useState(false);
 
   useEffect(() => {
     fetch("/api/admin/auth/me")
@@ -78,7 +82,11 @@ export function AdminLayout({ children, title, subtitle, actions }: Props) {
       .then(d => {
         if (d?.user) {
           setAdminUser(d.user as { username: string; role: string; userType?: string });
-          // Load permissions (needed to filter nav for employee users)
+          if (d.user.forcePasswordChange === true) {
+            setForceChangePwd(true);
+            setAuthChecked(true);
+            return;
+          }
           fetch("/api/admin/auth/permissions")
             .then(r2 => r2.ok ? r2.json() : null)
             .then(p => { if (p) setPermissions(p as PermissionSet); })
@@ -88,6 +96,31 @@ export function AdminLayout({ children, title, subtitle, actions }: Props) {
       })
       .catch(() => navigate("/admin/login"));
   }, []);
+
+  async function handleForceChangePwd() {
+    if (changePwdInput.length < 6) { setChangePwdError("Password must be at least 6 characters"); return; }
+    setChangePwdPending(true);
+    setChangePwdError("");
+    try {
+      const res = await fetch("/api/admin/auth/change-password", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newPassword: changePwdInput }),
+      });
+      if (!res.ok) {
+        const d = await res.json() as { error?: string };
+        setChangePwdError(d.error ?? "Failed"); return;
+      }
+      setForceChangePwd(false);
+      setChangePwdInput("");
+      // Re-load permissions after password change
+      fetch("/api/admin/auth/permissions")
+        .then(r2 => r2.ok ? r2.json() : null)
+        .then(p => { if (p) setPermissions(p as PermissionSet); })
+        .catch(() => {});
+    } finally {
+      setChangePwdPending(false);
+    }
+  }
 
   const handleLogout = async () => {
     await fetch("/api/admin/auth/logout", { method: "POST" });
@@ -107,6 +140,52 @@ export function AdminLayout({ children, title, subtitle, actions }: Props) {
         <div className="text-center">
           <Loader2 size={28} className="animate-spin text-[#c9a227] mx-auto mb-3" />
           <p className="text-white/40 text-sm">Verifying session…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (forceChangePwd) {
+    return (
+      <div className="min-h-screen bg-[#0f2044] flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="bg-[#c9a227] text-[#0f2044] p-2 rounded-lg"><Scale size={20} /></div>
+            <div>
+              <div className="font-bold text-[#0f2044]">Change Your Password</div>
+              <div className="text-xs text-gray-500">Required before accessing the panel</div>
+            </div>
+          </div>
+          <p className="text-sm text-gray-600 mb-4">
+            Your account requires a password change. Please set a new password to continue.
+          </p>
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs font-medium text-gray-700 block mb-1">New Password (min 6 characters)</label>
+              <input
+                type="password"
+                value={changePwdInput}
+                onChange={e => setChangePwdInput(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") handleForceChangePwd(); }}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#c9a227]"
+                placeholder="Enter new password"
+              />
+            </div>
+            {changePwdError && <p className="text-xs text-red-600">{changePwdError}</p>}
+            <button
+              onClick={handleForceChangePwd}
+              disabled={changePwdPending || changePwdInput.length < 6}
+              className="w-full bg-[#c9a227] hover:bg-[#b8911e] disabled:opacity-50 text-[#0f2044] font-semibold py-2.5 rounded-lg text-sm transition-colors"
+            >
+              {changePwdPending ? "Saving…" : "Set New Password & Continue"}
+            </button>
+            <button
+              onClick={handleLogout}
+              className="w-full text-xs text-gray-400 hover:text-gray-600 py-1 transition-colors"
+            >
+              Sign out instead
+            </button>
+          </div>
         </div>
       </div>
     );

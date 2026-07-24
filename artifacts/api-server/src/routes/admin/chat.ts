@@ -187,11 +187,19 @@ router.get("/admin/chat/members", async (_req, res): Promise<void> => {
 
 // ─── File upload (base64) ─────────────────────────────────────────────────────
 
+// Extensions that can execute scripts if served from same origin — blocked
+const BLOCKED_EXTS = new Set([
+  ".html",".htm",".xhtml",".js",".mjs",".cjs",".jsx",".ts",".tsx",
+  ".php",".py",".rb",".sh",".bash",".bat",".cmd",".ps1",".vbs",
+  ".svg",".xml",".xsl",".json",".yaml",".yml",
+]);
+
 router.post("/admin/chat/upload", async (req, res): Promise<void> => {
   const { filename, data } = req.body as { filename?: string; data?: string };
   if (!data || !filename) { res.status(400).json({ error: "filename and data required" }); return; }
+  const ext = (path.extname(filename) || ".bin").toLowerCase();
+  if (BLOCKED_EXTS.has(ext)) { res.status(400).json({ error: `File type ${ext} is not allowed` }); return; }
   const base64 = data.replace(/^data:[^;]+;base64,/, "");
-  const ext = path.extname(filename) || ".bin";
   const safeName = `${Date.now()}-${crypto.randomBytes(4).toString("hex")}${ext}`;
   const filePath = path.join(UPLOADS_DIR, safeName);
   try {
@@ -202,12 +210,15 @@ router.post("/admin/chat/upload", async (req, res): Promise<void> => {
   }
 });
 
-// ─── Serve uploaded files ─────────────────────────────────────────────────────
+// ─── Serve uploaded files (forced download — prevents same-origin script exec) ──
 
 router.get("/admin/chat/files/:filename", (req: Request, res: Response): void => {
   const filename = String(req.params["filename"]).replace(/\.\./g, "");
   const filePath = path.join(UPLOADS_DIR, filename);
   if (!fs.existsSync(filePath)) { res.status(404).json({ error: "Not found" }); return; }
+  // Force download so browser cannot execute content as page/script
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  res.setHeader("X-Content-Type-Options", "nosniff");
   res.sendFile(filePath);
 });
 

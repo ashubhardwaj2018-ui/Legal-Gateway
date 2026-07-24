@@ -21,9 +21,6 @@ interface Employee {
 }
 
 const DEPARTMENTS = ["Management","Legal","Accounts","HR","Marketing","Operations","IT","Support","Sales","Finance"];
-const ROLES = ["Super Admin","Admin","Sales Manager","Sales Executive","Accounts","HR",
-  "SEO Executive","Digital Marketing Executive","Content Writer","Customer Support",
-  "Legal Team","Finance Manager","Developer","Customer","staff","manager","intern"];
 const STATUS_COLORS: Record<string, string> = {
   active: "bg-green-100 text-green-700 border-green-200",
   inactive: "bg-gray-100 text-gray-500 border-gray-200",
@@ -40,6 +37,11 @@ export default function AdminEmployees() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterDept, setFilterDept] = useState("all");
   const [showForm, setShowForm] = useState(false);
+
+  const { data: rolesList = [] } = useQuery<{ id: number; name: string }[]>({
+    queryKey: ["roles-list"],
+    queryFn: () => fetch("/api/admin/roles").then(r => r.json()),
+  });
   const [editing, setEditing] = useState<Employee | null>(null);
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [showPwdModal, setShowPwdModal] = useState<Employee | null>(null);
@@ -302,7 +304,9 @@ export default function AdminEmployees() {
               <Label className="text-xs mb-1 block">Role</Label>
               <Select value={form.role} onValueChange={v => setForm(f => ({ ...f, role: v }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{ROLES.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
+                <SelectContent>
+                  {rolesList.map(r => <SelectItem key={r.id} value={r.name}>{r.name}</SelectItem>)}
+                </SelectContent>
               </Select>
             </div>
             <div className="col-span-2">

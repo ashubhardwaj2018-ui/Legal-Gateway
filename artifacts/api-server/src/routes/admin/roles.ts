@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
 import { db, rolesTable, rolePermissionsTable } from "@workspace/db";
+import { invalidatePermissionCache } from "./auth";
 
 const router: IRouter = Router();
 
@@ -83,6 +84,9 @@ router.put("/admin/roles/:id/permissions", async (req, res): Promise<void> => {
   if (rows.length > 0) {
     await db.insert(rolePermissionsTable).values(rows);
   }
+  // Invalidate in-memory permission cache so changes take effect immediately
+  const [roleRow] = await db.select({ name: rolesTable.name }).from(rolesTable).where(eq(rolesTable.id, id));
+  if (roleRow) invalidatePermissionCache(roleRow.name);
   res.json({ ok: true, saved: rows.length });
 });
 
