@@ -183,6 +183,10 @@ router.post("/admin/chat/channels", async (req, res): Promise<void> => {
   if (!name?.trim()) { res.status(400).json({ error: "Name required" }); return; }
   const slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + "-" + Date.now();
   const chanType = type ?? "public";
+  // Only admins may create private/group channels
+  if (chanType === "private" && !isAdminRole(req)) {
+    res.status(403).json({ error: "Only admins can create group channels" }); return;
+  }
   const creator = actorName(req);
   // Private/group channels: always include creator + any pre-selected members (by username)
   const membersList: string[] = chanType === "private"
@@ -292,44 +296,66 @@ router.post("/admin/chat/channels/:id/messages", async (req, res): Promise<void>
 
   broadcast(channelId, "message", msg);
 
-  // For DM channels: notify the other participant
-  // Participants are stored as auth usernames; look up employee by username
+  // Notify eligible recipients based on channel type (non-fatal; never blocks response)
   try {
     const ch = access.channel;
+    const msgBody = String(content ?? "").slice(0, 100);
+    const link = "/admin/chat";
+
+    // Helper: notify a single user by username (checks team members then admins)
+    async function notifyByUsername(username: string): Promise<void> {
+      const [member] = await db.select().from(teamMembersTable)
+        .where(eq(teamMembersTable.username, username));
+      if (member) {
+        await createNotification({
+          recipientId: member.id, recipientType: "employee", type: "chat_message",
+          title: `New message from ${senderName}`, body: msgBody, entityType: "chat", entityId: channelId, link,
+        });
+        return;
+      }
+      const [admin] = await db.select().from(adminUsersTable)
+        .where(eq(adminUsersTable.username, username));
+      if (admin) {
+        await createNotification({
+          recipientId: admin.id, recipientType: "admin", type: "chat_message",
+          title: `New message from ${senderName}`, body: msgBody, entityType: "chat", entityId: channelId, link,
+        });
+      }
+    }
+
     if (ch.type === "direct" && ch.members) {
+      // DM: notify the other participant only
       const participants = parseMembersJson(ch.members);
       const otherUsername = participants.find(n => n !== senderName);
-      if (otherUsername) {
-        // Check team members table (employee)
-        const [member] = await db.select().from(teamMembersTable)
-          .where(eq(teamMembersTable.username, otherUsername));
-        if (member) {
+      if (otherUsername) await notifyByUsername(otherUsername);
+
+    } else if (ch.type === "private" && ch.members) {
+      // Group/private: notify all other members listed in the channel
+      const memberUsernames = parseMembersJson(ch.members).filter(n => n !== senderName);
+      for (const username of memberUsernames) {
+        await notifyByUsername(username);
+      }
+
+    } else if (ch.type === "public" || ch.type === "department") {
+      // Public/department: notify all team members and admins (exclude sender)
+      const allMembers = await db.select().from(teamMembersTable);
+      for (const m of allMembers) {
+        if (m.username && m.username !== senderName) {
           await createNotification({
-            recipientId: member.id,
-            recipientType: "employee",
-            type: "chat_message",
-            title: `New message from ${senderName}`,
-            body: String(content ?? "").slice(0, 100),
-            entityType: "chat",
-            entityId: channelId,
-            link: "/admin/chat",
+            recipientId: m.id, recipientType: "employee", type: "chat_message",
+            title: `New message in #${ch.name} from ${senderName}`, body: msgBody,
+            entityType: "chat", entityId: channelId, link,
           });
-        } else {
-          // Try admin users table
-          const [admin] = await db.select().from(adminUsersTable)
-            .where(eq(adminUsersTable.username, otherUsername));
-          if (admin) {
-            await createNotification({
-              recipientId: admin.id,
-              recipientType: "admin",
-              type: "chat_message",
-              title: `New message from ${senderName}`,
-              body: String(content ?? "").slice(0, 100),
-              entityType: "chat",
-              entityId: channelId,
-              link: "/admin/chat",
-            });
-          }
+        }
+      }
+      const allAdmins = await db.select().from(adminUsersTable);
+      for (const a of allAdmins) {
+        if (a.username !== senderName) {
+          await createNotification({
+            recipientId: a.id, recipientType: "admin", type: "chat_message",
+            title: `New message in #${ch.name} from ${senderName}`, body: msgBody,
+            entityType: "chat", entityId: channelId, link,
+          });
         }
       }
     }
@@ -420,6 +446,10 @@ router.patch("/admin/chat/messages/:id", async (req, res): Promise<void> => {
   const id = parseInt(req.params.id, 10);
   const result = await assertMessageAccess(req, id);
   if ("error" in result) { res.status(result.status).json({ error: result.error }); return; }
+  // Only the original sender or an admin may edit a message
+  if (result.msg.senderName !== actorName(req) && !isAdminRole(req)) {
+    res.status(403).json({ error: "You can only edit your own messages" }); return;
+  }
 
   const { content } = req.body as { content?: string };
   if (!content?.trim()) { res.status(400).json({ error: "Content required" }); return; }
@@ -434,6 +464,10 @@ router.delete("/admin/chat/messages/:id", async (req, res): Promise<void> => {
   const id = parseInt(req.params.id, 10);
   const result = await assertMessageAccess(req, id);
   if ("error" in result) { res.status(result.status).json({ error: result.error }); return; }
+  // Only the original sender or an admin may delete a message
+  if (result.msg.senderName !== actorName(req) && !isAdminRole(req)) {
+    res.status(403).json({ error: "You can only delete your own messages" }); return;
+  }
 
   const [msg] = await db.update(chatMessagesTable)
     .set({ isDeleted: true, content: "This message was deleted.", updatedAt: new Date() })
@@ -470,6 +504,10 @@ router.patch("/admin/chat/messages/:id/pin", async (req, res): Promise<void> => 
   const id = parseInt(req.params.id, 10);
   const result = await assertMessageAccess(req, id);
   if ("error" in result) { res.status(result.status).json({ error: result.error }); return; }
+  // Pinning is a moderation action — admin-only
+  if (!isAdminRole(req)) {
+    res.status(403).json({ error: "Only admins can pin messages" }); return;
+  }
 
   const [msg] = await db.update(chatMessagesTable)
     .set({ isPinned: !result.msg.isPinned, updatedAt: new Date() })
