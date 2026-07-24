@@ -234,6 +234,7 @@ router.patch("/admin/leads/:id", async (req: AuthenticatedRequest, res): Promise
 });
 
 // ── DELETE /admin/leads/:id — requires leads/delete or leads/manage permission ─
+// Employees with delete permission are still scoped to their assigned leads only.
 router.delete("/admin/leads/:id", async (req: AuthenticatedRequest, res): Promise<void> => {
   const id = parseInt(req.params.id as string, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -241,6 +242,10 @@ router.delete("/admin/leads/:id", async (req: AuthenticatedRequest, res): Promis
   const perms = (req as { permissions?: { all: boolean; map: Record<string, Record<string, boolean>> } }).permissions;
   const canDelete = perms?.all || perms?.map["leads"]?.["delete"] || perms?.map["leads"]?.["manage"];
   if (!canDelete) { res.status(403).json({ error: "Insufficient permissions: leads/delete" }); return; }
+
+  // Enforce object-level scoping for employees — even with delete permission,
+  // they can only delete leads they are actively assigned to.
+  if (!await requireLeadAccess(req, id)) { res.status(403).json({ error: "Access denied: not assigned to this lead" }); return; }
 
   await db.delete(consultationsTable).where(eq(consultationsTable.id, id));
   res.status(204).end();
