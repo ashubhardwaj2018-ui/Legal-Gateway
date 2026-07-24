@@ -7,32 +7,53 @@ import {
   LogOut, ShieldCheck, Loader2, Layers, Shield, History, Activity,
 } from "lucide-react";
 
-const navItems = [
-  { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
-  { href: "/admin/leads", label: "CRM — Leads", icon: Users },
-  { href: "/admin/employees", label: "Employees", icon: Users },
-  { href: "/admin/roles", label: "Roles & Permissions", icon: Shield },
-  { href: "/admin/login-history", label: "Login History", icon: History },
-  { href: "/admin/activity-log", label: "Activity Log", icon: Activity },
-  { href: "/admin/team", label: "Team & HR", icon: UserCog },
-  { href: "/admin/indian-companies", label: "Indian Companies DB", icon: Building2 },
-  { href: "/admin/tasks", label: "Task Management", icon: CheckSquare },
-  { href: "/admin/invoices", label: "Invoice & Finance", icon: FileText },
-  { href: "/admin/chat", label: "Team Chat", icon: MessageSquare },
-  { href: "/admin/email", label: "Email", icon: Mail },
-  { href: "/admin/reports", label: "Reports", icon: TrendingUp },
-  { href: "/admin/contacts", label: "Contacts", icon: MessageSquare },
-  { href: "/admin/quotations", label: "Quotations", icon: Briefcase },
-  { href: "/admin/blogs", label: "Blog Manager", icon: BookOpen },
-  { href: "/admin/seo", label: "SEO Manager", icon: Search },
-  { href: "/admin/services", label: "Services & Pricing", icon: FileText },
-  { href: "/admin/company-data", label: "Company Data", icon: Building2 },
-  { href: "/admin/newsletter", label: "Newsletter", icon: Mail },
-  { href: "/admin/lawyers", label: "Lawyer Profiles", icon: User },
-  { href: "/admin/locations", label: "Locations (pSEO)", icon: MapPin },
-  { href: "/admin/settings", label: "Site Settings", icon: Settings },
-  { href: "/admin/page-editor", label: "Page Editor", icon: Layers },
+interface NavItem {
+  href: string;
+  label: string;
+  icon: React.ElementType;
+  exact?: boolean;
+  module: string | null; // null = always visible (dashboard)
+}
+
+const navItems: NavItem[] = [
+  { href: "/admin",                 label: "Dashboard",           icon: LayoutDashboard,  exact: true, module: null },
+  { href: "/admin/leads",           label: "CRM — Leads",         icon: Users,                         module: "leads" },
+  { href: "/admin/employees",       label: "Employees",           icon: Users,                         module: "employees" },
+  { href: "/admin/roles",           label: "Roles & Permissions", icon: Shield,                        module: "employees" },
+  { href: "/admin/login-history",   label: "Login History",       icon: History,                       module: "employees" },
+  { href: "/admin/activity-log",    label: "Activity Log",        icon: Activity,                      module: "employees" },
+  { href: "/admin/team",            label: "Team & HR",           icon: UserCog,                       module: "team" },
+  { href: "/admin/indian-companies",label: "Indian Companies DB", icon: Building2,                     module: "indian_companies" },
+  { href: "/admin/tasks",           label: "Task Management",     icon: CheckSquare,                   module: "tasks" },
+  { href: "/admin/invoices",        label: "Invoice & Finance",   icon: FileText,                      module: "invoices" },
+  { href: "/admin/chat",            label: "Team Chat",           icon: MessageSquare,                 module: "chat" },
+  { href: "/admin/email",           label: "Email",               icon: Mail,                          module: "email" },
+  { href: "/admin/reports",         label: "Reports",             icon: TrendingUp,                    module: "reports" },
+  { href: "/admin/contacts",        label: "Contacts",            icon: MessageSquare,                 module: "contacts" },
+  { href: "/admin/quotations",      label: "Quotations",          icon: Briefcase,                     module: "quotations" },
+  { href: "/admin/blogs",           label: "Blog Manager",        icon: BookOpen,                      module: "seo" },
+  { href: "/admin/seo",             label: "SEO Manager",         icon: Search,                        module: "seo" },
+  { href: "/admin/services",        label: "Services & Pricing",  icon: FileText,                      module: "services" },
+  { href: "/admin/company-data",    label: "Company Data",        icon: Building2,                     module: "company_data" },
+  { href: "/admin/newsletter",      label: "Newsletter",          icon: Mail,                          module: "newsletter" },
+  { href: "/admin/lawyers",         label: "Lawyer Profiles",     icon: User,                          module: "lawyers" },
+  { href: "/admin/locations",       label: "Locations (pSEO)",    icon: MapPin,                        module: "locations" },
+  { href: "/admin/settings",        label: "Site Settings",       icon: Settings,                      module: "settings" },
+  { href: "/admin/page-editor",     label: "Page Editor",         icon: Layers,                        module: "settings" },
 ];
+
+interface PermissionSet {
+  all: boolean;
+  map: Record<string, Record<string, boolean>>;
+}
+
+function canViewModule(perms: PermissionSet | null, module: string | null): boolean {
+  if (module === null) return true; // dashboard always visible
+  if (!perms) return true; // still loading — show all to avoid flicker before fetch
+  if (perms.all) return true;
+  const m = perms.map[module];
+  return !!(m?.["view"] || m?.["manage"]);
+}
 
 interface Props {
   children: ReactNode;
@@ -45,7 +66,8 @@ export function AdminLayout({ children, title, subtitle, actions }: Props) {
   const [location, navigate] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
-  const [adminUser, setAdminUser] = useState<{ username: string; role: string } | null>(null);
+  const [adminUser, setAdminUser] = useState<{ username: string; role: string; userType?: string } | null>(null);
+  const [permissions, setPermissions] = useState<PermissionSet | null>(null);
 
   useEffect(() => {
     fetch("/api/admin/auth/me")
@@ -54,7 +76,14 @@ export function AdminLayout({ children, title, subtitle, actions }: Props) {
         return r.json();
       })
       .then(d => {
-        if (d?.user) setAdminUser(d.user as { username: string; role: string });
+        if (d?.user) {
+          setAdminUser(d.user as { username: string; role: string; userType?: string });
+          // Load permissions (needed to filter nav for employee users)
+          fetch("/api/admin/auth/permissions")
+            .then(r2 => r2.ok ? r2.json() : null)
+            .then(p => { if (p) setPermissions(p as PermissionSet); })
+            .catch(() => {});
+        }
         setAuthChecked(true);
       })
       .catch(() => navigate("/admin/login"));
@@ -69,6 +98,8 @@ export function AdminLayout({ children, title, subtitle, actions }: Props) {
     if (exact) return location === href;
     return location === href || location.startsWith(href + "/");
   };
+
+  const visibleNav = navItems.filter(item => canViewModule(permissions, item.module));
 
   if (!authChecked) {
     return (
@@ -94,7 +125,7 @@ export function AdminLayout({ children, title, subtitle, actions }: Props) {
       </div>
 
       <nav className="flex-1 px-2 py-4 space-y-0.5 overflow-y-auto">
-        {navItems.map(item => {
+        {visibleNav.map(item => {
           const active = isActive(item.href, item.exact);
           return (
             <Link
@@ -121,7 +152,9 @@ export function AdminLayout({ children, title, subtitle, actions }: Props) {
             <ShieldCheck size={13} className="text-[#c9a227] shrink-0" />
             <div className="min-w-0">
               <div className="text-xs font-semibold text-white truncate">{adminUser.username}</div>
-              <div className="text-[10px] text-white/40 capitalize">{adminUser.role}</div>
+              <div className="text-[10px] text-white/40 capitalize">
+                {adminUser.userType === "employee" ? "Employee" : adminUser.role}
+              </div>
             </div>
           </div>
         )}

@@ -170,6 +170,44 @@ export function requirePermission(module: string, action: string) {
   };
 }
 
+// ── CRUD activity logging middleware ──────────────────────────────────────────
+export function crudActivityMiddleware(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
+  if (!["POST", "PUT", "PATCH", "DELETE"].includes(req.method) || req.path.includes("/admin/auth/")) {
+    next(); return;
+  }
+  const onFinish = () => {
+    res.removeListener("finish", onFinish);
+    if (res.statusCode >= 400 || !req.adminUser) return;
+    const userId = typeof req.adminUser.userId === "number" ? req.adminUser.userId : null;
+    const username = typeof req.adminUser.username === "string" ? req.adminUser.username : "unknown";
+    const userType: "admin" | "employee" = req.adminUser.userType === "employee" ? "employee" : "admin";
+    const parts = req.path.split("/").filter(Boolean);
+    const module = parts[1] ?? "unknown"; // /admin/leads/123 → "leads"
+    const action = req.method === "POST" ? "create" : req.method === "DELETE" ? "delete" : "update";
+    logActivity(userId, username, userType, module, action).catch(() => {});
+  };
+  res.on("finish", onFinish);
+  next();
+}
+
+// ── URL-pattern based module permission middleware ────────────────────────────
+export function makeModulePermissionMiddleware(map: Array<[string, string]>) {
+  return (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+    if (!req.adminUser || req.permissions?.all) { next(); return; }
+    const entry = map.find(([prefix]) => req.path.startsWith(prefix));
+    if (!entry) { next(); return; }
+    const [, module] = entry;
+    const action = (req.method === "GET" || req.method === "HEAD") ? "view"
+      : req.method === "POST" ? "create"
+      : req.method === "DELETE" ? "delete"
+      : "edit";
+    if (req.permissions?.map[module]?.[action] || req.permissions?.map[module]?.["manage"]) {
+      next(); return;
+    }
+    res.status(403).json({ error: `Insufficient permissions: ${module}/${action}` });
+  };
+}
+
 // ── Routes ────────────────────────────────────────────────────────────────────
 
 authRouter.post("/admin/auth/login", async (req, res): Promise<void> => {

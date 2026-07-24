@@ -15,7 +15,7 @@ import chatRouter from "./chat";
 import dashboardRouter from "./dashboard";
 import emailRouter from "./email";
 import reportsRouter from "./reports";
-import { authRouter, adminAuthMiddleware, seedDefaultAdmin, seedDefaultRoles } from "./auth";
+import { authRouter, adminAuthMiddleware, seedDefaultAdmin, seedDefaultRoles, crudActivityMiddleware, makeModulePermissionMiddleware } from "./auth";
 import pagesRouter from "./pages";
 import employeesRouter from "./employees";
 import rolesRouter from "./roles";
@@ -33,6 +33,38 @@ router.use(authRouter);
 
 // --- All routes below require valid admin session ---
 router.use(adminAuthMiddleware);
+
+// Auto-log all successful mutations (POST/PUT/PATCH/DELETE) to activity_logs
+router.use(crudActivityMiddleware);
+
+// Enforce module-level permissions for non-admin (employee) sessions.
+// Admins have permissions.all = true and skip all checks.
+// Each tuple: [URL prefix, module name] — sorted longest-first for correct matching.
+router.use(makeModulePermissionMiddleware([
+  ["/admin/activity-logs",      "employees"],
+  ["/admin/login-history",      "employees"],
+  ["/admin/indian-companies",   "indian_companies"],
+  ["/admin/working-hours",      "team"],
+  ["/admin/company-data",       "company_data"],
+  ["/admin/quotations",         "quotations"],
+  ["/admin/newsletter",         "newsletter"],
+  ["/admin/locations",          "locations"],
+  ["/admin/employees",          "employees"],
+  ["/admin/contacts",           "contacts"],
+  ["/admin/invoices",           "invoices"],
+  ["/admin/reports",            "reports"],
+  ["/admin/lawyers",            "lawyers"],
+  ["/admin/services",           "services"],
+  ["/admin/settings",           "settings"],
+  ["/admin/tasks",              "tasks"],
+  ["/admin/leads",              "leads"],
+  ["/admin/email",              "email"],
+  ["/admin/roles",              "employees"],
+  ["/admin/pages",              "settings"],
+  ["/admin/team",               "team"],
+  ["/admin/chat",               "chat"],
+  ["/admin/seo",                "seo"],
+]));
 
 router.use(leadsRouter);
 router.use(invoicesRouter);

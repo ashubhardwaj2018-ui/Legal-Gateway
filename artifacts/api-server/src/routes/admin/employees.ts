@@ -5,11 +5,18 @@ import { hashPassword } from "./auth";
 
 const router: IRouter = Router();
 
-// Generate next employee ID
+// Generate next employee ID (MAX-based to avoid collisions after deletes)
 async function nextEmployeeId(): Promise<string> {
-  const [row] = await db.select({ cnt: sql<number>`count(*)` }).from(teamMembersTable);
-  const n = (Number(row?.cnt ?? 0) + 1).toString().padStart(4, "0");
-  return `EMP-${n}`;
+  const rows = await db
+    .select({ empId: teamMembersTable.employeeId })
+    .from(teamMembersTable)
+    .where(sql`${teamMembersTable.employeeId} LIKE 'EMP-%'`);
+  const max = rows.reduce((acc, r) => {
+    if (!r.empId) return acc;
+    const num = parseInt(r.empId.slice(4), 10); // strip "EMP-"
+    return isNaN(num) ? acc : Math.max(acc, num);
+  }, 0);
+  return `EMP-${(max + 1).toString().padStart(4, "0")}`;
 }
 
 // ── List employees ─────────────────────────────────────────────────────────────
