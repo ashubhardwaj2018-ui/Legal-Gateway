@@ -60,7 +60,7 @@ router.use(makeModulePermissionMiddleware([
   ["/admin/services",           "services"],
   ["/admin/settings",           "settings"],
   ["/admin/tasks",              "tasks"],
-  ["/admin/leads",              "leads",   ["assign"]],
+  ["/admin/leads",              "leads",   [{ pattern: /\/assignments?(\/|$)/, actions: ["assign"] }]],
   ["/admin/email",              "email"],
   ["/admin/roles",              "employees"],
   ["/admin/pages",              "settings"],

@@ -197,25 +197,30 @@ export function crudActivityMiddleware(req: AuthenticatedRequest, res: Response,
 }
 
 // ── URL-pattern based module permission middleware ────────────────────────────
-// Each map entry: [urlPrefix, moduleName, extraAllowedActions?]
-// extraAllowedActions lets specific sub-routes (e.g. assign) pass the coarse
-// module gate without requiring the standard verb-mapped action. Fine-grained
-// checks are still enforced inside each route handler.
+// Each map entry: [urlPrefix, moduleName, extraRules?]
+// extraRules allow specific path-pattern sub-routes to pass the coarse module
+// gate with additional permission keys (e.g. "assign") without affecting the
+// standard read/write/delete paths. Fine-grained checks still run in handlers.
+type ExtraRule = { pattern: RegExp; actions: string[] };
 export function makeModulePermissionMiddleware(
-  map: Array<[string, string] | [string, string, string[]]>
+  map: Array<[string, string] | [string, string, ExtraRule[]]>
 ) {
   return (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
     if (!req.adminUser || req.permissions?.all) { next(); return; }
     const entry = map.find(([prefix]) => req.path.startsWith(prefix));
     if (!entry) { next(); return; }
-    const [, module, extraActions] = entry as [string, string, string[] | undefined];
+    const [, module, extraRules] = entry as [string, string, ExtraRule[] | undefined];
     const action = (req.method === "GET" || req.method === "HEAD") ? "view"
       : req.method === "POST" ? "create"
       : req.method === "DELETE" ? "delete"
       : "edit";
     const perms = req.permissions?.map[module];
     if (perms?.[action] || perms?.["manage"]) { next(); return; }
-    if (extraActions?.some(a => perms?.[a])) { next(); return; }
+    // Extra rules: only fire when the path matches the rule's pattern
+    if (extraRules) {
+      const matched = extraRules.find(r => r.pattern.test(req.path));
+      if (matched?.actions.some(a => perms?.[a])) { next(); return; }
+    }
     res.status(403).json({ error: `Insufficient permissions: ${module}/${action}` });
   };
 }
