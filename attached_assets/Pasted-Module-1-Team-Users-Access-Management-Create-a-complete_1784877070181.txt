@@ -1,0 +1,240 @@
+Module 1 – Team Users & Access Management
+Create a complete User Management module.
+Admin should be able to:
+•	Create new users 
+•	Edit users 
+•	Deactivate users 
+•	Delete users 
+•	Reset passwords 
+•	Unlock accounts 
+•	Force password change 
+•	View login history 
+•	View activity logs 
+•	View last login 
+•	Manage online/offline status 
+Each user should have:
+•	Employee ID (Auto Generated) 
+•	Full Name 
+•	Profile Photo 
+•	Mobile Number 
+•	Email 
+•	Department 
+•	Designation 
+•	Reporting Manager 
+•	Username 
+•	Password (Encrypted) 
+•	Role 
+•	Status (Active/Inactive) 
+•	Two-Factor Authentication (Future Ready) 
+•	Recording of working hours through login and logout 
+________________________________________
+User Roles
+Create role-based access control (RBAC).
+Example roles:
+•	Super Admin 
+•	Admin 
+•	Sales Manager 
+•	Sales Executive 
+•	Accounts 
+•	HR 
+•	SEO Executive 
+•	Digital Marketing Executive 
+•	Content Writer 
+•	Customer Support 
+•	Legal Team 
+•	Finance Manager 
+•	Developer 
+•	Customer (Portal Login) 
+Admin must also be able to create custom roles.
+________________________________________
+Permission System
+Every menu should have individual permissions.
+Permissions include:
+•	View 
+•	Create 
+•	Edit 
+•	Export 
+•	Approve 
+•	Assign 
+•	Print 
+•	Download 
+•	Upload 
+Example:
+Leads
+✓ View
+✓ Create
+✓ Edit
+✓ Assign
+✓ Export
+________________________________________
+Quotaiin
+✓ View
+✓ Create
+✓ Send
+✓ Print
+✓ Edit
+✓ Delete
+________________________________________
+Blogs
+✓ Create
+✓ Publish
+✓ Edit
+✓ Delete
+________________________________________
+Finance
+✓ View
+✓ Approve
+✓ Export
+________________________________________
+Admin should simply tick checkboxes to assign permissions.
+________________________________________
+Login System
+Every employee receives:
+•	Username 
+•	Password 
+After login, they should only see the menus they have permission to access.
+No employee should be able to access restricted URLs directly.
+Protect all routes using middleware or permission checks.
+________________________________________
+Employee Dashboard
+Each employee should have a personalized dashboard.
+Show:
+•	Assigned Leads 
+•	Today's Follow-ups 
+•	Pending Tasks 
+•	New Messages 
+•	Upcoming Meetings 
+•	Assigned Documents 
+•	Revenue Generated 
+•	Conversion Rate 
+•	Monthly Target 
+•	Performance Graph 
+________________________________________
+Lead Assignment Module
+Admin or Sales Manager should be able to assign leads.
+Lead Assignment methods:
+•	Individual 
+•	Multiple Employees 
+•	Department 
+•	Round Robin 
+•	Auto Assignment 
+Each assignment should include:
+•	Employee 
+•	Assignment Date 
+•	Deadline 
+•	Priority 
+•	Notes 
+________________________________________
+Employee Lead View
+Employees should only see:
+•	Their own assigned leads 
+•	Team leads (if permission granted) 
+Employees can:
+•	Update lead status 
+•	Add notes 
+•	Upload documents 
+•	Add follow-up 
+•	Schedule meetings 
+•	Change probability 
+•	Update expected closure date 
+•	Record calls 
+•	Upload quotations 
+•	Generate invoices (if permission) 
+Cannot delete leads unless permission is granted.
+________________________________________
+Lead Timeline
+Every activity should be logged.
+Timeline should record:
+•	Lead created 
+•	Assigned 
+•	Status changed 
+•	Notes added 
+•	Email sent 
+•	WhatsApp sent 
+•	Invoice created 
+•	Payment received 
+•	Documents uploaded 
+•	User who performed the action 
+•	Date & Time 
+________________________________________
+Internal Team Chat
+Create a modern internal messaging system.
+Features:
+•	One-to-One Chat 
+•	Group Chat 
+•	Department Chat 
+•	Project Chat 
+•	Lead-specific Chat 
+•	Customer-specific Chat 
+Support:
+•	Text 
+•	Images 
+•	PDF 
+•	Excel 
+•	Word 
+•	ZIP 
+•	Voice Notes 
+•	Emojis 
+Include:
+•	Online Status 
+•	Last Seen 
+•	Read Receipts 
+•	Typing Indicator 
+•	Search Messages 
+•	Pin Messages 
+•	Notifications 
+________________________________________
+Notifications
+Employees receive notifications for:
+•	New Lead Assigned 
+•	Lead Updated 
+•	Task Assigned 
+•	Chat Message 
+•	Follow-up Reminder 
+•	Invoice Generated 
+•	Payment Received 
+Support:
+•	In-App Notifications 
+•	Browser Notifications 
+•	Email Notifications 
+________________________________________
+Employee Performance
+Track:
+•	Leads Assigned 
+•	Leads Converted 
+•	Revenue Generated 
+•	Calls 
+•	Meetings 
+•	Follow-ups 
+•	Quotations Sent 
+•	Pending Leads 
+•	Lost Leads 
+Generate monthly reports.
+________________________________________
+Activity Log
+Log every employee activity.
+Example:
+•	Login 
+•	Logout 
+•	Created Lead 
+•	Updated Lead 
+•	Deleted Note 
+•	Sent Email 
+•	Sent WhatsApp 
+•	Uploaded File 
+•	Downloaded File 
+•	Created Invoice 
+Allow filtering by:
+•	Employee 
+•	Date 
+•	Module 
+•	Action 
+________________________________________
+Module 2 – Bulk Location Upload (pSEO)
+Create a bulk location upload system for programmatic SEO.
+Admin Menu:
+SEO → Bulk Location Upload
+Support:
+•	Excel (.xlsx) 
+•	Excel (.xls) 
+•	CSV
