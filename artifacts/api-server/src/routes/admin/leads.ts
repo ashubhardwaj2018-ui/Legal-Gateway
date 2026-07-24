@@ -7,6 +7,7 @@ import {
   leadActivitiesTable,
   leadTasksTable,
   leadTimelineTable,
+  leadAssignmentsTable,
 } from "@workspace/db";
 import type { AuthenticatedRequest } from "./auth";
 
@@ -35,6 +36,25 @@ async function logTimeline(
   const actorId = req?.adminUser?.userType === "employee" && typeof req.adminUser.userId === "number"
     ? req.adminUser.userId : null;
   await db.insert(leadTimelineTable).values({ leadId, actionType, description, actorName, actorId });
+}
+
+/** Returns true if the requesting user is allowed to access/modify a specific lead.
+ *  Admins always pass. Employees must have an active assignment for the lead. */
+async function requireLeadAccess(req: AuthenticatedRequest, leadId: number): Promise<boolean> {
+  if (!req.adminUser) return false;
+  if (req.adminUser.userType !== "employee") return true;
+  const uid = typeof req.adminUser.userId === "number" ? req.adminUser.userId : null;
+  if (!uid) return false;
+  const [row] = await db
+    .select({ id: leadAssignmentsTable.id })
+    .from(leadAssignmentsTable)
+    .where(and(
+      eq(leadAssignmentsTable.leadId, leadId),
+      eq(leadAssignmentsTable.assignedToId, uid),
+      eq(leadAssignmentsTable.status, "active"),
+    ))
+    .limit(1);
+  return !!row;
 }
 
 // ── GET /admin/leads ──────────────────────────────────────────────────────────
@@ -113,9 +133,11 @@ router.post("/admin/leads", async (req: AuthenticatedRequest, res): Promise<void
 });
 
 // ── GET /admin/leads/:id ──────────────────────────────────────────────────────
-router.get("/admin/leads/:id", async (req, res): Promise<void> => {
+router.get("/admin/leads/:id", async (req: AuthenticatedRequest, res): Promise<void> => {
   const id = parseInt(req.params.id as string, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+
+  if (!await requireLeadAccess(req, id)) { res.status(403).json({ error: "Access denied" }); return; }
 
   const [lead] = await db.select().from(consultationsTable).where(eq(consultationsTable.id, id));
   if (!lead) { res.status(404).json({ error: "Lead not found" }); return; }
@@ -130,9 +152,11 @@ router.get("/admin/leads/:id", async (req, res): Promise<void> => {
 });
 
 // ── PATCH /admin/leads/:id ────────────────────────────────────────────────────
-router.patch("/admin/leads/:id", async (req, res): Promise<void> => {
+router.patch("/admin/leads/:id", async (req: AuthenticatedRequest, res): Promise<void> => {
   const id = parseInt(req.params.id as string, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+
+  if (!await requireLeadAccess(req, id)) { res.status(403).json({ error: "Access denied" }); return; }
 
   const body = req.body as Record<string, unknown>;
   const updateData: Partial<typeof consultationsTable.$inferInsert> = {};
@@ -166,10 +190,12 @@ router.patch("/admin/leads/:id", async (req, res): Promise<void> => {
   res.json(updated);
 });
 
-// ── DELETE /admin/leads/:id ───────────────────────────────────────────────────
-router.delete("/admin/leads/:id", async (req, res): Promise<void> => {
+// ── DELETE /admin/leads/:id — admin-only ──────────────────────────────────────
+router.delete("/admin/leads/:id", async (req: AuthenticatedRequest, res): Promise<void> => {
   const id = parseInt(req.params.id as string, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+
+  if (req.adminUser?.userType === "employee") { res.status(403).json({ error: "Employees cannot delete leads" }); return; }
 
   await db.delete(consultationsTable).where(eq(consultationsTable.id, id));
   res.status(204).end();
@@ -177,42 +203,50 @@ router.delete("/admin/leads/:id", async (req, res): Promise<void> => {
 
 // ── Notes ─────────────────────────────────────────────────────────────────────
 
-router.get("/admin/leads/:id/notes", async (req, res): Promise<void> => {
+router.get("/admin/leads/:id/notes", async (req: AuthenticatedRequest, res): Promise<void> => {
   const id = parseInt(req.params.id as string, 10);
+  if (!await requireLeadAccess(req, id)) { res.status(403).json({ error: "Access denied" }); return; }
   const notes = await db.select().from(leadNotesTable).where(eq(leadNotesTable.leadId, id)).orderBy(desc(leadNotesTable.createdAt));
   res.json(notes);
 });
 
-router.post("/admin/leads/:id/notes", async (req, res): Promise<void> => {
+router.post("/admin/leads/:id/notes", async (req: AuthenticatedRequest, res): Promise<void> => {
   const id = parseInt(req.params.id as string, 10);
+  if (!await requireLeadAccess(req, id)) { res.status(403).json({ error: "Access denied" }); return; }
   const { content, createdBy } = req.body as { content: string; createdBy?: string };
   if (!content?.trim()) { res.status(400).json({ error: "content required" }); return; }
 
+  const actorName = typeof req.adminUser?.username === "string" ? req.adminUser.username : (createdBy ?? "Admin");
   const [note] = await db.insert(leadNotesTable).values({
-    leadId: id, content: content.trim(), createdBy: createdBy ?? "Admin",
+    leadId: id, content: content.trim(), createdBy: actorName,
   }).returning();
 
   await logActivity(id, "note_added", `Note added: "${content.slice(0, 60)}${content.length > 60 ? "…" : ""}"`);
-  await logTimeline(id, "note_added", `Note added by ${createdBy ?? "Admin"}: "${content.slice(0, 80)}${content.length > 80 ? "…" : ""}"`, req as AuthenticatedRequest);
+  await logTimeline(id, "note_added", `Note added by ${actorName}: "${content.slice(0, 80)}${content.length > 80 ? "…" : ""}"`, req);
   res.status(201).json(note);
 });
 
-router.delete("/admin/leads/:id/notes/:noteId", async (req, res): Promise<void> => {
+router.delete("/admin/leads/:id/notes/:noteId", async (req: AuthenticatedRequest, res): Promise<void> => {
+  const id = parseInt(req.params.id as string, 10);
   const noteId = parseInt(req.params.noteId as string, 10);
-  await db.delete(leadNotesTable).where(eq(leadNotesTable.id, noteId));
+  if (!await requireLeadAccess(req, id)) { res.status(403).json({ error: "Access denied" }); return; }
+  // Scope note deletion to this lead to prevent cross-lead tampering
+  await db.delete(leadNotesTable).where(and(eq(leadNotesTable.id, noteId), eq(leadNotesTable.leadId, id)));
   res.status(204).end();
 });
 
 // ── Tasks ─────────────────────────────────────────────────────────────────────
 
-router.get("/admin/leads/:id/tasks", async (req, res): Promise<void> => {
+router.get("/admin/leads/:id/tasks", async (req: AuthenticatedRequest, res): Promise<void> => {
   const id = parseInt(req.params.id as string, 10);
+  if (!await requireLeadAccess(req, id)) { res.status(403).json({ error: "Access denied" }); return; }
   const tasks = await db.select().from(leadTasksTable).where(eq(leadTasksTable.leadId, id)).orderBy(desc(leadTasksTable.createdAt));
   res.json(tasks);
 });
 
-router.post("/admin/leads/:id/tasks", async (req, res): Promise<void> => {
+router.post("/admin/leads/:id/tasks", async (req: AuthenticatedRequest, res): Promise<void> => {
   const id = parseInt(req.params.id as string, 10);
+  if (!await requireLeadAccess(req, id)) { res.status(403).json({ error: "Access denied" }); return; }
   const { title, description, dueDate, priority } = req.body as {
     title: string; description?: string; dueDate?: string; priority?: string;
   };
@@ -227,12 +261,14 @@ router.post("/admin/leads/:id/tasks", async (req, res): Promise<void> => {
   }).returning();
 
   await logActivity(id, "task_created", `Task created: "${title}"`);
-  await logTimeline(id, "task_created", `Task created: "${title}"`, req as AuthenticatedRequest);
+  await logTimeline(id, "task_created", `Task created: "${title}"`, req);
   res.status(201).json(task);
 });
 
-router.patch("/admin/leads/:id/tasks/:taskId", async (req, res): Promise<void> => {
+router.patch("/admin/leads/:id/tasks/:taskId", async (req: AuthenticatedRequest, res): Promise<void> => {
+  const id = parseInt(req.params.id as string, 10);
   const taskId = parseInt(req.params.taskId as string, 10);
+  if (!await requireLeadAccess(req, id)) { res.status(403).json({ error: "Access denied" }); return; }
   const body = req.body as { status?: string; title?: string; description?: string; dueDate?: string; priority?: string };
   const updateData: Partial<typeof leadTasksTable.$inferInsert> = {};
   if (body.status !== undefined) updateData.status = body.status;
@@ -241,13 +277,18 @@ router.patch("/admin/leads/:id/tasks/:taskId", async (req, res): Promise<void> =
   if (body.dueDate !== undefined) updateData.dueDate = body.dueDate;
   if (body.priority !== undefined) updateData.priority = body.priority;
 
-  const [task] = await db.update(leadTasksTable).set(updateData).where(eq(leadTasksTable.id, taskId)).returning();
+  // Scope update to this lead to prevent cross-lead task tampering
+  const [task] = await db.update(leadTasksTable).set(updateData)
+    .where(and(eq(leadTasksTable.id, taskId), eq(leadTasksTable.leadId, id))).returning();
   res.json(task);
 });
 
-router.delete("/admin/leads/:id/tasks/:taskId", async (req, res): Promise<void> => {
+router.delete("/admin/leads/:id/tasks/:taskId", async (req: AuthenticatedRequest, res): Promise<void> => {
+  const id = parseInt(req.params.id as string, 10);
   const taskId = parseInt(req.params.taskId as string, 10);
-  await db.delete(leadTasksTable).where(eq(leadTasksTable.id, taskId));
+  if (!await requireLeadAccess(req, id)) { res.status(403).json({ error: "Access denied" }); return; }
+  // Scope delete to this lead to prevent cross-lead task removal
+  await db.delete(leadTasksTable).where(and(eq(leadTasksTable.id, taskId), eq(leadTasksTable.leadId, id)));
   res.status(204).end();
 });
 

@@ -70,8 +70,8 @@ router.use(makeModulePermissionMiddleware([
   ["/admin/seo",                "seo"],
 ]));
 
-router.use(leadsRouter);
 router.use(leadsAssignmentRouter);
+router.use(leadsRouter);
 router.use(invoicesRouter);
 router.use(chatRouter);
 router.use(dashboardRouter);

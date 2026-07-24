@@ -25,10 +25,29 @@ export async function addTimelineEntry(
   });
 }
 
+/** Check if employee is assigned to a lead (admins always pass). */
+async function checkLeadAccess(req: AuthenticatedRequest, leadId: number): Promise<boolean> {
+  if (!req.adminUser) return false;
+  if (req.adminUser.userType !== "employee") return true;
+  const uid = typeof req.adminUser.userId === "number" ? req.adminUser.userId : null;
+  if (!uid) return false;
+  const [row] = await db
+    .select({ id: leadAssignmentsTable.id })
+    .from(leadAssignmentsTable)
+    .where(and(
+      eq(leadAssignmentsTable.leadId, leadId),
+      eq(leadAssignmentsTable.assignedToId, uid),
+      eq(leadAssignmentsTable.status, "active"),
+    ))
+    .limit(1);
+  return !!row;
+}
+
 // ── GET /admin/leads/:id/timeline ─────────────────────────────────────────────
-router.get("/admin/leads/:id/timeline", async (req, res): Promise<void> => {
+router.get("/admin/leads/:id/timeline", async (req: AuthenticatedRequest, res): Promise<void> => {
   const id = parseInt(req.params.id as string, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+  if (!await checkLeadAccess(req, id)) { res.status(403).json({ error: "Access denied" }); return; }
   const entries = await db.select().from(leadTimelineTable)
     .where(eq(leadTimelineTable.leadId, id))
     .orderBy(desc(leadTimelineTable.createdAt));
@@ -39,6 +58,7 @@ router.get("/admin/leads/:id/timeline", async (req, res): Promise<void> => {
 router.post("/admin/leads/:id/timeline", async (req: AuthenticatedRequest, res): Promise<void> => {
   const id = parseInt(req.params.id as string, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+  if (!await checkLeadAccess(req, id)) { res.status(403).json({ error: "Access denied" }); return; }
 
   const { actionType, description, payload } = req.body as {
     actionType: string; description: string; payload?: Record<string, unknown>;
@@ -63,8 +83,8 @@ router.post("/admin/leads/:id/timeline", async (req: AuthenticatedRequest, res):
   res.status(201).json(entry);
 });
 
-// ── GET /admin/leads/:id/assignments ──────────────────────────────────────────
-router.get("/admin/leads/:id/assignments", async (req, res): Promise<void> => {
+// ── GET /admin/leads/:id/assignments (admin-only view; employees see their own via /my) ──
+router.get("/admin/leads/:id/assignments", async (req: AuthenticatedRequest, res): Promise<void> => {
   const id = parseInt(req.params.id as string, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
   const assignments = await db.select().from(leadAssignmentsTable)
@@ -77,6 +97,8 @@ router.get("/admin/leads/:id/assignments", async (req, res): Promise<void> => {
 router.post("/admin/leads/:id/assign", async (req: AuthenticatedRequest, res): Promise<void> => {
   const id = parseInt(req.params.id as string, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+
+  if (req.adminUser?.userType === "employee") { res.status(403).json({ error: "Only admins can assign leads" }); return; }
 
   const [lead] = await db.select().from(consultationsTable).where(eq(consultationsTable.id, id));
   if (!lead) { res.status(404).json({ error: "Lead not found" }); return; }
@@ -211,10 +233,12 @@ router.delete("/admin/leads/:id/assignments/:assignmentId", async (req: Authenti
   const actorId = typeof req.adminUser?.userId === "number" ? req.adminUser.userId : undefined;
 
   const [assignment] = await db.select()
-    .from(leadAssignmentsTable).where(eq(leadAssignmentsTable.id, assignmentId));
+    .from(leadAssignmentsTable)
+    .where(and(eq(leadAssignmentsTable.id, assignmentId), eq(leadAssignmentsTable.leadId, leadId)));
   if (!assignment) { res.status(404).json({ error: "Assignment not found" }); return; }
 
-  await db.update(leadAssignmentsTable).set({ status: "removed" }).where(eq(leadAssignmentsTable.id, assignmentId));
+  await db.update(leadAssignmentsTable).set({ status: "removed" })
+    .where(and(eq(leadAssignmentsTable.id, assignmentId), eq(leadAssignmentsTable.leadId, leadId)));
   await addTimelineEntry(leadId, "unassigned",
     `${assignment.assignedToName} unassigned from lead by ${actorName}`,
     actorName, actorId);
