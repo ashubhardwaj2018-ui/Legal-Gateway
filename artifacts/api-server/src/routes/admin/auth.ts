@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import crypto from "crypto";
-import { eq, or, sql } from "drizzle-orm";
+import { eq, or, and, isNull } from "drizzle-orm";
 import { db, adminUsersTable, teamMembersTable, rolesTable, rolePermissionsTable, loginHistoryTable, activityLogsTable } from "@workspace/db";
 
 export const authRouter: IRouter = Router();
@@ -100,18 +100,74 @@ export async function logActivity(
   }
 }
 
+// ── Permission cache (in-memory, 5-minute TTL) ────────────────────────────────
+type PermissionSet = { all: boolean; map: Record<string, Record<string, boolean>> };
+const permCache = new Map<string, PermissionSet & { ts: number }>();
+const PERM_TTL = 5 * 60 * 1000;
+const ADMIN_ROLES = new Set(["admin", "super_admin", "Super Admin", "Admin"]);
+
+async function loadPermissions(role: string, userType: string): Promise<PermissionSet> {
+  if (userType === "admin" || ADMIN_ROLES.has(role)) {
+    return { all: true, map: {} };
+  }
+  const cached = permCache.get(role);
+  if (cached && Date.now() - cached.ts < PERM_TTL) {
+    return { all: cached.all, map: cached.map };
+  }
+  const [roleRow] = await db.select().from(rolesTable).where(eq(rolesTable.name, role));
+  if (!roleRow) {
+    const result: PermissionSet = { all: false, map: {} };
+    permCache.set(role, { ...result, ts: Date.now() });
+    return result;
+  }
+  const perms = await db.select().from(rolePermissionsTable)
+    .where(eq(rolePermissionsTable.roleId, roleRow.id));
+  const map: Record<string, Record<string, boolean>> = {};
+  for (const p of perms) {
+    if (!map[p.module]) map[p.module] = {};
+    map[p.module][p.action] = p.allowed;
+  }
+  const result: PermissionSet = { all: false, map };
+  permCache.set(role, { ...result, ts: Date.now() });
+  return result;
+}
+
+// Invalidate cache entry when permissions are updated
+export function invalidatePermissionCache(role: string) {
+  permCache.delete(role);
+}
+
 // ── Auth Middleware ───────────────────────────────────────────────────────────
 export interface AuthenticatedRequest extends Request {
   adminUser?: Record<string, unknown>;
+  permissions?: PermissionSet;
 }
 
-export function adminAuthMiddleware(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
+export async function adminAuthMiddleware(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
   const token = req.cookies?.[TOKEN_COOKIE] as string | undefined;
   if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
   const payload = verifyToken(token);
   if (!payload) { res.status(401).json({ error: "Session expired" }); return; }
   req.adminUser = payload;
+
+  const role = typeof payload.role === "string" ? payload.role : "";
+  const userType = typeof payload.userType === "string" ? payload.userType : "admin";
+  try {
+    req.permissions = await loadPermissions(role, userType);
+  } catch {
+    req.permissions = { all: false, map: {} };
+  }
   next();
+}
+
+// ── Permission Guard Factory ──────────────────────────────────────────────────
+export function requirePermission(module: string, action: string) {
+  return (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+    if (!req.adminUser) { res.status(401).json({ error: "Not authenticated" }); return; }
+    if (req.permissions?.all) { next(); return; }
+    if (req.permissions?.map[module]?.[action]) { next(); return; }
+    res.status(403).json({ error: `Insufficient permissions: ${module}/${action}` });
+  };
 }
 
 // ── Routes ────────────────────────────────────────────────────────────────────
@@ -173,8 +229,19 @@ authRouter.post("/admin/auth/logout", async (req, res): Promise<void> => {
   if (token) {
     const payload = verifyToken(token);
     if (payload) {
+      const userId = typeof payload.userId === "number" ? payload.userId : null;
+      if (userId !== null) {
+        // Mark the most recent active session as logged out
+        await db.update(loginHistoryTable)
+          .set({ loggedOutAt: new Date() })
+          .where(and(
+            eq(loginHistoryTable.userId, userId),
+            eq(loginHistoryTable.status, "success"),
+            isNull(loginHistoryTable.loggedOutAt),
+          ));
+      }
       await logActivity(
-        typeof payload.userId === "number" ? payload.userId : null,
+        userId,
         typeof payload.username === "string" ? payload.username : "unknown",
         (payload.userType as "admin" | "employee") ?? "admin",
         "auth", "logout",
@@ -200,29 +267,17 @@ authRouter.get("/admin/auth/permissions", async (req, res): Promise<void> => {
   if (!payload) { res.status(401).json({ error: "Session expired" }); return; }
 
   const role = typeof payload.role === "string" ? payload.role : "";
-  // Super Admin / admin get all permissions
-  if (role === "admin" || role === "super_admin" || role === "Super Admin" || role === "Admin") {
-    res.json({ all: true, permissions: {} });
-    return;
+  const userType = typeof payload.userType === "string" ? payload.userType : "admin";
+  try {
+    const perms = await loadPermissions(role, userType);
+    res.json(perms);
+  } catch {
+    res.json({ all: false, map: {} });
   }
-
-  // Look up role in roles table
-  const [roleRow] = await db.select().from(rolesTable).where(eq(rolesTable.name, role));
-  if (!roleRow) { res.json({ all: false, permissions: {} }); return; }
-
-  const perms = await db.select().from(rolePermissionsTable)
-    .where(eq(rolePermissionsTable.roleId, roleRow.id));
-
-  const map: Record<string, Record<string, boolean>> = {};
-  for (const p of perms) {
-    if (!map[p.module]) map[p.module] = {};
-    map[p.module][p.action] = p.allowed;
-  }
-  res.json({ all: false, permissions: map });
 });
 
 // ── User management (admin only) ──────────────────────────────────────────────
-authRouter.get("/admin/auth/users", adminAuthMiddleware, async (_req, res): Promise<void> => {
+authRouter.get("/admin/auth/users", adminAuthMiddleware, requirePermission("employees", "view"), async (_req, res): Promise<void> => {
   const users = await db.select({
     id: adminUsersTable.id, username: adminUsersTable.username,
     email: adminUsersTable.email, role: adminUsersTable.role,
@@ -231,21 +286,21 @@ authRouter.get("/admin/auth/users", adminAuthMiddleware, async (_req, res): Prom
   res.json(users);
 });
 
-authRouter.post("/admin/auth/users", adminAuthMiddleware, async (req, res): Promise<void> => {
+authRouter.post("/admin/auth/users", adminAuthMiddleware, requirePermission("employees", "create"), async (req, res): Promise<void> => {
   const { username, email, password, role } = req.body as Record<string, string>;
   if (!username || !email || !password) { res.status(400).json({ error: "username, email, password required" }); return; }
   const [user] = await db.insert(adminUsersTable).values({ username, email, passwordHash: hashPassword(password), role: role ?? "staff" }).returning({ id: adminUsersTable.id, username: adminUsersTable.username, email: adminUsersTable.email, role: adminUsersTable.role });
   res.status(201).json(user);
 });
 
-authRouter.patch("/admin/auth/users/:id/password", adminAuthMiddleware, async (req, res): Promise<void> => {
+authRouter.patch("/admin/auth/users/:id/password", adminAuthMiddleware, requirePermission("employees", "edit"), async (req, res): Promise<void> => {
   const { password } = req.body as { password?: string };
   if (!password || password.length < 6) { res.status(400).json({ error: "Password must be at least 6 characters" }); return; }
   await db.update(adminUsersTable).set({ passwordHash: hashPassword(password) }).where(eq(adminUsersTable.id, parseInt(String(req.params["id"]), 10)));
   res.json({ ok: true });
 });
 
-authRouter.delete("/admin/auth/users/:id", adminAuthMiddleware, async (req, res): Promise<void> => {
+authRouter.delete("/admin/auth/users/:id", adminAuthMiddleware, requirePermission("employees", "delete"), async (req, res): Promise<void> => {
   await db.delete(adminUsersTable).where(eq(adminUsersTable.id, parseInt(String(req.params["id"]), 10)));
   res.sendStatus(204);
 });
