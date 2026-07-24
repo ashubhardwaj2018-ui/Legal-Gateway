@@ -24,6 +24,7 @@ import rolesRouter from "./roles";
 import loginHistoryRouter from "./login-history";
 import activityLogsRouter from "./activity-logs";
 import performanceRouter from "./performance";
+import notificationsRouter from "./notifications";
 
 const router: IRouter = Router();
 
@@ -97,5 +98,6 @@ router.use(loginHistoryRouter);
 router.use(activityLogsRouter);
 router.use(adminBlogsRouter);
 router.use(performanceRouter);
+router.use(notificationsRouter);
 
 export default router;

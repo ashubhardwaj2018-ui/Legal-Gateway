@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, and, desc, asc, count, sql } from "drizzle-orm";
 import { db, consultationsTable, leadAssignmentsTable, leadTimelineTable, teamMembersTable } from "@workspace/db";
 import type { AuthenticatedRequest } from "./auth";
+import { createNotification } from "./notifications";
 
 const router: IRouter = Router();
 
@@ -224,6 +225,20 @@ router.post("/admin/leads/:id/assign", async (req: AuthenticatedRequest, res): P
   await addTimelineEntry(id, "assigned",
     `Lead assigned to ${names} by ${actorName} (${method})`,
     actorName, actorId, { method, assignees: names, deadline, priority });
+
+  // Notify each newly assigned employee
+  for (const e of newAssignees) {
+    await createNotification({
+      recipientId: e.id,
+      recipientType: "employee",
+      type: "lead_assigned",
+      title: "New Lead Assigned",
+      body: `You have been assigned a lead by ${actorName}`,
+      entityType: "lead",
+      entityId: id,
+      link: `/admin/leads/${id}`,
+    });
+  }
 
   res.status(201).json({ assigned: inserted, count: inserted.length });
 });

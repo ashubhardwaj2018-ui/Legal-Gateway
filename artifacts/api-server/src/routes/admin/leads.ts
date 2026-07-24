@@ -10,6 +10,7 @@ import {
   leadAssignmentsTable,
 } from "@workspace/db";
 import type { AuthenticatedRequest } from "./auth";
+import { createNotification } from "./notifications";
 
 const router: IRouter = Router();
 
@@ -225,6 +226,23 @@ router.patch("/admin/leads/:id", async (req: AuthenticatedRequest, res): Promise
   if (body.status && body.status !== before.status) {
     await logActivity(id, "status_change", `Status changed from "${before.status}" to "${body.status}"`);
     await logTimeline(id, "status_changed", `Status changed from "${before.status}" to "${body.status}"`, req as AuthenticatedRequest);
+
+    // Notify all active assignees of the status change
+    const assignees = await db.select()
+      .from(leadAssignmentsTable)
+      .where(and(eq(leadAssignmentsTable.leadId, id), eq(leadAssignmentsTable.status, "active")));
+    for (const a of assignees) {
+      await createNotification({
+        recipientId: a.assignedToId,
+        recipientType: "employee",
+        type: "lead_updated",
+        title: "Lead Status Updated",
+        body: `Status changed to "${body.status}" on lead #${id}`,
+        entityType: "lead",
+        entityId: id,
+        link: `/admin/leads/${id}`,
+      });
+    }
   }
   if (body.assignedTo && body.assignedTo !== before.assignedTo) {
     await logTimeline(id, "assigned", `Lead assigned to ${body.assignedTo}`, req as AuthenticatedRequest);

@@ -21,3 +21,4 @@ export * from "./portal";
 export * from "./admin-users";
 export * from "./page-content";
 export * from "./rbac";
+export * from "./notifications";

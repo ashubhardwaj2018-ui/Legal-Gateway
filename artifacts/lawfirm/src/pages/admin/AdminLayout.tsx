@@ -1,5 +1,7 @@
 import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
+import { NotificationBell } from "../../components/admin/NotificationBell";
+import { ChatSlideIn } from "../../components/admin/ChatSlideIn";
 import {
   LayoutDashboard, Users, MessageSquare, FileText, Search,
   Settings, Building2, Mail, User, Scale, Menu, X, ChevronRight,
@@ -68,6 +70,7 @@ interface Props {
 export function AdminLayout({ children, title, subtitle, actions }: Props) {
   const [location, navigate] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
   const [adminUser, setAdminUser] = useState<{ username: string; role: string; userType?: string } | null>(null);
   const [permissions, setPermissions] = useState<PermissionSet | null>(null);
@@ -302,13 +305,29 @@ export function AdminLayout({ children, title, subtitle, actions }: Props) {
             <h1 className="text-lg font-bold text-[#0f2044] truncate">{title}</h1>
             {subtitle && <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>}
           </div>
-          {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
+          <div className="flex items-center gap-2 shrink-0">
+            {actions}
+            <NotificationBell />
+            <button
+              onClick={() => setChatOpen(true)}
+              className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-800 transition-colors"
+              title="Team Chat"
+            >
+              <MessageSquare size={18} />
+            </button>
+          </div>
         </header>
 
         <main className="flex-1 overflow-y-auto p-4 lg:p-6">
           {children}
         </main>
       </div>
+
+      <ChatSlideIn
+        open={chatOpen}
+        onClose={() => setChatOpen(false)}
+        currentUser={adminUser?.username ?? "User"}
+      />
     </div>
   );
 }
