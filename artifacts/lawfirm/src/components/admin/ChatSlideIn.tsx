@@ -55,8 +55,9 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
   const [showEmoji, setShowEmoji] = useState(false);
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<"channels" | "dms">("channels");
-  const [creating, setCreating] = useState(false);
+  const [createMode, setCreateMode] = useState<"public" | "group" | null>(null);
   const [newChanName, setNewChanName] = useState("");
+  const [groupMemberUsernames, setGroupMemberUsernames] = useState<string[]>([]);
   const [editId, setEditId] = useState<number | null>(null);
   const [editVal, setEditVal] = useState("");
   const [replyTo, setReplyTo] = useState<Msg | null>(null);
@@ -289,18 +290,18 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
     if (r.ok) setChannelMembers(await r.json() as string[]);
   }
 
-  async function addChannelMember(name: string) {
+  async function addChannelMember(username: string) {
     if (!active) return;
     await fetch(`/api/admin/chat/channels/${active.id}/members`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ memberName: name }),
+      body: JSON.stringify({ memberName: username }),
     });
     await loadChannelMembers(active.id);
   }
 
-  async function removeChannelMember(name: string) {
+  async function removeChannelMember(username: string) {
     if (!active) return;
-    await fetch(`/api/admin/chat/channels/${active.id}/members/${encodeURIComponent(name)}`, { method: "DELETE" });
+    await fetch(`/api/admin/chat/channels/${active.id}/members/${encodeURIComponent(username)}`, { method: "DELETE" });
     await loadChannelMembers(active.id);
   }
 
@@ -331,9 +332,30 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
     if (r.ok) {
       const ch = await r.json() as Channel;
       setChannels(prev => [...prev, ch]);
-      setNewChanName(""); setCreating(false);
+      setNewChanName(""); setCreateMode(null);
       selectChannel(ch);
     }
+  }
+
+  async function createGroup() {
+    if (!newChanName.trim()) return;
+    const r = await fetch("/api/admin/chat/channels", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: newChanName.trim(), type: "private",
+        initialMembers: groupMemberUsernames,
+      }),
+    });
+    if (r.ok) {
+      const ch = await r.json() as Channel;
+      setChannels(prev => [...prev, ch]);
+      setNewChanName(""); setGroupMemberUsernames([]); setCreateMode(null);
+      selectChannel(ch);
+    }
+  }
+
+  function displayNameForUsername(username: string): string {
+    return members.find(m => m.username === username)?.name ?? username;
   }
 
   function isDmChannel(ch: Channel) { return ch.type === "direct"; }
@@ -453,18 +475,55 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
                     </button>
                   );
                 })}
-                <button onClick={() => setCreating(v => !v)}
-                  className="w-full flex items-center gap-2 px-2 py-2 text-white/40 hover:text-white text-xs rounded-lg transition-colors mt-1">
-                  <Plus size={11} /> New channel
-                </button>
-                {creating && (
+                <div className="flex gap-1 mt-1">
+                  <button onClick={() => { setCreateMode(m => m === "public" ? null : "public"); setNewChanName(""); setGroupMemberUsernames([]); }}
+                    className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-white/40 hover:text-white text-[10px] rounded-lg transition-colors">
+                    <Hash size={10} /> Channel
+                  </button>
+                  <button onClick={() => { setCreateMode(m => m === "group" ? null : "group"); setNewChanName(""); setGroupMemberUsernames([]); }}
+                    className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-white/40 hover:text-white text-[10px] rounded-lg transition-colors">
+                    <Lock size={10} /> Group
+                  </button>
+                </div>
+                {createMode === "public" && (
                   <div className="mt-1 space-y-1">
                     <input value={newChanName} onChange={e => setNewChanName(e.target.value)}
                       onKeyDown={e => { if (e.key === "Enter") createChannel(); }}
                       placeholder="Channel name"
                       className="w-full bg-white/10 text-white text-xs rounded-lg px-2 py-1.5 outline-none placeholder-white/30"
                       autoFocus />
-                    <button onClick={createChannel} className="w-full bg-[#c9a227] text-[#0f2044] text-xs font-semibold py-1.5 rounded-lg">Create</button>
+                    <button onClick={createChannel} className="w-full bg-[#c9a227] text-[#0f2044] text-xs font-semibold py-1.5 rounded-lg">Create Public Channel</button>
+                  </div>
+                )}
+                {createMode === "group" && (
+                  <div className="mt-1 space-y-1.5">
+                    <input value={newChanName} onChange={e => setNewChanName(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter") createGroup(); }}
+                      placeholder="Group name"
+                      className="w-full bg-white/10 text-white text-xs rounded-lg px-2 py-1.5 outline-none placeholder-white/30"
+                      autoFocus />
+                    <div className="text-[9px] text-white/30 uppercase tracking-wider px-0.5">Add members</div>
+                    <div className="max-h-28 overflow-y-auto space-y-0.5">
+                      {members.map(m => {
+                        const checked = groupMemberUsernames.includes(m.username);
+                        return (
+                          <button key={m.id}
+                            onClick={() => setGroupMemberUsernames(prev =>
+                              checked ? prev.filter(u => u !== m.username) : [...prev, m.username]
+                            )}
+                            className={`w-full flex items-center gap-2 px-2 py-1 rounded-lg text-[10px] transition-all text-left ${checked ? "bg-[#c9a227]/20 text-[#c9a227]" : "text-white/60 hover:bg-white/10 hover:text-white"}`}>
+                            <div className={`w-3 h-3 rounded border flex-shrink-0 flex items-center justify-center ${checked ? "bg-[#c9a227] border-[#c9a227]" : "border-white/30"}`}>
+                              {checked && <span className="text-[#0f2044] text-[8px] font-bold">✓</span>}
+                            </div>
+                            {m.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <button onClick={createGroup} disabled={!newChanName.trim()}
+                      className="w-full bg-[#c9a227] text-[#0f2044] text-xs font-semibold py-1.5 rounded-lg disabled:opacity-40">
+                      Create Group ({groupMemberUsernames.length} members)
+                    </button>
                   </div>
                 )}
               </>
@@ -593,18 +652,18 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
                     <Users size={11} /> Members ({channelMembers.length})
                   </div>
                   <div className="flex flex-wrap gap-1">
-                    {channelMembers.map(name => (
-                      <span key={name} className="flex items-center gap-1 bg-white border border-gray-200 rounded-full px-2 py-0.5 text-[10px]">
-                        {name}
-                        <button onClick={() => removeChannelMember(name)} className="text-red-400 hover:text-red-600">
+                    {channelMembers.map(uname => (
+                      <span key={uname} className="flex items-center gap-1 bg-white border border-gray-200 rounded-full px-2 py-0.5 text-[10px]">
+                        {displayNameForUsername(uname)}
+                        <button onClick={() => removeChannelMember(uname)} className="text-red-400 hover:text-red-600">
                           <XIcon size={9} />
                         </button>
                       </span>
                     ))}
                   </div>
                   <div className="mt-1 flex flex-wrap gap-1">
-                    {members.filter(m => !channelMembers.includes(m.name)).slice(0, 8).map(m => (
-                      <button key={m.id} onClick={() => addChannelMember(m.name)}
+                    {members.filter(m => !channelMembers.includes(m.username)).slice(0, 8).map(m => (
+                      <button key={m.id} onClick={() => addChannelMember(m.username)}
                         className="text-[10px] text-blue-600 hover:text-blue-800 flex items-center gap-0.5">
                         <Plus size={9} />{m.name}
                       </button>

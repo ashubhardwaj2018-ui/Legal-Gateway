@@ -159,21 +159,36 @@ router.get("/admin/chat/search", async (req, res): Promise<void> => {
     res.json(results); return;
   }
 
-  // Global search — only return messages from channels the user can access
+  // Global search — filter by channels the caller can actually access; never leak private/DM content
+  const isAdmin = isAdminRole(req);
+  const username = actorName(req);
+  const allChannels = await db.select().from(chatChannelsTable);
+  const accessibleIds = allChannels
+    .filter(ch => {
+      if (ch.type === "public" || ch.type === "department") return true;
+      if (isAdmin) return true;
+      return parseMembersJson(ch.members).includes(username);
+    })
+    .map(ch => ch.id);
+  if (accessibleIds.length === 0) { res.json([]); return; }
   const results = await db.select().from(chatMessagesTable)
-    .where(ilike(chatMessagesTable.content, `%${q}%`))
-    .orderBy(desc(chatMessagesTable.createdAt)).limit(50);
+    .where(and(inArray(chatMessagesTable.channelId, accessibleIds), ilike(chatMessagesTable.content, `%${q}%`)))
+    .orderBy(desc(chatMessagesTable.createdAt)).limit(30);
   res.json(results);
 });
 
 router.post("/admin/chat/channels", async (req, res): Promise<void> => {
-  const { name, description, type } = req.body as { name?: string; description?: string; type?: string };
+  const { name, description, type, initialMembers } =
+    req.body as { name?: string; description?: string; type?: string; initialMembers?: string[] };
   if (!name?.trim()) { res.status(400).json({ error: "Name required" }); return; }
   const slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + "-" + Date.now();
   const chanType = type ?? "public";
   const creator = actorName(req);
-  // Private channels: creator is first member
-  const members = chanType === "private" ? JSON.stringify([creator]) : null;
+  // Private/group channels: always include creator + any pre-selected members (by username)
+  const membersList: string[] = chanType === "private"
+    ? [...new Set([creator, ...(Array.isArray(initialMembers) ? initialMembers.filter(m => typeof m === "string") : [])])]
+    : [];
+  const members = chanType === "private" ? JSON.stringify(membersList) : null;
   const [ch] = await db.insert(chatChannelsTable).values({
     name: name.trim(), slug, type: chanType,
     description: description?.trim() ?? null, members,
