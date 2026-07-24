@@ -11,7 +11,7 @@ interface Msg {
   reactions: string; replyToId: number | null; replyPreview: string | null;
   isEdited: boolean; isDeleted: boolean; isPinned: boolean; createdAt: string;
 }
-interface Member { id: number; name: string; department: string; designation: string; }
+interface Member { id: number; name: string; username: string; department: string; designation: string; }
 interface PresenceEntry { userName: string; lastSeenAt: string; isOnline: boolean; }
 
 const EMOJIS = ["👍","❤️","😂","😮","🎉","🔥","🙏","👏","✅","🚀","😢","💯","🎊","💡","⚡","🌟","🤝","👀","🔑","✨"];
@@ -304,9 +304,9 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
     await loadChannelMembers(active.id);
   }
 
-  // Server-side DM dedup
+  // Server-side DM dedup — 'a' derived from auth on server; only 'b' (target username) sent
   async function openDm(member: Member) {
-    const r = await fetch(`/api/admin/chat/channels/dm?a=${encodeURIComponent(currentUser)}&b=${encodeURIComponent(member.name)}`);
+    const r = await fetch(`/api/admin/chat/channels/dm?b=${encodeURIComponent(member.username)}`);
     if (!r.ok) return;
     const ch = await r.json() as Channel;
     setChannels(prev => prev.some(c => c.id === ch.id) ? prev : [...prev, ch]);
@@ -337,13 +337,21 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
   }
 
   function isDmChannel(ch: Channel) { return ch.type === "direct"; }
-  function dmLabel(ch: Channel): string {
-    if (!isDmChannel(ch)) return ch.name;
+  /** Returns the other participant's auth username from a DM channel. */
+  function dmPartnerUsername(ch: Channel): string {
     try {
       const participants = JSON.parse(ch.members ?? "[]") as string[];
-      const other = participants.find(n => n !== currentUser);
-      return other ?? ch.name;
-    } catch { return ch.name; }
+      return participants.find(n => n !== currentUser) ?? "";
+    } catch { return ""; }
+  }
+  /** Returns the display name for a DM channel (looks up by username). */
+  function dmLabel(ch: Channel): string {
+    if (!isDmChannel(ch)) return ch.name;
+    const username = dmPartnerUsername(ch);
+    if (!username) return ch.name;
+    // Look up display name from the members list by username
+    const found = members.find(m => m.username === username);
+    return found?.name ?? username;
   }
 
   const publicChannels = channels.filter(c =>
@@ -426,8 +434,9 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
                 )}
                 {dmChannels.map(ch => {
                   const other = dmLabel(ch);
-                  const online = isUserOnline(other);
-                  const lastSeen = userLastSeenText(other);
+                  const otherUsername = dmPartnerUsername(ch);
+                  const online = isUserOnline(otherUsername);
+                  const lastSeen = userLastSeenText(otherUsername);
                   return (
                     <button key={ch.id} onClick={() => selectChannel(ch)}
                       className={`w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all text-left ${active?.id === ch.id ? "bg-[#c9a227] text-[#0f2044] font-semibold" : "text-white/70 hover:bg-white/10 hover:text-white"}`}>
@@ -463,8 +472,8 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
             {tab === "dms" && (
               <>
                 {filteredMembers.map(m => {
-                  const online = isUserOnline(m.name);
-                  const lastSeen = userLastSeenText(m.name);
+                  const online = isUserOnline(m.username);
+                  const lastSeen = userLastSeenText(m.username);
                   return (
                     <button key={m.id} onClick={() => openDm(m)}
                       className="w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs text-white/70 hover:bg-white/10 hover:text-white transition-all text-left">
@@ -501,16 +510,16 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
                       <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-bold" style={{ background: nameColor(dmLabel(active)) }}>
                         {initials(dmLabel(active))}
                       </div>
-                      {isUserOnline(dmLabel(active)) && (
+                      {isUserOnline(dmPartnerUsername(active)) && (
                         <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-400 rounded-full border-2 border-white" />
                       )}
                     </div>
                     <div>
                       <div className="font-semibold text-[#0f2044] text-sm">{dmLabel(active)}</div>
-                      <div className={`text-[10px] ${isUserOnline(dmLabel(active)) ? "text-green-500" : "text-gray-400"}`}>
-                        {isUserOnline(dmLabel(active))
+                      <div className={`text-[10px] ${isUserOnline(dmPartnerUsername(active)) ? "text-green-500" : "text-gray-400"}`}>
+                        {isUserOnline(dmPartnerUsername(active))
                           ? "Online"
-                          : userLastSeenText(dmLabel(active)) ?? "Offline"}
+                          : userLastSeenText(dmPartnerUsername(active)) ?? "Offline"}
                       </div>
                     </div>
                   </>

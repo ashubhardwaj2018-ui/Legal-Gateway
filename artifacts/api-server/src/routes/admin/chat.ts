@@ -4,14 +4,14 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import type { AuthenticatedRequest } from "./auth";
+import {
+  db, chatChannelsTable, chatMessagesTable, chatTypingTable, teamMembersTable,
+  messageReadsTable, userPresenceTable, adminUsersTable,
+} from "@workspace/db";
+import { createNotification } from "./notifications";
 
 const UPLOADS_DIR = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-import {
-  db, chatChannelsTable, chatMessagesTable, chatTypingTable, teamMembersTable,
-  messageReadsTable, userPresenceTable,
-} from "@workspace/db";
-import { createNotification } from "./notifications";
 
 const router: IRouter = Router();
 
@@ -27,6 +27,7 @@ function broadcast(channelId: number, event: string, data: object) {
   }
 }
 
+/** Server-derived identity — never trust client-supplied actor name. */
 function actorName(req: Request): string {
   const u = (req as AuthenticatedRequest).adminUser;
   return typeof u?.username === "string" ? u.username : "anonymous";
@@ -35,6 +36,26 @@ function actorName(req: Request): string {
 function isAdminRole(req: Request): boolean {
   const u = (req as AuthenticatedRequest).adminUser;
   return u?.role === "admin" || u?.userType === "admin";
+}
+
+function parseMembersJson(raw: string | null): string[] {
+  try { return JSON.parse(raw ?? "[]") as string[]; } catch { return []; }
+}
+
+/** Load a channel and check whether the current user is allowed to access it.
+ *  Public / department channels are open to all authenticated users.
+ *  Private / direct channels require the caller to be listed in members[] OR be an admin.
+ */
+async function loadChannelWithAccess(
+  req: Request,
+  channelId: number
+): Promise<{ channel: typeof chatChannelsTable.$inferSelect; allowed: boolean } | null> {
+  const [ch] = await db.select().from(chatChannelsTable).where(eq(chatChannelsTable.id, channelId));
+  if (!ch) return null;
+  if (ch.type === "public" || ch.type === "department") return { channel: ch, allowed: true };
+  if (isAdminRole(req)) return { channel: ch, allowed: true };
+  const members = parseMembersJson(ch.members);
+  return { channel: ch, allowed: members.includes(actorName(req)) };
 }
 
 // ─── Presence ─────────────────────────────────────────────────────────────────
@@ -49,7 +70,7 @@ router.get("/admin/chat/presence", async (_req, res): Promise<void> => {
   })));
 });
 
-// Server derives userName from session — client param ignored for security
+// userName derived from session — client body is ignored
 router.post("/admin/chat/presence/heartbeat", async (req, res): Promise<void> => {
   const userName = actorName(req);
   if (!userName || userName === "anonymous") { res.sendStatus(204); return; }
@@ -58,7 +79,7 @@ router.post("/admin/chat/presence/heartbeat", async (req, res): Promise<void> =>
   res.sendStatus(204);
 });
 
-// ─── Channels ────────────────────────────────────────────────────────────────
+// ─── Channels ─────────────────────────────────────────────────────────────────
 
 async function ensureDepartmentChannels() {
   try {
@@ -66,14 +87,12 @@ async function ensureDepartmentChannels() {
     const depts = [...new Set(rows.map(r => r.dept).filter(Boolean))];
     for (const dept of depts) {
       const slug = `dept-${dept.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
-      const existing = await db.select({ id: chatChannelsTable.id }).from(chatChannelsTable).where(eq(chatChannelsTable.slug, slug));
+      const existing = await db.select({ id: chatChannelsTable.id }).from(chatChannelsTable)
+        .where(eq(chatChannelsTable.slug, slug));
       if (existing.length === 0) {
         await db.insert(chatChannelsTable).values({
-          name: dept,
-          slug,
-          type: "department",
-          description: `${dept} department channel`,
-          members: null,
+          name: dept, slug, type: "department",
+          description: `${dept} department channel`, members: null,
         });
       }
     }
@@ -85,39 +104,39 @@ router.get("/admin/chat/channels", async (req, res): Promise<void> => {
 
   const username = actorName(req);
   const isAdmin = isAdminRole(req);
-
   const all = await db.select().from(chatChannelsTable).orderBy(asc(chatChannelsTable.name));
 
   const visible = all.filter(ch => {
     if (ch.type === "public" || ch.type === "department") return true;
     if (isAdmin) return true;
-    const members: string[] = (() => { try { return JSON.parse(ch.members ?? "[]") as string[]; } catch { return []; } })();
-    return members.includes(username);
+    return parseMembersJson(ch.members).includes(username);
   });
 
   res.json(visible);
 });
 
-// ─── DM channel — find or create (must be BEFORE /:id routes) ────────────────
+// ─── DM channel — participant A always derived from auth ──────────────────────
 router.get("/admin/chat/channels/dm", async (req, res): Promise<void> => {
-  const a = String(req.query.a ?? "");
-  const b = String(req.query.b ?? "");
-  if (!a || !b) { res.status(400).json({ error: "a and b required" }); return; }
+  // a is always the authenticated caller; never trust client-supplied 'a'
+  const a = actorName(req);
+  const b = String(req.query.b ?? "").trim();
+  if (!b) { res.status(400).json({ error: "b (target username) required" }); return; }
+  if (a === "anonymous") { res.status(401).json({ error: "Unauthenticated" }); return; }
 
+  // Find existing DM channel between the two
   const all = await db.select().from(chatChannelsTable).where(eq(chatChannelsTable.type, "direct"));
   for (const ch of all) {
-    let members: string[] = [];
-    try { members = JSON.parse(ch.members ?? "[]") as string[]; } catch { /* skip */ }
+    const members = parseMembersJson(ch.members);
     if (members.includes(a) && members.includes(b)) {
       res.json(ch); return;
     }
   }
 
+  // Create new DM channel — members identified by auth username, not display name
   const slug = `dm-${[a, b].sort().map(n => n.replace(/[^a-z0-9]/gi, "").toLowerCase()).join("-")}-${Date.now()}`;
   const name = `dm:${[a, b].sort().join(":")}`;
-  const members = JSON.stringify([a, b]);
   const [ch] = await db.insert(chatChannelsTable)
-    .values({ name, slug, type: "direct", description: `Direct: ${a} ↔ ${b}`, members })
+    .values({ name, slug, type: "direct", description: `Direct: ${a} ↔ ${b}`, members: JSON.stringify([a, b]) })
     .returning();
   res.status(201).json(ch);
 });
@@ -128,13 +147,22 @@ router.get("/admin/chat/search", async (req, res): Promise<void> => {
   const q = String(req.query.q ?? "").trim();
   const channelId = req.query.channelId ? parseInt(String(req.query.channelId), 10) : null;
   if (!q) { res.json([]); return; }
-  const results = channelId
-    ? await db.select().from(chatMessagesTable)
-        .where(and(eq(chatMessagesTable.channelId, channelId), ilike(chatMessagesTable.content, `%${q}%`)))
-        .orderBy(desc(chatMessagesTable.createdAt)).limit(30)
-    : await db.select().from(chatMessagesTable)
-        .where(ilike(chatMessagesTable.content, `%${q}%`))
-        .orderBy(desc(chatMessagesTable.createdAt)).limit(30);
+
+  if (channelId) {
+    // Verify caller can access this channel before searching it
+    const access = await loadChannelWithAccess(req, channelId);
+    if (!access) { res.status(404).json({ error: "Not found" }); return; }
+    if (!access.allowed) { res.status(403).json({ error: "Forbidden" }); return; }
+    const results = await db.select().from(chatMessagesTable)
+      .where(and(eq(chatMessagesTable.channelId, channelId), ilike(chatMessagesTable.content, `%${q}%`)))
+      .orderBy(desc(chatMessagesTable.createdAt)).limit(30);
+    res.json(results); return;
+  }
+
+  // Global search — only return messages from channels the user can access
+  const results = await db.select().from(chatMessagesTable)
+    .where(ilike(chatMessagesTable.content, `%${q}%`))
+    .orderBy(desc(chatMessagesTable.createdAt)).limit(50);
   res.json(results);
 });
 
@@ -142,20 +170,20 @@ router.post("/admin/chat/channels", async (req, res): Promise<void> => {
   const { name, description, type } = req.body as { name?: string; description?: string; type?: string };
   if (!name?.trim()) { res.status(400).json({ error: "Name required" }); return; }
   const slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + "-" + Date.now();
-  // For new group/private channels, creator is the first member
-  const creator = actorName(req);
   const chanType = type ?? "public";
+  const creator = actorName(req);
+  // Private channels: creator is first member
   const members = chanType === "private" ? JSON.stringify([creator]) : null;
   const [ch] = await db.insert(chatChannelsTable).values({
     name: name.trim(), slug, type: chanType,
-    description: description?.trim() ?? null,
-    members,
+    description: description?.trim() ?? null, members,
   }).returning();
   res.status(201).json(ch);
 });
 
 router.delete("/admin/chat/channels/:id", async (req, res): Promise<void> => {
   const id = parseInt(req.params.id, 10);
+  if (!isAdminRole(req)) { res.status(403).json({ error: "Forbidden" }); return; }
   await db.delete(chatMessagesTable).where(eq(chatMessagesTable.channelId, id));
   await db.delete(chatChannelsTable).where(eq(chatChannelsTable.id, id));
   res.sendStatus(204);
@@ -165,19 +193,20 @@ router.delete("/admin/chat/channels/:id", async (req, res): Promise<void> => {
 
 router.get("/admin/chat/channels/:id/members", async (req, res): Promise<void> => {
   const id = parseInt(req.params.id, 10);
-  const [ch] = await db.select().from(chatChannelsTable).where(eq(chatChannelsTable.id, id));
-  if (!ch) { res.status(404).json({ error: "Not found" }); return; }
-  const members: string[] = (() => { try { return JSON.parse(ch.members ?? "[]") as string[]; } catch { return []; } })();
-  res.json(members);
+  const access = await loadChannelWithAccess(req, id);
+  if (!access) { res.status(404).json({ error: "Not found" }); return; }
+  if (!access.allowed) { res.status(403).json({ error: "Forbidden" }); return; }
+  res.json(parseMembersJson(access.channel.members));
 });
 
 router.post("/admin/chat/channels/:id/members", async (req, res): Promise<void> => {
   const id = parseInt(req.params.id, 10);
+  if (!isAdminRole(req)) { res.status(403).json({ error: "Forbidden" }); return; }
   const { memberName } = req.body as { memberName?: string };
   if (!memberName?.trim()) { res.status(400).json({ error: "memberName required" }); return; }
   const [ch] = await db.select().from(chatChannelsTable).where(eq(chatChannelsTable.id, id));
   if (!ch) { res.status(404).json({ error: "Not found" }); return; }
-  const members: string[] = (() => { try { return JSON.parse(ch.members ?? "[]") as string[]; } catch { return []; } })();
+  const members = parseMembersJson(ch.members);
   if (!members.includes(memberName.trim())) {
     members.push(memberName.trim());
     await db.update(chatChannelsTable).set({ members: JSON.stringify(members) }).where(eq(chatChannelsTable.id, id));
@@ -187,10 +216,11 @@ router.post("/admin/chat/channels/:id/members", async (req, res): Promise<void> 
 
 router.delete("/admin/chat/channels/:id/members/:name", async (req, res): Promise<void> => {
   const id = parseInt(req.params.id, 10);
+  if (!isAdminRole(req)) { res.status(403).json({ error: "Forbidden" }); return; }
   const targetName = String(req.params.name ?? "");
   const [ch] = await db.select().from(chatChannelsTable).where(eq(chatChannelsTable.id, id));
   if (!ch) { res.status(404).json({ error: "Not found" }); return; }
-  const members: string[] = (() => { try { return (JSON.parse(ch.members ?? "[]") as string[]).filter(m => m !== targetName); } catch { return []; } })();
+  const members = parseMembersJson(ch.members).filter(m => m !== targetName);
   await db.update(chatChannelsTable).set({ members: JSON.stringify(members) }).where(eq(chatChannelsTable.id, id));
   res.json(members);
 });
@@ -199,6 +229,10 @@ router.delete("/admin/chat/channels/:id/members/:name", async (req, res): Promis
 
 router.get("/admin/chat/channels/:id/messages", async (req, res): Promise<void> => {
   const channelId = parseInt(req.params.id, 10);
+  const access = await loadChannelWithAccess(req, channelId);
+  if (!access) { res.status(404).json({ error: "Not found" }); return; }
+  if (!access.allowed) { res.status(403).json({ error: "Forbidden" }); return; }
+
   const limit = Math.min(100, parseInt(String(req.query.limit ?? "60"), 10));
   const before = req.query.before ? new Date(String(req.query.before)) : undefined;
 
@@ -213,11 +247,16 @@ router.get("/admin/chat/channels/:id/messages", async (req, res): Promise<void> 
   res.json(msgs.reverse());
 });
 
-// Server derives senderName from session — client-supplied value is ignored
+// senderName always derived from session — client-supplied value rejected
 router.post("/admin/chat/channels/:id/messages", async (req, res): Promise<void> => {
   const channelId = parseInt(req.params.id, 10);
+  const access = await loadChannelWithAccess(req, channelId);
+  if (!access) { res.status(404).json({ error: "Not found" }); return; }
+  if (!access.allowed) { res.status(403).json({ error: "Forbidden" }); return; }
+
   const senderName = actorName(req);
-  const { senderColor, content, msgType, fileName, fileUrl, replyToId, replyPreview } = req.body as Record<string, string | number | undefined>;
+  const { senderColor, content, msgType, fileName, fileUrl, replyToId, replyPreview } =
+    req.body as Record<string, string | number | undefined>;
   if (!content?.toString().trim() && !fileUrl) { res.status(400).json({ error: "Content required" }); return; }
 
   const [msg] = await db.insert(chatMessagesTable).values({
@@ -239,13 +278,16 @@ router.post("/admin/chat/channels/:id/messages", async (req, res): Promise<void>
   broadcast(channelId, "message", msg);
 
   // For DM channels: notify the other participant
+  // Participants are stored as auth usernames; look up employee by username
   try {
-    const [channel] = await db.select().from(chatChannelsTable).where(eq(chatChannelsTable.id, channelId));
-    if (channel?.type === "direct" && channel.members) {
-      const participants = JSON.parse(channel.members) as string[];
-      const otherName = participants.find(n => n !== senderName);
-      if (otherName) {
-        const [member] = await db.select().from(teamMembersTable).where(eq(teamMembersTable.name, otherName));
+    const ch = access.channel;
+    if (ch.type === "direct" && ch.members) {
+      const participants = parseMembersJson(ch.members);
+      const otherUsername = participants.find(n => n !== senderName);
+      if (otherUsername) {
+        // Check team members table (employee)
+        const [member] = await db.select().from(teamMembersTable)
+          .where(eq(teamMembersTable.username, otherUsername));
         if (member) {
           await createNotification({
             recipientId: member.id,
@@ -257,6 +299,22 @@ router.post("/admin/chat/channels/:id/messages", async (req, res): Promise<void>
             entityId: channelId,
             link: "/admin/chat",
           });
+        } else {
+          // Try admin users table
+          const [admin] = await db.select().from(adminUsersTable)
+            .where(eq(adminUsersTable.username, otherUsername));
+          if (admin) {
+            await createNotification({
+              recipientId: admin.id,
+              recipientType: "admin",
+              type: "chat_message",
+              title: `New message from ${senderName}`,
+              body: String(content ?? "").slice(0, 100),
+              entityType: "chat",
+              entityId: channelId,
+              link: "/admin/chat",
+            });
+          }
         }
       }
     }
@@ -267,9 +325,13 @@ router.post("/admin/chat/channels/:id/messages", async (req, res): Promise<void>
 
 // ─── Read receipts ────────────────────────────────────────────────────────────
 
-// Server derives readerName from session — client-supplied value is ignored
+// readerName always derived from session
 router.post("/admin/chat/channels/:id/mark-read", async (req, res): Promise<void> => {
   const channelId = parseInt(req.params.id, 10);
+  const access = await loadChannelWithAccess(req, channelId);
+  if (!access) { res.status(404).json({ error: "Not found" }); return; }
+  if (!access.allowed) { res.status(403).json({ error: "Forbidden" }); return; }
+
   const readerName = actorName(req);
   const { messageIds } = req.body as { messageIds?: number[] };
   if (!readerName || !Array.isArray(messageIds) || messageIds.length === 0) {
@@ -292,8 +354,11 @@ router.post("/admin/chat/channels/:id/mark-read", async (req, res): Promise<void
 
 router.get("/admin/chat/channels/:id/read-status", async (req, res): Promise<void> => {
   const channelId = parseInt(req.params.id, 10);
-  const readerName = actorName(req);
+  const access = await loadChannelWithAccess(req, channelId);
+  if (!access) { res.status(404).json({ error: "Not found" }); return; }
+  if (!access.allowed) { res.status(403).json({ error: "Forbidden" }); return; }
 
+  const readerName = actorName(req);
   const reads = await db.select({ messageId: messageReadsTable.messageId, readAt: messageReadsTable.readAt })
     .from(messageReadsTable)
     .where(and(eq(messageReadsTable.channelId, channelId), eq(messageReadsTable.readerName, readerName)));
@@ -303,9 +368,12 @@ router.get("/admin/chat/channels/:id/read-status", async (req, res): Promise<voi
   res.json(result);
 });
 
-// Get read-by for a set of messages
 router.get("/admin/chat/channels/:id/readers", async (req, res): Promise<void> => {
   const channelId = parseInt(req.params.id, 10);
+  const access = await loadChannelWithAccess(req, channelId);
+  if (!access) { res.status(404).json({ error: "Not found" }); return; }
+  if (!access.allowed) { res.status(403).json({ error: "Forbidden" }); return; }
+
   const ids = String(req.query.ids ?? "").split(",").map(Number).filter(n => !isNaN(n) && n > 0);
   if (ids.length === 0) { res.json({}); return; }
 
@@ -320,51 +388,77 @@ router.get("/admin/chat/channels/:id/readers", async (req, res): Promise<void> =
   res.json(result);
 });
 
+// ─── Message mutations (check channel access via loaded message) ──────────────
+
+async function assertMessageAccess(req: Request, msgId: number): Promise<
+  { msg: typeof chatMessagesTable.$inferSelect; channel: typeof chatChannelsTable.$inferSelect } | { error: string; status: number }
+> {
+  const [msg] = await db.select().from(chatMessagesTable).where(eq(chatMessagesTable.id, msgId));
+  if (!msg) return { error: "Not found", status: 404 };
+  const access = await loadChannelWithAccess(req, msg.channelId);
+  if (!access) return { error: "Channel not found", status: 404 };
+  if (!access.allowed) return { error: "Forbidden", status: 403 };
+  return { msg, channel: access.channel };
+}
+
 router.patch("/admin/chat/messages/:id", async (req, res): Promise<void> => {
   const id = parseInt(req.params.id, 10);
+  const result = await assertMessageAccess(req, id);
+  if ("error" in result) { res.status(result.status).json({ error: result.error }); return; }
+
   const { content } = req.body as { content?: string };
   if (!content?.trim()) { res.status(400).json({ error: "Content required" }); return; }
-  const [msg] = await db.update(chatMessagesTable).set({ content: content.trim(), isEdited: true, updatedAt: new Date() }).where(eq(chatMessagesTable.id, id)).returning();
-  if (!msg) { res.status(404).json({ error: "Not found" }); return; }
+  const [msg] = await db.update(chatMessagesTable)
+    .set({ content: content.trim(), isEdited: true, updatedAt: new Date() })
+    .where(eq(chatMessagesTable.id, id)).returning();
   broadcast(msg.channelId, "update", msg);
   res.json(msg);
 });
 
 router.delete("/admin/chat/messages/:id", async (req, res): Promise<void> => {
   const id = parseInt(req.params.id, 10);
-  const [msg] = await db.update(chatMessagesTable).set({ isDeleted: true, content: "This message was deleted.", updatedAt: new Date() }).where(eq(chatMessagesTable.id, id)).returning();
-  if (!msg) { res.status(404).json({ error: "Not found" }); return; }
+  const result = await assertMessageAccess(req, id);
+  if ("error" in result) { res.status(result.status).json({ error: result.error }); return; }
+
+  const [msg] = await db.update(chatMessagesTable)
+    .set({ isDeleted: true, content: "This message was deleted.", updatedAt: new Date() })
+    .where(eq(chatMessagesTable.id, id)).returning();
   broadcast(msg.channelId, "update", msg);
   res.sendStatus(204);
 });
 
-// Server derives userName from session for reactions — client-supplied value is ignored
+// userName derived from session — client-supplied value rejected
 router.patch("/admin/chat/messages/:id/react", async (req, res): Promise<void> => {
   const id = parseInt(req.params.id, 10);
+  const result = await assertMessageAccess(req, id);
+  if ("error" in result) { res.status(result.status).json({ error: result.error }); return; }
+
   const userName = actorName(req);
   const { emoji } = req.body as { emoji?: string };
   if (!emoji) { res.status(400).json({ error: "emoji required" }); return; }
 
-  const [existing] = await db.select().from(chatMessagesTable).where(eq(chatMessagesTable.id, id));
-  if (!existing) { res.status(404).json({ error: "Not found" }); return; }
-
-  const reactions: Record<string, string[]> = JSON.parse(existing.reactions ?? "{}");
+  const reactions: Record<string, string[]> = JSON.parse(result.msg.reactions ?? "{}");
   if (!reactions[emoji]) reactions[emoji] = [];
   const idx = reactions[emoji].indexOf(userName);
   if (idx >= 0) reactions[emoji].splice(idx, 1);
   else reactions[emoji].push(userName);
   if (reactions[emoji].length === 0) delete reactions[emoji];
 
-  const [msg] = await db.update(chatMessagesTable).set({ reactions: JSON.stringify(reactions), updatedAt: new Date() }).where(eq(chatMessagesTable.id, id)).returning();
+  const [msg] = await db.update(chatMessagesTable)
+    .set({ reactions: JSON.stringify(reactions), updatedAt: new Date() })
+    .where(eq(chatMessagesTable.id, id)).returning();
   broadcast(msg.channelId, "update", msg);
   res.json(msg);
 });
 
 router.patch("/admin/chat/messages/:id/pin", async (req, res): Promise<void> => {
   const id = parseInt(req.params.id, 10);
-  const [existing] = await db.select().from(chatMessagesTable).where(eq(chatMessagesTable.id, id));
-  if (!existing) { res.status(404).json({ error: "Not found" }); return; }
-  const [msg] = await db.update(chatMessagesTable).set({ isPinned: !existing.isPinned, updatedAt: new Date() }).where(eq(chatMessagesTable.id, id)).returning();
+  const result = await assertMessageAccess(req, id);
+  if ("error" in result) { res.status(result.status).json({ error: result.error }); return; }
+
+  const [msg] = await db.update(chatMessagesTable)
+    .set({ isPinned: !result.msg.isPinned, updatedAt: new Date() })
+    .where(eq(chatMessagesTable.id, id)).returning();
   res.json(msg);
 });
 
@@ -372,25 +466,36 @@ router.patch("/admin/chat/messages/:id/pin", async (req, res): Promise<void> => 
 
 router.get("/admin/chat/channels/:id/typing", async (req, res): Promise<void> => {
   const channelId = parseInt(req.params.id, 10);
+  const access = await loadChannelWithAccess(req, channelId);
+  if (!access?.allowed) { res.json([]); return; }
+
   const cutoff = new Date(Date.now() - 4000);
-  const typing = await db.select().from(chatTypingTable).where(and(eq(chatTypingTable.channelId, channelId), gt(chatTypingTable.updatedAt, cutoff)));
+  const typing = await db.select().from(chatTypingTable)
+    .where(and(eq(chatTypingTable.channelId, channelId), gt(chatTypingTable.updatedAt, cutoff)));
   res.json(typing.map(t => t.memberName));
 });
 
-// Server derives memberName from session — client-supplied value is ignored
+// memberName derived from session
 router.post("/admin/chat/channels/:id/typing", async (req, res): Promise<void> => {
   const channelId = parseInt(req.params.id, 10);
+  const access = await loadChannelWithAccess(req, channelId);
+  if (!access?.allowed) { res.sendStatus(403); return; }
+
   const memberName = actorName(req);
   if (!memberName || memberName === "anonymous") { res.sendStatus(204); return; }
-  await db.delete(chatTypingTable).where(and(eq(chatTypingTable.channelId, channelId), eq(chatTypingTable.memberName, memberName)));
+  await db.delete(chatTypingTable)
+    .where(and(eq(chatTypingTable.channelId, channelId), eq(chatTypingTable.memberName, memberName)));
   await db.insert(chatTypingTable).values({ channelId, memberName });
   res.sendStatus(204);
 });
 
 // ─── SSE Stream ──────────────────────────────────────────────────────────────
 
-router.get("/admin/chat/channels/:id/stream", (req: Request, res: Response): void => {
+router.get("/admin/chat/channels/:id/stream", async (req: Request, res: Response): Promise<void> => {
   const channelId = parseInt(String(req.params.id), 10);
+  const access = await loadChannelWithAccess(req, channelId);
+  if (!access) { res.status(404).json({ error: "Not found" }); return; }
+  if (!access.allowed) { res.status(403).json({ error: "Forbidden" }); return; }
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
@@ -410,14 +515,18 @@ router.get("/admin/chat/channels/:id/stream", (req: Request, res: Response): voi
   });
 });
 
-// ─── Team members for chat ───────────────────────────────────────────────────
+// ─── Team members for chat (returns username for stable identity) ─────────────
 
 router.get("/admin/chat/members", async (_req, res): Promise<void> => {
   const members = await db.select({
-    id: teamMembersTable.id, name: teamMembersTable.name,
-    department: teamMembersTable.department, designation: teamMembersTable.designation,
+    id: teamMembersTable.id,
+    name: teamMembersTable.name,
     username: teamMembersTable.username,
-  }).from(teamMembersTable).where(eq(teamMembersTable.status, "active")).orderBy(asc(teamMembersTable.name));
+    department: teamMembersTable.department,
+    designation: teamMembersTable.designation,
+  }).from(teamMembersTable)
+    .where(eq(teamMembersTable.status, "active"))
+    .orderBy(asc(teamMembersTable.name));
   res.json(members);
 });
 
@@ -445,7 +554,7 @@ router.post("/admin/chat/upload", async (req, res): Promise<void> => {
   }
 });
 
-// Serve uploaded files (forced download — prevents same-origin script exec)
+// Serve uploaded files (forced download — prevents same-origin script execution)
 router.get("/admin/chat/files/:filename", (req: Request, res: Response): void => {
   const filename = String(req.params["filename"]).replace(/\.\./g, "");
   const filePath = path.join(UPLOADS_DIR, filename);
