@@ -504,11 +504,7 @@ router.patch("/admin/chat/messages/:id/pin", async (req, res): Promise<void> => 
   const id = parseInt(req.params.id, 10);
   const result = await assertMessageAccess(req, id);
   if ("error" in result) { res.status(result.status).json({ error: result.error }); return; }
-  // Pinning is a moderation action — admin-only
-  if (!isAdminRole(req)) {
-    res.status(403).json({ error: "Only admins can pin messages" }); return;
-  }
-
+  // Any channel member may pin/unpin; channel access already verified above
   const [msg] = await db.update(chatMessagesTable)
     .set({ isPinned: !result.msg.isPinned, updatedAt: new Date() })
     .where(eq(chatMessagesTable.id, id)).returning();

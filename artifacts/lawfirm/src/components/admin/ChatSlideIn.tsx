@@ -257,10 +257,11 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
   }
 
   async function togglePin(msg: Msg) {
-    await fetch(`/api/admin/chat/messages/${msg.id}/pin`, { method: "PATCH" });
-    const updated = { ...msg, isPinned: !msg.isPinned };
-    setMessages(prev => prev.map(m => m.id === msg.id ? updated : m));
-    setPinned(prev => updated.isPinned ? [...prev, updated] : prev.filter(m => m.id !== updated.id));
+    const r = await fetch(`/api/admin/chat/messages/${msg.id}/pin`, { method: "PATCH" });
+    if (!r.ok) return; // only update local state on server confirmation
+    const updated = await r.json() as Msg;
+    setMessages(prev => prev.map(m => m.id === updated.id ? updated : m));
+    setPinned(prev => updated.isPinned ? [...prev.filter(m => m.id !== updated.id), updated] : prev.filter(m => m.id !== updated.id));
   }
 
   // userName is derived from auth on the server — not sent in body
