@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, MessageSquare, FileText, Search,
   Settings, Building2, Mail, User, Scale, Menu, X, ChevronRight,
   Briefcase, ExternalLink, MapPin, BookOpen, UserCog, CheckSquare, TrendingUp,
-  LogOut, ShieldCheck, Loader2,
+  LogOut, ShieldCheck, Loader2, Layers,
 } from "lucide-react";
 
 const navItems = [
@@ -27,6 +27,7 @@ const navItems = [
   { href: "/admin/lawyers", label: "Lawyer Profiles", icon: User },
   { href: "/admin/locations", label: "Locations (pSEO)", icon: MapPin },
   { href: "/admin/settings", label: "Site Settings", icon: Settings },
+  { href: "/admin/page-editor", label: "Page Editor", icon: Layers },
 ];
 
 interface Props {

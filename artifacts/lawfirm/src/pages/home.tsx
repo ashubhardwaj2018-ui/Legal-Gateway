@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { CATEGORIES } from "@/data/services";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useListBlogs } from "@workspace/api-client-react";
+import { usePageContent } from "@/hooks/usePageContent";
 
 const CATEGORY_LABELS: Record<string, string> = {
   "legal-advice": "Legal Advice", "business-setup": "Business Setup",
@@ -118,8 +119,21 @@ function LatestBlogSection() {
 }
 
 export default function Home() {
+  const get = usePageContent("home");
   const [form, setForm] = useState({ name: "", email: "", phone: "", serviceCategory: "", message: "" });
   const [consultStatus, setConsultStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
+
+  const activeStats = [
+    { value: get("stat_1_value", "5000+"), label: get("stat_1_label", "Clients Served") },
+    { value: get("stat_2_value", "15+"), label: get("stat_2_label", "Years Experience") },
+    { value: get("stat_3_value", "98%"), label: get("stat_3_label", "Success Rate") },
+    { value: get("stat_4_value", "500+"), label: get("stat_4_label", "Legal Experts") },
+  ];
+  const activeFeatures = [
+    { icon: ShieldCheck, title: get("feature_1_title", "Absolute Confidentiality"), desc: get("feature_1_desc", "Your data and legal matters are protected with bank-grade security and strict NDAs.") },
+    { icon: Clock, title: get("feature_2_title", "Transparent Timelines"), desc: get("feature_2_desc", "Clear deadlines for every milestone. Track your case progress in real-time.") },
+    { icon: Award, title: get("feature_3_title", "Specialized Experts"), desc: get("feature_3_desc", "Work with lawyers who specialize exclusively in your specific legal requirement.") },
+  ];
 
   const handleConsult = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -163,15 +177,14 @@ export default function Home() {
               transition={{ duration: 0.6 }}
             >
               <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-secondary/20 text-secondary font-medium text-sm mb-6 border border-secondary/30">
-                <Scale size={14} /> India's Premium Legal Network
+                <Scale size={14} /> {get("hero_badge", "India's Premium Legal Network")}
               </span>
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-serif font-bold text-white leading-[1.1] mb-5">
-                Expert Legal Counsel,<br />
-                <span className="text-secondary">Made Accessible.</span>
+                {get("hero_title", "Expert Legal Counsel,")}<br />
+                <span className="text-secondary">{get("hero_subtitle", "Made Accessible.")}</span>
               </h1>
               <p className="text-base md:text-lg text-white/80 mb-8 max-w-xl leading-relaxed">
-                From protecting your intellectual property to complex corporate litigation,
-                our network of top-tier attorneys delivers decisive results with complete transparency.
+                {get("hero_description", "From protecting your intellectual property to complex corporate litigation, our network of top-tier attorneys delivers decisive results with complete transparency.")}
               </p>
               <button
                 onClick={() => document.getElementById("services")?.scrollIntoView({ behavior: "smooth" })}
@@ -279,7 +292,7 @@ export default function Home() {
       <section className="bg-primary border-t border-white/10 py-12 relative z-20 -mt-8 md:-mt-12 mx-4 md:mx-auto max-w-7xl rounded-xl shadow-2xl">
         <div className="container mx-auto px-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 divide-x divide-white/10">
-            {stats.map((stat, i) => (
+            {activeStats.map((stat, i) => (
               <motion.div 
                 key={i}
                 initial={{ opacity: 0, y: 20 }}
@@ -353,10 +366,10 @@ export default function Home() {
                 viewport={{ once: true }}
               >
                 <h2 className="text-3xl md:text-5xl font-serif font-bold text-primary mb-6">
-                  Legal Solutions,<br/> Simplified.
+                  {get("process_title", "Legal Solutions, Simplified.")}
                 </h2>
                 <p className="text-lg text-muted-foreground mb-8">
-                  We've streamlined the process of getting expert legal help. No endless waiting rooms, no confusing jargon — just clear, actionable advice and decisive execution.
+                  {get("process_desc", "We've streamlined the process of getting expert legal help. No endless waiting rooms, no confusing jargon — just clear, actionable advice and decisive execution.")}
                 </p>
 
                 <div className="space-y-8">
@@ -401,7 +414,7 @@ export default function Home() {
       <section className="py-20 bg-primary text-white">
         <div className="container mx-auto px-4 md:px-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
-            {features.map((feature, i) => (
+            {activeFeatures.map((feature, i) => (
               <motion.div 
                 key={i}
                 initial={{ opacity: 0, y: 20 }}

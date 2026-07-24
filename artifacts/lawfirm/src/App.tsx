@@ -29,6 +29,7 @@ import AdminInvoices from "@/pages/admin/invoices";
 import AdminChat from "@/pages/admin/chat";
 import AdminEmail from "@/pages/admin/email";
 import AdminReports from "@/pages/admin/reports";
+import AdminPageEditor from "@/pages/admin/page-editor";
 import PortalLogin from "@/pages/portal/login";
 import PortalDashboard from "@/pages/portal/dashboard";
 import IndianCompanies from "@/pages/indian-companies";
@@ -73,6 +74,7 @@ function Router() {
       <Route path="/admin/chat" component={AdminChat} />
       <Route path="/admin/email" component={AdminEmail} />
       <Route path="/admin/reports" component={AdminReports} />
+      <Route path="/admin/page-editor" component={AdminPageEditor} />
 
       {/* Customer Portal */}
       <Route path="/portal" component={PortalLogin} />

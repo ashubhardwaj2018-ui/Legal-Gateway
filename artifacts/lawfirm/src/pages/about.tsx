@@ -2,6 +2,7 @@ import { Helmet } from "react-helmet-async";
 import { motion } from "framer-motion";
 import { Scale, Award, Users, ShieldCheck, Target, Heart, Globe2, Lightbulb } from "lucide-react";
 import { Link } from "wouter";
+import { usePageContent } from "@/hooks/usePageContent";
 
 const values = [
   { icon: ShieldCheck, title: "Integrity", desc: "We operate with absolute transparency and ethical standards in every engagement." },
@@ -22,6 +23,7 @@ const milestones = [
 ];
 
 export default function AboutUs() {
+  const get = usePageContent("about");
   return (
     <>
       <Helmet>
@@ -38,11 +40,11 @@ export default function AboutUs() {
         <div className="container mx-auto max-w-4xl text-center relative z-10">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
             <div className="inline-flex items-center gap-2 bg-[#c9a227]/20 text-[#c9a227] px-4 py-1.5 rounded-full text-sm font-medium mb-6">
-              <Scale size={14} /> Est. 2009 · Mumbai, India
+              <Scale size={14} /> {get("hero_badge", "Est. 2009 · Mumbai, India")}
             </div>
-            <h1 className="font-serif text-4xl md:text-6xl font-bold mb-6">India's Trusted <br /><span className="text-[#c9a227]">Legal Partner</span></h1>
+            <h1 className="font-serif text-4xl md:text-6xl font-bold mb-6">{get("hero_title", "India's Trusted")} <br /><span className="text-[#c9a227]">{get("hero_subtitle", "Legal Partner")}</span></h1>
             <p className="text-white/70 text-xl max-w-3xl mx-auto leading-relaxed">
-              For over 15 years, Vakil & Co. has been at the forefront of making premium legal services accessible, transparent, and effective for businesses and individuals across India.
+              {get("hero_description", "For over 15 years, Vakil & Co. has been at the forefront of making premium legal services accessible, transparent, and effective for businesses and individuals across India.")}
             </p>
           </motion.div>
         </div>
@@ -53,10 +55,10 @@ export default function AboutUs() {
         <div className="container mx-auto max-w-5xl px-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             {[
-              { value: "5,000+", label: "Clients Served" },
-              { value: "15+", label: "Years Experience" },
-              { value: "500+", label: "Legal Experts" },
-              { value: "12", label: "Cities Across India" },
+              { value: get("stat_1_value", "5,000+"), label: get("stat_1_label", "Clients Served") },
+              { value: get("stat_2_value", "15+"), label: get("stat_2_label", "Years Experience") },
+              { value: get("stat_3_value", "500+"), label: get("stat_3_label", "Legal Experts") },
+              { value: get("stat_4_value", "12"), label: get("stat_4_label", "Cities Across India") },
             ].map(s => (
               <div key={s.label}>
                 <div className="text-3xl md:text-4xl font-bold text-[#0f2044] font-serif">{s.value}</div>

@@ -10,6 +10,7 @@ import { blogsRouter } from "./blogs";
 import { adminBlogsRouter } from "./admin/blogs";
 import companiesRouter from "./companies";
 import portalRouter from "./portal";
+import publicPagesRouter from "./public-pages";
 
 const router: IRouter = Router();
 
@@ -24,5 +25,6 @@ router.use(blogsRouter);
 router.use(adminBlogsRouter);
 router.use(companiesRouter);
 router.use(portalRouter);
+router.use(publicPagesRouter);
 
 export default router;

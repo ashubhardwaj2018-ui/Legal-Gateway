@@ -16,6 +16,7 @@ import dashboardRouter from "./dashboard";
 import emailRouter from "./email";
 import reportsRouter from "./reports";
 import { authRouter, adminAuthMiddleware, seedDefaultAdmin } from "./auth";
+import pagesRouter from "./pages";
 
 const router: IRouter = Router();
 
@@ -44,5 +45,6 @@ router.use(companyDataRouter);
 router.use(lawyersRouter);
 router.use(settingsRouter);
 router.use(locationsRouter);
+router.use(pagesRouter);
 
 export default router;
