@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, MessageSquare, FileText, Search,
   Settings, Building2, Mail, User, Scale, Menu, X, ChevronRight,
   Briefcase, ExternalLink, MapPin, BookOpen, UserCog, CheckSquare, TrendingUp,
-  LogOut, ShieldCheck, Loader2, Layers, Shield, History, Activity,
+  LogOut, ShieldCheck, Loader2, Layers, Shield, History, Activity, BarChart2,
 } from "lucide-react";
 
 interface NavItem {
@@ -17,6 +17,9 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { href: "/admin",                 label: "Dashboard",           icon: LayoutDashboard,  exact: true, module: null },
+  { href: "/admin/my-dashboard",    label: "My Dashboard",        icon: BarChart2,                      module: null },
+  { href: "/admin/my-leads",        label: "My Leads",            icon: Users,                         module: "leads" },
+  { href: "/admin/team-performance",label: "Team Performance",    icon: TrendingUp,                    module: "team" },
   { href: "/admin/leads",           label: "CRM — Leads",         icon: Users,                         module: "leads" },
   { href: "/admin/employees",       label: "Employees",           icon: Users,                         module: "employees" },
   { href: "/admin/roles",           label: "Roles & Permissions", icon: Shield,                        module: "employees" },

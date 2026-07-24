@@ -23,6 +23,7 @@ import employeesRouter from "./employees";
 import rolesRouter from "./roles";
 import loginHistoryRouter from "./login-history";
 import activityLogsRouter from "./activity-logs";
+import performanceRouter from "./performance";
 
 const router: IRouter = Router();
 
@@ -68,7 +69,9 @@ router.use(makeModulePermissionMiddleware([
   ["/admin/chat",               "chat"],
   ["/admin/blogs",              "seo"],
   ["/admin/seo",                "seo"],
+  ["/admin/performance/team",   "team"],
 ]));
+
 
 router.use(leadsAssignmentRouter);
 router.use(leadsRouter);
@@ -93,5 +96,6 @@ router.use(rolesRouter);
 router.use(loginHistoryRouter);
 router.use(activityLogsRouter);
 router.use(adminBlogsRouter);
+router.use(performanceRouter);
 
 export default router;

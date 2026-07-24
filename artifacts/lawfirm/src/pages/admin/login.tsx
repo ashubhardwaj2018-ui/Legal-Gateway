@@ -12,7 +12,8 @@ export default function AdminLogin() {
 
   useEffect(() => {
     fetch("/api/admin/auth/me")
-      .then(r => { if (r.ok) navigate("/admin"); })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.user) navigate(d.user.userType === "employee" ? "/admin/my-dashboard" : "/admin"); })
       .finally(() => setChecking(false));
   }, []);
 
@@ -25,9 +26,9 @@ export default function AdminLogin() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
     });
-    const d = await r.json();
+    const d = await r.json() as { error?: string; user?: { userType?: string } };
     setLoading(false);
-    if (r.ok) navigate("/admin");
+    if (r.ok) navigate(d.user?.userType === "employee" ? "/admin/my-dashboard" : "/admin");
     else setError(d.error ?? "Login failed");
   };
 
