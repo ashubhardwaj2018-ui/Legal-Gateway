@@ -83,10 +83,11 @@ router.post("/admin/leads/:id/timeline", async (req: AuthenticatedRequest, res):
   res.status(201).json(entry);
 });
 
-// ── GET /admin/leads/:id/assignments (admin-only view; employees see their own via /my) ──
+// ── GET /admin/leads/:id/assignments (admin-only) ─────────────────────────────
 router.get("/admin/leads/:id/assignments", async (req: AuthenticatedRequest, res): Promise<void> => {
   const id = parseInt(req.params.id as string, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+  if (req.adminUser?.userType === "employee") { res.status(403).json({ error: "Employees cannot view assignment records" }); return; }
   const assignments = await db.select().from(leadAssignmentsTable)
     .where(and(eq(leadAssignmentsTable.leadId, id), eq(leadAssignmentsTable.status, "active")))
     .orderBy(asc(leadAssignmentsTable.assignedAt));
@@ -223,11 +224,13 @@ router.post("/admin/leads/:id/assign", async (req: AuthenticatedRequest, res): P
   res.status(201).json({ assigned: inserted, count: inserted.length });
 });
 
-// ── DELETE /admin/leads/:id/assignments/:assignmentId ─────────────────────────
+// ── DELETE /admin/leads/:id/assignments/:assignmentId (admin-only) ─────────────
 router.delete("/admin/leads/:id/assignments/:assignmentId", async (req: AuthenticatedRequest, res): Promise<void> => {
   const leadId = parseInt(req.params.id as string, 10);
   const assignmentId = parseInt(req.params.assignmentId as string, 10);
   if (isNaN(leadId) || isNaN(assignmentId)) { res.status(400).json({ error: "Invalid ID" }); return; }
+
+  if (req.adminUser?.userType === "employee") { res.status(403).json({ error: "Employees cannot unassign leads" }); return; }
 
   const actorName = typeof req.adminUser?.username === "string" ? req.adminUser.username : "Admin";
   const actorId = typeof req.adminUser?.userId === "number" ? req.adminUser.userId : undefined;

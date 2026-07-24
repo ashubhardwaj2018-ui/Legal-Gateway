@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, and, ilike, or } from "drizzle-orm";
+import { eq, desc, and, ilike, or, inArray } from "drizzle-orm";
 import {
   db,
   consultationsTable,
@@ -58,9 +58,50 @@ async function requireLeadAccess(req: AuthenticatedRequest, leadId: number): Pro
 }
 
 // ── GET /admin/leads ──────────────────────────────────────────────────────────
-router.get("/admin/leads", async (req, res): Promise<void> => {
+router.get("/admin/leads", async (req: AuthenticatedRequest, res): Promise<void> => {
   const { status, priority, source, search, assignedTo } = req.query as Record<string, string>;
 
+  // Employees can only see their own assigned leads via this endpoint
+  const isEmployee = req.adminUser?.userType === "employee";
+  const employeeId = isEmployee && typeof req.adminUser?.userId === "number" ? req.adminUser.userId : null;
+
+  if (isEmployee && employeeId) {
+    // Get lead IDs assigned to this employee
+    const assignments = await db
+      .select({ leadId: leadAssignmentsTable.leadId })
+      .from(leadAssignmentsTable)
+      .where(and(eq(leadAssignmentsTable.assignedToId, employeeId), eq(leadAssignmentsTable.status, "active")));
+    const leadIds = [...new Set(assignments.map(a => a.leadId))];
+    if (!leadIds.length) { res.json([]); return; }
+
+    // Apply additional filters within the employee's assigned set
+    const baseCondition = inArray(consultationsTable.id, leadIds);
+    const extraConditions: ReturnType<typeof eq>[] = [];
+    if (status && status !== "all") extraConditions.push(eq(consultationsTable.status, status));
+    if (priority && priority !== "all") extraConditions.push(eq(consultationsTable.priority, priority));
+
+    let results;
+    if (search) {
+      const likeSearch = `%${search}%`;
+      const searchCondition = or(
+        ilike(consultationsTable.name, likeSearch),
+        ilike(consultationsTable.email, likeSearch),
+        ilike(consultationsTable.phone, likeSearch),
+        ilike(consultationsTable.serviceInterest, likeSearch),
+      );
+      results = await db.select().from(consultationsTable)
+        .where(and(baseCondition, ...extraConditions, searchCondition))
+        .orderBy(desc(consultationsTable.createdAt));
+    } else {
+      results = await db.select().from(consultationsTable)
+        .where(extraConditions.length ? and(baseCondition, ...extraConditions) : baseCondition)
+        .orderBy(desc(consultationsTable.createdAt));
+    }
+    res.json(results);
+    return;
+  }
+
+  // Admin: full access with all filters
   const conditions: ReturnType<typeof eq>[] = [];
 
   if (status && status !== "all") conditions.push(eq(consultationsTable.status, status));

@@ -11,10 +11,15 @@ import {
   Activity, Plus, CheckCircle2, Circle, ChevronRight
 } from "lucide-react";
 
-const BASE = import.meta.env.BASE_URL?.replace(/\/$/, "");
-const api = (path: string, opts?: RequestInit) =>
-  fetch(`${BASE}${path}`, { credentials: "include", headers: { "Content-Type": "application/json", ...(opts?.headers ?? {}) }, ...opts })
-    .then(r => r.status === 204 ? null : r.json());
+const api = async (path: string, opts?: RequestInit) => {
+  const r = await fetch(`/api${path}`, {
+    headers: { "Content-Type": "application/json" },
+    ...opts,
+  });
+  if (!r.ok) throw new Error(`${r.status}`);
+  if (r.status === 204) return null;
+  return r.json();
+};
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
