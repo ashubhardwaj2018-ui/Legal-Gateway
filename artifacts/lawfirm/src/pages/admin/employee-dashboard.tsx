@@ -121,7 +121,7 @@ export default function EmployeeDashboard() {
             <KpiCard label="Conversion Rate" value={`${kpi.conversionRate}%`} icon={TrendingUp} color="text-indigo-600" bg="bg-indigo-100" />
             <KpiCard label="Leads Won" value={kpi.wonLeads} icon={Award} color="text-green-700" bg="bg-green-100" sub="Total" />
             <KpiCard label="Pending Leads" value={kpi.pendingLeads} icon={Activity} color="text-yellow-700" bg="bg-yellow-100" />
-            <KpiCard label="Calls Logged" value={kpi.calls} icon={PhoneCall} color="text-blue-600" bg="bg-blue-100" />
+            <KpiCard label="Assigned Documents" value={kpi.documents} icon={FileText} color="text-teal-600" bg="bg-teal-100" />
           </div>
 
           {/* Monthly Target + Activity Summary */}

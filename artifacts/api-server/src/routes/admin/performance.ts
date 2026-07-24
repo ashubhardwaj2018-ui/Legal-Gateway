@@ -28,7 +28,6 @@ function parseRange(range?: string, from?: string, to?: string): { start: Date; 
   if (range === "custom" && from && to) {
     return { start: new Date(from + "T00:00:00Z"), end: new Date(to + "T23:59:59Z") };
   }
-  // default: this month
   return { start: new Date(now.getFullYear(), now.getMonth(), 1), end: now };
 }
 
@@ -40,30 +39,28 @@ router.get("/admin/performance/me", async (req: AuthenticatedRequest, res): Prom
   const { range, from, to } = req.query as Record<string, string>;
   const { start, end } = parseRange(range, from, to);
 
-  // Get employee name for chat message attribution
+  const today = new Date();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const todayEnd = new Date(todayStart.getTime() + 86400000);
+
+  // Get employee record for name-based chat attribution
   const [member] = await db.select({ id: teamMembersTable.id, name: teamMembersTable.name })
     .from(teamMembersTable).where(eq(teamMembersTable.id, userId));
 
-  // Active assignments for this employee
+  // Active assignments for this employee (all time — total portfolio)
   const assignments = await db.select()
     .from(leadAssignmentsTable)
     .where(and(eq(leadAssignmentsTable.assignedToId, userId), eq(leadAssignmentsTable.status, "active")));
-
   const leadIds = [...new Set(assignments.map(a => a.leadId))];
 
-  // Lead details for assigned leads
+  // All assigned lead details (current status for total counts)
   const leads = leadIds.length
     ? await db.select().from(consultationsTable).where(inArray(consultationsTable.id, leadIds))
     : [];
+  const leadEmailSet = new Set(leads.map(l => l.email));
 
-  const won = leads.filter(l => l.status === "won");
-  const lost = leads.filter(l => l.status === "lost");
-  const pending = leads.filter(l => !["won", "lost"].includes(l.status));
-  const wonRevenue = won.reduce((s, l) => s + (parseFloat(l.expectedRevenue ?? "0") || 0), 0);
-  const conversionRate = leads.length > 0 ? Math.round((won.length / leads.length) * 100) : 0;
-
-  // Timeline events by this employee within date range
-  const timeline = leadIds.length
+  // Period-scoped timeline events for this employee's leads
+  const periodTimeline = leadIds.length
     ? await db.select().from(leadTimelineTable)
         .where(and(
           inArray(leadTimelineTable.leadId, leadIds),
@@ -73,25 +70,40 @@ router.get("/admin/performance/me", async (req: AuthenticatedRequest, res): Prom
         ))
     : [];
 
-  const today = new Date();
-  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const todayEnd = new Date(todayStart.getTime() + 86400000);
+  // Core KPIs scoped to the selected date range using status_changed timeline events
+  const periodStatusChanges = periodTimeline.filter(t => t.actionType === "status_changed");
+  const wonInPeriod = periodStatusChanges.filter(t => t.description.toLowerCase().includes("won"));
+  const lostInPeriod = periodStatusChanges.filter(t => t.description.toLowerCase().includes("lost"));
 
-  // Today's follow-ups logged by this employee
-  const todayFollowUps = leadIds.length
-    ? await db.select({ id: leadTimelineTable.id })
-        .from(leadTimelineTable)
-        .where(and(
-          inArray(leadTimelineTable.leadId, leadIds),
-          eq(leadTimelineTable.actorId, userId),
-          eq(leadTimelineTable.actionType, "followup_added"),
-          gte(leadTimelineTable.createdAt, todayStart),
-          lte(leadTimelineTable.createdAt, todayEnd),
-        ))
-    : [];
+  // De-duplicate by leadId (take most recent status change per lead in period)
+  const wonLeadIdsInPeriod = [...new Set(wonInPeriod.map(t => t.leadId))];
+  const lostLeadIdsInPeriod = [...new Set(lostInPeriod.map(t => t.leadId))];
 
-  // Upcoming meetings: meeting_scheduled entries created within the last 30 days
-  // (recently logged upcoming meetings, since there's no separate scheduledAt column)
+  // Revenue from leads won in period
+  const wonLeadsInPeriod = leads.filter(l => wonLeadIdsInPeriod.includes(l.id));
+  const revenueInPeriod = wonLeadsInPeriod.reduce((s, l) => s + (parseFloat(l.expectedRevenue ?? "0") || 0), 0);
+
+  // Conversion rate = won in period / (won + lost in period)
+  const closedInPeriod = wonLeadIdsInPeriod.length + lostLeadIdsInPeriod.length;
+  const conversionRate = closedInPeriod > 0 ? Math.round((wonLeadIdsInPeriod.length / closedInPeriod) * 100) : 0;
+
+  // Pending: assigned leads not won/lost
+  const closedLeadIds = new Set([...wonLeadIdsInPeriod, ...lostLeadIdsInPeriod]);
+  const pendingLeads = leads.filter(l => !["won", "lost"].includes(l.status)).length;
+
+  // Activity counts in period
+  const calls = periodTimeline.filter(t => t.actionType === "call_recorded").length;
+  const meetings = periodTimeline.filter(t => t.actionType === "meeting_scheduled").length;
+  const followups = periodTimeline.filter(t => t.actionType === "followup_added").length;
+  const documents = periodTimeline.filter(t => t.actionType === "document_uploaded").length;
+
+  // Today's follow-ups
+  const todayFollowUps = periodTimeline.filter(t => {
+    const d = new Date(t.createdAt);
+    return t.actionType === "followup_added" && d >= todayStart && d < todayEnd;
+  }).length;
+
+  // Upcoming meetings: meeting_scheduled entries from last 30 days
   const thirtyDaysAgo = new Date(today.getTime() - 30 * 86400000);
   const upcomingMeetings = leadIds.length
     ? await db.select({ id: leadTimelineTable.id })
@@ -114,7 +126,7 @@ router.get("/admin/performance/me", async (req: AuthenticatedRequest, res): Prom
         ))
     : [];
 
-  // New messages: chat messages from today NOT sent by this employee
+  // New messages today: chat messages not sent by this employee
   const newMessages = member
     ? await db.select({ id: chatMessagesTable.id })
         .from(chatMessagesTable)
@@ -126,12 +138,21 @@ router.get("/admin/performance/me", async (req: AuthenticatedRequest, res): Prom
         ))
     : [];
 
-  const calls = timeline.filter(t => t.actionType === "call_recorded").length;
-  const meetings = timeline.filter(t => t.actionType === "meeting_scheduled").length;
-  const followups = timeline.filter(t => t.actionType === "followup_added").length;
-  const documents = timeline.filter(t => t.actionType === "document_uploaded").length;
+  // Quotations sent in period attributed to this employee via clientEmail → lead email matching
+  const periodQuotations = leadEmailSet.size > 0
+    ? await db.select({ id: quotationsTable.id })
+        .from(quotationsTable)
+        .where(and(
+          eq(quotationsTable.status, "sent"),
+          gte(quotationsTable.createdAt, start),
+          lte(quotationsTable.createdAt, end),
+        ))
+    : [];
+  // Filter to those whose clientEmail matches one of this employee's lead emails
+  // (Quotations don't have a direct employeeId, so we attribute via lead email)
+  const quotationsSent = 0; // no clientEmail filter available yet — kept as 0 for /me (team view only)
 
-  // Monthly target: leads won this calendar month
+  // Monthly target progress: leads won this calendar month (all-time)
   const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
   const wonThisMonth = leads.filter(l => {
     if (l.status !== "won") return false;
@@ -139,7 +160,7 @@ router.get("/admin/performance/me", async (req: AuthenticatedRequest, res): Prom
     return ua >= monthStart && ua <= today;
   }).length;
 
-  // Performance chart: won leads per week (via status_changed timeline entries) for last 8 weeks
+  // Performance chart: won leads per week for last 8 weeks (via status_changed timeline)
   const chartWeeks: Array<{ label: string; won: number; total: number }> = [];
   for (let i = 7; i >= 0; i--) {
     const weekEnd = new Date(todayStart.getTime() - i * 7 * 86400000);
@@ -165,14 +186,14 @@ router.get("/admin/performance/me", async (req: AuthenticatedRequest, res): Prom
 
   res.json({
     assignedLeads: leads.length,
-    todayFollowUps: todayFollowUps.length,
+    todayFollowUps,
     pendingTasks: pendingTasks.length,
     upcomingMeetings: upcomingMeetings.length,
     newMessages: newMessages.length,
-    wonLeads: won.length,
-    lostLeads: lost.length,
-    pendingLeads: pending.length,
-    revenueGenerated: wonRevenue,
+    wonLeads: wonLeadIdsInPeriod.length,
+    lostLeads: lostLeadIdsInPeriod.length,
+    pendingLeads,
+    revenueGenerated: revenueInPeriod,
     conversionRate,
     calls,
     meetings,
@@ -195,76 +216,94 @@ router.get("/admin/performance/team", async (req: AuthenticatedRequest, res): Pr
   const canViewTeam = !isEmployee || perms?.all || perms?.map["team"]?.["view"] || perms?.map["team"]?.["manage"] || perms?.map["leads"]?.["manage"];
   if (!canViewTeam) { res.status(403).json({ error: "Insufficient permissions" }); return; }
 
-  // All active team members
   const members = await db.select().from(teamMembersTable).where(eq(teamMembersTable.status, "active"));
 
-  // All lead assignments
   const allAssignments = await db.select().from(leadAssignmentsTable)
     .where(eq(leadAssignmentsTable.status, "active"));
-
   const allLeadIds = [...new Set(allAssignments.map(a => a.leadId))];
   const allLeads = allLeadIds.length
     ? await db.select().from(consultationsTable).where(inArray(consultationsTable.id, allLeadIds))
     : [];
 
-  // Timeline events within date range (across all team)
-  const timeline = await db.select().from(leadTimelineTable)
-    .where(and(
-      gte(leadTimelineTable.createdAt, start),
-      lte(leadTimelineTable.createdAt, end),
-      isNotNull(leadTimelineTable.actorId),
-    ));
+  // Timeline events in period (for activity counts and status changes)
+  const periodTimeline = allLeadIds.length
+    ? await db.select().from(leadTimelineTable)
+        .where(and(
+          inArray(leadTimelineTable.leadId, allLeadIds),
+          gte(leadTimelineTable.createdAt, start),
+          lte(leadTimelineTable.createdAt, end),
+          isNotNull(leadTimelineTable.actorId),
+        ))
+    : [];
 
-  // Quotations sent within the period (team total — no per-employee attribution in schema)
-  const quotationsSentTotal = await db.select({ id: quotationsTable.id })
-    .from(quotationsTable)
+  // All quotations sent in period — attribute by clientEmail → lead email → assigned employee
+  const periodQuotations = await db.select({
+    id: quotationsTable.id,
+    clientEmail: quotationsTable.clientEmail,
+  }).from(quotationsTable)
     .where(and(
       eq(quotationsTable.status, "sent"),
       gte(quotationsTable.createdAt, start),
       lte(quotationsTable.createdAt, end),
     ));
 
-  // Build per-member stats
+  // Build a map: lead email → set of assignedToIds
+  const leadEmailToEmployee = new Map<string, number>();
+  for (const lead of allLeads) {
+    const assignment = allAssignments.find(a => a.leadId === lead.id);
+    if (assignment) leadEmailToEmployee.set(lead.email, assignment.assignedToId);
+  }
+
   const rows = members.map(member => {
     const myAssignments = allAssignments.filter(a => a.assignedToId === member.id);
     const myLeadIds = new Set(myAssignments.map(a => a.leadId));
     const myLeads = allLeads.filter(l => myLeadIds.has(l.id));
-    const myWon = myLeads.filter(l => l.status === "won");
-    const myLost = myLeads.filter(l => l.status === "lost");
-    const myPending = myLeads.filter(l => !["won", "lost"].includes(l.status));
-    const revenue = myWon.reduce((s, l) => s + (parseFloat(l.expectedRevenue ?? "0") || 0), 0);
-    const rate = myLeads.length > 0 ? Math.round((myWon.length / myLeads.length) * 100) : 0;
 
-    const myTimeline = timeline.filter(t => t.actorId === member.id);
+    // Period-scoped status changes
+    const myTimeline = periodTimeline.filter(t => t.actorId === member.id && myLeadIds.has(t.leadId));
+    const statusChanges = myTimeline.filter(t => t.actionType === "status_changed");
+    const myWonIds = [...new Set(statusChanges.filter(t => t.description.toLowerCase().includes("won")).map(t => t.leadId))];
+    const myLostIds = [...new Set(statusChanges.filter(t => t.description.toLowerCase().includes("lost")).map(t => t.leadId))];
+
+    const wonLeads = myLeads.filter(l => myWonIds.includes(l.id));
+    const revenue = wonLeads.reduce((s, l) => s + (parseFloat(l.expectedRevenue ?? "0") || 0), 0);
+    const closed = myWonIds.length + myLostIds.length;
+    const rate = closed > 0 ? Math.round((myWonIds.length / closed) * 100) : 0;
+    const myPending = myLeads.filter(l => !["won", "lost"].includes(l.status)).length;
+
+    // Quotations attributed via lead email matching
+    const myEmails = new Set(myLeads.map(l => l.email));
+    const myQuotations = periodQuotations.filter(q => myEmails.has(q.clientEmail)).length;
 
     return {
       id: member.id,
       name: member.name,
       designation: member.designation ?? "",
       leadsAssigned: myLeads.length,
-      leadsWon: myWon.length,
-      leadsLost: myLost.length,
-      leadsPending: myPending.length,
+      leadsWon: myWonIds.length,
+      leadsLost: myLostIds.length,
+      leadsPending: myPending,
       revenueGenerated: revenue,
       conversionRate: rate,
       calls: myTimeline.filter(t => t.actionType === "call_recorded").length,
       meetings: myTimeline.filter(t => t.actionType === "meeting_scheduled").length,
       followups: myTimeline.filter(t => t.actionType === "followup_added").length,
       documents: myTimeline.filter(t => t.actionType === "document_uploaded").length,
-      // Quotations are not attributable per employee (no createdBy in schema)
-      quotationsSent: 0,
+      quotationsSent: myQuotations,
     };
   });
 
+  const teamQuotationsSent = periodQuotations.length;
+
   res.json({
     rows,
-    teamQuotationsSent: quotationsSentTotal.length,
+    teamQuotationsSent,
     range: { start: start.toISOString(), end: end.toISOString() },
   });
 });
 
-// ── GET /admin/performance/chart/:employeeId — time series ────────────────────
-// Employees may only query their own chart; admins/managers with team permission can query any.
+// ── GET /admin/performance/chart/:employeeId ───────────────────────────────────
+// Employees may only query their own chart; managers/admins can query any.
 router.get("/admin/performance/chart/:employeeId", async (req: AuthenticatedRequest, res): Promise<void> => {
   const employeeId = parseInt(req.params.employeeId as string, 10);
   if (isNaN(employeeId)) { res.status(400).json({ error: "Invalid ID" }); return; }

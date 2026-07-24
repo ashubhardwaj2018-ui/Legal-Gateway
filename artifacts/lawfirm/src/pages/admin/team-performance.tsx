@@ -256,6 +256,7 @@ export default function TeamPerformance() {
                     <td className="px-3 py-2.5 text-gray-600">{row.meetings}</td>
                     <td className="px-3 py-2.5 text-gray-600">{row.followups}</td>
                     <td className="px-3 py-2.5 text-gray-600">{row.documents}</td>
+                    <td className="px-3 py-2.5 text-gray-600">{row.quotationsSent}</td>
                   </tr>
                 ))}
               </tbody>
