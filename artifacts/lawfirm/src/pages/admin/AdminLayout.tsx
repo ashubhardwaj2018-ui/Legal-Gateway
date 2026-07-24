@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Users, MessageSquare, FileText, Search,
   Settings, Building2, Mail, User, Scale, Menu, X, ChevronRight,
   Briefcase, ExternalLink, MapPin, BookOpen, UserCog, CheckSquare, TrendingUp,
-  LogOut, ShieldCheck, Loader2, Layers, Shield, History, Activity, BarChart2,
+  LogOut, ShieldCheck, Loader2, Layers, Shield, History, Activity, BarChart2, Upload,
 } from "lucide-react";
 
 interface NavItem {
@@ -43,6 +43,7 @@ const navItems: NavItem[] = [
   { href: "/admin/newsletter",      label: "Newsletter",          icon: Mail,                          module: "newsletter" },
   { href: "/admin/lawyers",         label: "Lawyer Profiles",     icon: User,                          module: "lawyers" },
   { href: "/admin/locations",       label: "Locations (pSEO)",    icon: MapPin,                        module: "locations" },
+  { href: "/admin/bulk-location-upload", label: "Bulk Location Upload", icon: Upload,                   module: "locations" },
   { href: "/admin/settings",        label: "Site Settings",       icon: Settings,                      module: "settings" },
   { href: "/admin/page-editor",     label: "Page Editor",         icon: Layers,                        module: "settings" },
 ];

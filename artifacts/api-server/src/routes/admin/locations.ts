@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, ilike, or, count, desc, sql, and, inArray } from "drizzle-orm";
 import { db, locationsTable, locationUploadLogsTable } from "@workspace/db";
+import * as XLSX from "xlsx";
 
 const router: IRouter = Router();
 
@@ -21,7 +22,59 @@ function makeSlug(row: {
     .replace(/\s+/g, "-");
 }
 
-// Stats dashboard
+// ─── Template download ──────────────────────────────────────────────────────
+
+router.get("/admin/locations/template", (_req, res): void => {
+  const wb = XLSX.utils.book_new();
+  const sampleData = [
+    { Country: "India", State: "Maharashtra", District: "Mumbai Suburban", City: "Mumbai", Town: "", Village: "", Pincode: "400001", Latitude: 19.076, Longitude: 72.8777, Population: 20667656 },
+    { Country: "India", State: "Karnataka", District: "Bangalore Urban", City: "Bangalore", Town: "", Village: "", Pincode: "560001", Latitude: 12.9716, Longitude: 77.5946, Population: 8443675 },
+    { Country: "India", State: "Tamil Nadu", District: "Chennai", City: "Chennai", Town: "", Village: "", Pincode: "600001", Latitude: 13.0827, Longitude: 80.2707, Population: 7088000 },
+  ];
+  const ws = XLSX.utils.json_to_sheet(sampleData, {
+    header: ["Country", "State", "District", "City", "Town", "Village", "Pincode", "Latitude", "Longitude", "Population"],
+  });
+  // Set column widths
+  ws["!cols"] = [12, 16, 20, 18, 14, 14, 10, 10, 10, 12].map((w) => ({ wch: w }));
+  XLSX.utils.book_append_sheet(wb, ws, "Locations");
+  const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader("Content-Disposition", "attachment; filename=\"locations-template.xlsx\"");
+  res.send(Buffer.from(buf));
+});
+
+// ─── CSV export ─────────────────────────────────────────────────────────────
+
+router.get("/admin/locations/export-csv", async (req, res): Promise<void> => {
+  const rows = await db.select().from(locationsTable).orderBy(desc(locationsTable.createdAt));
+  const header = "id,country,state,district,city,town,village,pincode,latitude,longitude,population,slug,isActive,createdAt";
+  const csvRows = rows.map((r) =>
+    [
+      r.id,
+      r.country,
+      r.state,
+      r.district ?? "",
+      r.city ?? "",
+      r.town ?? "",
+      r.village ?? "",
+      r.pincode ?? "",
+      r.latitude ?? "",
+      r.longitude ?? "",
+      r.population ?? "",
+      r.slug,
+      r.isActive,
+      r.createdAt.toISOString(),
+    ]
+      .map((v) => (String(v).includes(",") ? `"${String(v).replace(/"/g, '""')}"` : v))
+      .join(","),
+  );
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader("Content-Disposition", "attachment; filename=\"locations-export.csv\"");
+  res.send([header, ...csvRows].join("\n"));
+});
+
+// ─── Stats dashboard ─────────────────────────────────────────────────────────
+
 router.get("/admin/locations/stats", async (req, res): Promise<void> => {
   const result = await db.execute(sql`
     SELECT

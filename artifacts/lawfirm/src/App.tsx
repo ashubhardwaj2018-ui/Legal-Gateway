@@ -22,6 +22,7 @@ import AdminNewsletter from "@/pages/admin/newsletter";
 import AdminLawyers from "@/pages/admin/lawyers";
 import AdminSettings from "@/pages/admin/settings";
 import AdminLocations from "@/pages/admin/locations";
+import BulkLocationUpload from "@/pages/admin/bulk-location-upload";
 import AdminBlogs from "@/pages/admin/blogs";
 import AdminTeam from "@/pages/admin/team";
 import AdminIndianCompanies from "@/pages/admin/indian-companies";
@@ -74,6 +75,7 @@ function Router() {
       <Route path="/admin/lawyers" component={AdminLawyers} />
       <Route path="/admin/settings" component={AdminSettings} />
       <Route path="/admin/locations" component={AdminLocations} />
+      <Route path="/admin/bulk-location-upload" component={BulkLocationUpload} />
       <Route path="/admin/blogs" component={AdminBlogs} />
       <Route path="/admin/team" component={AdminTeam} />
       <Route path="/admin/indian-companies" component={AdminIndianCompanies} />
