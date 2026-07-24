@@ -16,6 +16,7 @@ import dashboardRouter from "./dashboard";
 import emailRouter from "./email";
 import reportsRouter from "./reports";
 import { authRouter, adminAuthMiddleware, seedDefaultAdmin, seedDefaultRoles, crudActivityMiddleware, makeModulePermissionMiddleware } from "./auth";
+import { adminBlogsRouter } from "./blogs";
 import pagesRouter from "./pages";
 import employeesRouter from "./employees";
 import rolesRouter from "./roles";
@@ -63,6 +64,7 @@ router.use(makeModulePermissionMiddleware([
   ["/admin/pages",              "settings"],
   ["/admin/team",               "team"],
   ["/admin/chat",               "chat"],
+  ["/admin/blogs",              "seo"],
   ["/admin/seo",                "seo"],
 ]));
 
@@ -87,5 +89,6 @@ router.use(employeesRouter);
 router.use(rolesRouter);
 router.use(loginHistoryRouter);
 router.use(activityLogsRouter);
+router.use(adminBlogsRouter);
 
 export default router;

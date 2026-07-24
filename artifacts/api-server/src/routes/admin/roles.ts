@@ -4,10 +4,11 @@ import { db, rolesTable, rolePermissionsTable } from "@workspace/db";
 
 const router: IRouter = Router();
 
+// Module keys must match the permission middleware map in admin/index.ts
 const MODULES = [
-  "dashboard","leads","employees","team","companies","tasks","invoices",
-  "chat","email","reports","contacts","quotations","blogs","seo",
-  "services","settings","locations","page-editor","roles",
+  "dashboard","leads","employees","team","indian_companies","tasks","invoices",
+  "chat","email","reports","contacts","quotations","seo","services",
+  "company_data","newsletter","lawyers","locations","settings",
 ];
 
 const ACTIONS = ["view","create","edit","delete","export","approve","assign","print","download","upload"];

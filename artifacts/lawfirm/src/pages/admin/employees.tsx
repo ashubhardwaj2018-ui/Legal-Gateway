@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import {
   Users, Plus, Pencil, Trash2, Search, KeyRound,
-  UserCheck, UserX, Shield, Clock, Building2, Mail, Phone,
+  UserCheck, UserX, Shield, Clock, Building2, Mail, Phone, Upload,
 } from "lucide-react";
 
 interface Employee {
@@ -31,7 +31,8 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const EMPTY_FORM = { name:"", email:"", phone:"", department:"", designation:"", role:"staff",
-  username:"", password:"", salary:"", joiningDate:"", address:"", emergencyContact:"", notes:"", avatar:"" };
+  username:"", password:"", salary:"", joiningDate:"", address:"", emergencyContact:"", notes:"",
+  avatar:"", reportingManagerId:"" };
 
 export default function AdminEmployees() {
   const qc = useQueryClient();
@@ -44,6 +45,7 @@ export default function AdminEmployees() {
   const [showPwdModal, setShowPwdModal] = useState<Employee | null>(null);
   const [newPwd, setNewPwd] = useState("");
   const [forceChange, setForceChange] = useState(true);
+  const [avatarUploading, setAvatarUploading] = useState(false);
 
   const { data: employees = [], isLoading } = useQuery<Employee[]>({
     queryKey: ["employees", search, filterStatus, filterDept],
@@ -60,12 +62,32 @@ export default function AdminEmployees() {
     mutationFn: async () => {
       const url = editing ? `/api/admin/employees/${editing.id}` : "/api/admin/employees";
       const method = editing ? "PATCH" : "POST";
-      const body = { ...form };
-      if (editing && !body.password) delete (body as Record<string, unknown>).password;
+      const body: Record<string, unknown> = { ...form };
+      if (editing && !body.password) delete body.password;
+      if (body.reportingManagerId) body.reportingManagerId = parseInt(body.reportingManagerId as string, 10);
+      else delete body.reportingManagerId;
       return fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(r => r.json());
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["employees"] }); closeForm(); },
   });
+
+  async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAvatarUploading(true);
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const res = await fetch("/api/admin/chat/upload", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ filename: file.name, data: reader.result as string }),
+        });
+        const json = await res.json() as { url: string };
+        setForm(f => ({ ...f, avatar: json.url }));
+      } finally { setAvatarUploading(false); }
+    };
+    reader.readAsDataURL(file);
+  }
 
   const remove = useMutation({
     mutationFn: (id: number) => fetch(`/api/admin/employees/${id}`, { method: "DELETE" }),
@@ -91,7 +113,8 @@ export default function AdminEmployees() {
     setForm({ name: emp.name, email: emp.email, phone: emp.phone ?? "", department: emp.department,
       designation: emp.designation, role: emp.role, username: emp.username ?? "",
       password: "", salary: emp.salary ?? "", joiningDate: emp.joiningDate ?? "",
-      address: "", emergencyContact: "", notes: emp.notes ?? "", avatar: emp.avatar ?? "" });
+      address: "", emergencyContact: "", notes: emp.notes ?? "", avatar: emp.avatar ?? "",
+      reportingManagerId: emp.reportingManagerId ? String(emp.reportingManagerId) : "" });
     setShowForm(true);
   }
 
@@ -228,6 +251,30 @@ export default function AdminEmployees() {
             <DialogTitle>{editing ? `Edit — ${editing.name}` : "Add New Employee"}</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-4 mt-2">
+            {/* Photo upload */}
+            <div className="col-span-2">
+              <Label className="text-xs mb-1 block">Profile Photo</Label>
+              <div className="flex items-center gap-3">
+                {form.avatar ? (
+                  <img src={form.avatar} alt="Preview" className="w-12 h-12 rounded-full object-cover border border-gray-200" />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-[#0f2044] flex items-center justify-center text-white text-lg font-bold shrink-0">
+                    {form.name.charAt(0).toUpperCase() || "?"}
+                  </div>
+                )}
+                <label className="cursor-pointer">
+                  <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-gray-300 hover:bg-gray-50 transition-colors">
+                    {avatarUploading ? "Uploading…" : <><Upload size={12} /> Upload Photo</>}
+                  </span>
+                </label>
+                {form.avatar && (
+                  <button type="button" onClick={() => setForm(f => ({ ...f, avatar: "" }))}
+                    className="text-xs text-red-500 hover:underline">Remove</button>
+                )}
+              </div>
+            </div>
+
             {[
               { label: "Full Name *", field: "name", span: 2 },
               { label: "Email *", field: "email", type: "email" },
@@ -235,7 +282,6 @@ export default function AdminEmployees() {
               { label: "Designation *", field: "designation" },
               { label: "Joining Date", field: "joiningDate", type: "date" },
               { label: "Salary", field: "salary" },
-              { label: "Avatar URL", field: "avatar", span: 2 },
               { label: "Username (for login)", field: "username" },
               { label: editing ? "New Password (blank = no change)" : "Password", field: "password", type: "password" },
               { label: "Notes", field: "notes", span: 2 },
@@ -257,6 +303,22 @@ export default function AdminEmployees() {
               <Select value={form.role} onValueChange={v => setForm(f => ({ ...f, role: v }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>{ROLES.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="col-span-2">
+              <Label className="text-xs mb-1 block">Reporting Manager</Label>
+              <Select
+                value={form.reportingManagerId || "none"}
+                onValueChange={v => setForm(f => ({ ...f, reportingManagerId: v === "none" ? "" : v }))}
+              >
+                <SelectTrigger><SelectValue placeholder="Select manager (optional)" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">— None —</SelectItem>
+                  {employees
+                    .filter(e => !editing || e.id !== editing.id)
+                    .map(e => <SelectItem key={e.id} value={String(e.id)}>{e.name} ({e.designation})</SelectItem>)
+                  }
+                </SelectContent>
               </Select>
             </div>
           </div>
