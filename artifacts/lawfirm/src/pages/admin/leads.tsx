@@ -13,7 +13,8 @@ import {
   Search, Download, Plus, X, ChevronRight, LayoutGrid, List,
   Clock, CheckCircle2, Circle, Trash2, MessageSquare,
   Activity, Phone, Mail, Building2, MapPin, Tag, Star,
-  Calendar, Target, User, AlertCircle, Pencil
+  Calendar, Target, User, AlertCircle, Pencil, UserPlus,
+  FileText, Video, PhoneCall, RefreshCw, Users
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -31,7 +32,10 @@ interface Lead {
 interface LeadNote { id: number; leadId: number; content: string; createdBy?: string; createdAt: string; }
 interface LeadActivity { id: number; leadId: number; type: string; description: string; createdAt: string; }
 interface LeadTask { id: number; leadId: number; title: string; description?: string; dueDate?: string; status: string; priority?: string; createdAt: string; }
-interface LeadDetail extends Lead { notes: LeadNote[]; activities: LeadActivity[]; tasks: LeadTask[]; }
+interface LeadDetail extends Omit<Lead, "notes"> { notes: LeadNote[]; activities: LeadActivity[]; tasks: LeadTask[]; }
+interface LeadAssignment { id: number; leadId: number; assignedToId: number; assignedToName: string; assignedByName?: string; deadline?: string; priority?: string; notes?: string; status: string; assignedAt: string; }
+interface LeadTimelineEntry { id: number; leadId: number; actorId?: number; actorName: string; actionType: string; description: string; payload?: string; createdAt: string; }
+interface Employee { id: number; name: string; department: string; designation: string; status: string; }
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -192,17 +196,84 @@ function CreateLeadDialog({ open, onClose, onCreated }: { open: boolean; onClose
 
 // ── Lead Detail Drawer ─────────────────────────────────────────────────────────
 
+const ASSIGN_METHODS = [
+  { value: "individual", label: "Individual" },
+  { value: "multiple", label: "Multiple Employees" },
+  { value: "department", label: "By Department" },
+  { value: "round_robin", label: "Round Robin" },
+  { value: "auto", label: "Auto (Least Loaded)" },
+];
+
+const TIMELINE_ICONS: Record<string, React.ReactElement> = {
+  created: <Plus size={11} />,
+  assigned: <UserPlus size={11} />,
+  unassigned: <Users size={11} />,
+  status_changed: <Activity size={11} />,
+  note_added: <MessageSquare size={11} />,
+  task_created: <CheckCircle2 size={11} />,
+  call_recorded: <PhoneCall size={11} />,
+  meeting_scheduled: <Video size={11} />,
+  followup_added: <RefreshCw size={11} />,
+  document_uploaded: <FileText size={11} />,
+  email_sent: <Mail size={11} />,
+  whatsapp_sent: <Phone size={11} />,
+};
+
+const TIMELINE_COLORS: Record<string, string> = {
+  created: "bg-[#0f2044] text-white",
+  assigned: "bg-[#c9a227] text-[#0f2044]",
+  unassigned: "bg-gray-200 text-gray-600",
+  status_changed: "bg-indigo-100 text-indigo-700",
+  note_added: "bg-yellow-100 text-yellow-700",
+  task_created: "bg-green-100 text-green-700",
+  call_recorded: "bg-blue-100 text-blue-700",
+  meeting_scheduled: "bg-purple-100 text-purple-700",
+  followup_added: "bg-orange-100 text-orange-700",
+  document_uploaded: "bg-teal-100 text-teal-700",
+  email_sent: "bg-pink-100 text-pink-700",
+  whatsapp_sent: "bg-emerald-100 text-emerald-700",
+};
+
 function LeadDetailDrawer({ leadId, onClose, onUpdated }: { leadId: number; onClose: () => void; onUpdated: () => void }) {
-  const [tab, setTab] = useState<"info" | "notes" | "tasks" | "timeline">("info");
+  const [tab, setTab] = useState<"info" | "notes" | "tasks" | "timeline" | "assign">("info");
   const [noteText, setNoteText] = useState("");
   const [taskForm, setTaskForm] = useState({ title: "", dueDate: "", priority: "medium" });
   const [editField, setEditField] = useState<string | null>(null);
   const [editVal, setEditVal] = useState("");
+  // Assignment state
+  const [assignMethod, setAssignMethod] = useState("individual");
+  const [assignDept, setAssignDept] = useState("");
+  const [assignDeadline, setAssignDeadline] = useState("");
+  const [assignPriority, setAssignPriority] = useState("medium");
+  const [assignNotes, setAssignNotes] = useState("");
+  const [assignReplace, setAssignReplace] = useState(false);
+  const [selectedEmployees, setSelectedEmployees] = useState<number[]>([]);
+  // Quick timeline action
+  const [quickAction, setQuickAction] = useState<string | null>(null);
+  const [quickActionNote, setQuickActionNote] = useState("");
   const qc = useQueryClient();
 
   const { data: lead, isLoading } = useQuery<LeadDetail>({
     queryKey: ["lead", leadId],
     queryFn: () => api(`/admin/leads/${leadId}`),
+  });
+
+  const { data: timeline = [] } = useQuery<LeadTimelineEntry[]>({
+    queryKey: ["lead-timeline", leadId],
+    queryFn: () => api(`/admin/leads/${leadId}/timeline`),
+    enabled: tab === "timeline",
+  });
+
+  const { data: assignments = [] } = useQuery<LeadAssignment[]>({
+    queryKey: ["lead-assignments", leadId],
+    queryFn: () => api(`/admin/leads/${leadId}/assignments`),
+    enabled: tab === "assign",
+  });
+
+  const { data: employees = [] } = useQuery<Employee[]>({
+    queryKey: ["team-active"],
+    queryFn: () => api(`/admin/team?status=active`),
+    enabled: tab === "assign",
   });
 
   const updateMutation = useMutation({
@@ -212,7 +283,7 @@ function LeadDetailDrawer({ leadId, onClose, onUpdated }: { leadId: number; onCl
 
   const addNoteMutation = useMutation({
     mutationFn: (content: string) => api(`/admin/leads/${leadId}/notes`, { method: "POST", body: JSON.stringify({ content }) }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["lead", leadId] }); setNoteText(""); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["lead", leadId] }); qc.invalidateQueries({ queryKey: ["lead-timeline", leadId] }); setNoteText(""); },
   });
 
   const deleteNoteMutation = useMutation({
@@ -222,7 +293,7 @@ function LeadDetailDrawer({ leadId, onClose, onUpdated }: { leadId: number; onCl
 
   const addTaskMutation = useMutation({
     mutationFn: (data: typeof taskForm) => api(`/admin/leads/${leadId}/tasks`, { method: "POST", body: JSON.stringify(data) }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["lead", leadId] }); setTaskForm({ title: "", dueDate: "", priority: "medium" }); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["lead", leadId] }); qc.invalidateQueries({ queryKey: ["lead-timeline", leadId] }); setTaskForm({ title: "", dueDate: "", priority: "medium" }); },
   });
 
   const updateTaskMutation = useMutation({
@@ -236,10 +307,55 @@ function LeadDetailDrawer({ leadId, onClose, onUpdated }: { leadId: number; onCl
     onSuccess: () => qc.invalidateQueries({ queryKey: ["lead", leadId] }),
   });
 
+  const assignMutation = useMutation({
+    mutationFn: (data: Record<string, unknown>) => api(`/admin/leads/${leadId}/assign`, { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["lead-assignments", leadId] });
+      qc.invalidateQueries({ queryKey: ["lead-timeline", leadId] });
+      qc.invalidateQueries({ queryKey: ["leads"] });
+      setSelectedEmployees([]);
+    },
+  });
+
+  const unassignMutation = useMutation({
+    mutationFn: (assignmentId: number) => api(`/admin/leads/${leadId}/assignments/${assignmentId}`, { method: "DELETE" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["lead-assignments", leadId] });
+      qc.invalidateQueries({ queryKey: ["lead-timeline", leadId] });
+    },
+  });
+
+  const addTimelineEntryMutation = useMutation({
+    mutationFn: (data: { actionType: string; description: string }) =>
+      api(`/admin/leads/${leadId}/timeline`, { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["lead-timeline", leadId] }); setQuickAction(null); setQuickActionNote(""); },
+  });
+
   const startEdit = (field: string, val: string) => { setEditField(field); setEditVal(val ?? ""); };
   const saveEdit = () => { if (editField) updateMutation.mutate({ [editField]: editVal }); setEditField(null); };
 
-  const activityIcons: Record<string, JSX.Element> = {
+  const toggleEmployee = (id: number) =>
+    setSelectedEmployees(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+
+  const handleAssign = () => {
+    const payload: Record<string, unknown> = { method: assignMethod, priority: assignPriority, replaceExisting: assignReplace };
+    if (assignDeadline) payload.deadline = assignDeadline;
+    if (assignNotes) payload.notes = assignNotes;
+    if (assignMethod === "individual" || assignMethod === "multiple") payload.employeeIds = selectedEmployees;
+    if (assignMethod === "department") payload.department = assignDept;
+    assignMutation.mutate(payload);
+  };
+
+  const handleQuickAction = (type: string) => {
+    if (!quickActionNote.trim()) return;
+    const labels: Record<string, string> = {
+      call_recorded: "Call recorded", meeting_scheduled: "Meeting scheduled",
+      followup_added: "Follow-up added", document_uploaded: "Document noted",
+    };
+    addTimelineEntryMutation.mutate({ actionType: type, description: `${labels[type] ?? type}: ${quickActionNote.trim()}` });
+  };
+
+  const activityIcons: Record<string, React.ReactElement> = {
     created: <Plus size={12} />, status_change: <Activity size={12} />,
     note_added: <MessageSquare size={12} />, task_created: <CheckCircle2 size={12} />,
   };
@@ -299,14 +415,14 @@ function LeadDetailDrawer({ leadId, onClose, onUpdated }: { leadId: number; onCl
         )}
 
         {/* Tabs */}
-        <div className="flex border-b px-6 bg-white">
-          {(["info", "notes", "tasks", "timeline"] as const).map(t => (
+        <div className="flex border-b px-4 bg-white overflow-x-auto">
+          {(["info", "notes", "tasks", "timeline", "assign"] as const).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`px-4 py-2.5 text-xs font-medium capitalize border-b-2 transition-colors ${tab === t ? "border-[#c9a227] text-[#0f2044]" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+              className={`px-3 py-2.5 text-xs font-medium capitalize whitespace-nowrap border-b-2 transition-colors ${tab === t ? "border-[#c9a227] text-[#0f2044]" : "border-transparent text-gray-500 hover:text-gray-700"}`}
             >
-              {t}
+              {t === "assign" ? <span className="flex items-center gap-1"><UserPlus size={11} />Assign</span> : t}
               {t === "notes" && lead?.notes?.length ? ` (${lead.notes.length})` : ""}
               {t === "tasks" && lead?.tasks?.length ? ` (${lead.tasks.length})` : ""}
             </button>
@@ -522,34 +638,218 @@ function LeadDetailDrawer({ leadId, onClose, onUpdated }: { leadId: number; onCl
 
               {/* TIMELINE TAB */}
               {tab === "timeline" && (
-                <div>
-                  {lead.activities.length === 0 ? (
-                    <div className="text-center py-8 text-gray-400 text-sm">No activity yet.</div>
+                <div className="space-y-4">
+                  {/* Quick Actions */}
+                  <div className="flex gap-2 flex-wrap">
+                    {[
+                      { type: "call_recorded", label: "Log Call", icon: <PhoneCall size={12} /> },
+                      { type: "meeting_scheduled", label: "Meeting", icon: <Video size={12} /> },
+                      { type: "followup_added", label: "Follow-up", icon: <RefreshCw size={12} /> },
+                      { type: "document_uploaded", label: "Document", icon: <FileText size={12} /> },
+                    ].map(qa => (
+                      <button
+                        key={qa.type}
+                        onClick={() => setQuickAction(quickAction === qa.type ? null : qa.type)}
+                        className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border transition-all ${quickAction === qa.type ? "bg-[#0f2044] text-white border-[#0f2044]" : "bg-white text-gray-600 border-gray-200 hover:border-[#0f2044] hover:text-[#0f2044]"}`}
+                      >
+                        {qa.icon} {qa.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {quickAction && (
+                    <div className="bg-gray-50 rounded-lg border border-gray-200 p-3 space-y-2">
+                      <p className="text-xs font-medium text-gray-700 capitalize">{quickAction.replace("_", " ")}</p>
+                      <Textarea
+                        rows={2}
+                        className="text-sm"
+                        placeholder="Add details…"
+                        value={quickActionNote}
+                        onChange={e => setQuickActionNote(e.target.value)}
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={() => handleQuickAction(quickAction)}
+                          disabled={!quickActionNote.trim() || addTimelineEntryMutation.isPending}
+                          className="h-7 text-xs bg-[#0f2044] text-white px-3"
+                        >Save</Button>
+                        <Button variant="outline" onClick={() => { setQuickAction(null); setQuickActionNote(""); }} className="h-7 text-xs px-3">Cancel</Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {timeline.length === 0 ? (
+                    <div className="text-center py-8 text-gray-400 text-sm">No timeline entries yet.</div>
                   ) : (
                     <div className="relative">
                       <div className="absolute left-4 top-0 bottom-0 w-px bg-gray-200" />
-                      <div className="space-y-4">
-                        {lead.activities.map(act => (
-                          <div key={act.id} className="flex gap-4 relative">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 z-10 border-2 border-white shadow-sm ${
-                              act.type === "status_change" ? "bg-[#0f2044] text-white" :
-                              act.type === "note_added" ? "bg-yellow-100 text-yellow-700" :
-                              act.type === "task_created" ? "bg-green-100 text-green-700" :
-                              "bg-gray-100 text-gray-600"
-                            }`}>
-                              {activityIcons[act.type] ?? <Activity size={12} />}
+                      <div className="space-y-3">
+                        {timeline.map(entry => (
+                          <div key={entry.id} className="flex gap-3 relative">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 z-10 border-2 border-white shadow-sm ${TIMELINE_COLORS[entry.actionType] ?? "bg-gray-100 text-gray-600"}`}>
+                              {TIMELINE_ICONS[entry.actionType] ?? <Activity size={11} />}
                             </div>
-                            <div className="flex-1 pb-2">
-                              <p className="text-sm text-gray-800">{act.description}</p>
-                              <p className="text-[10px] text-gray-400 mt-0.5">
-                                {new Date(act.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                              </p>
+                            <div className="flex-1 pb-2 pt-1">
+                              <p className="text-sm text-gray-800 leading-snug">{entry.description}</p>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span className="text-[10px] text-[#c9a227] font-medium">{entry.actorName}</span>
+                                <span className="text-[10px] text-gray-400">
+                                  {new Date(entry.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                                </span>
+                              </div>
                             </div>
                           </div>
                         ))}
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* ASSIGN TAB */}
+              {tab === "assign" && (
+                <div className="space-y-5">
+                  {/* Current Assignments */}
+                  <div>
+                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Currently Assigned</h3>
+                    {assignments.length === 0 ? (
+                      <p className="text-sm text-gray-400 italic">No active assignments</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {assignments.map(a => (
+                          <div key={a.id} className="flex items-center justify-between p-2.5 rounded-lg bg-[#0f2044]/5 border border-[#0f2044]/10">
+                            <div>
+                              <p className="text-sm font-medium text-[#0f2044]">{a.assignedToName}</p>
+                              <div className="flex gap-2 mt-0.5">
+                                {a.priority && <span className={`text-[10px] px-1.5 rounded capitalize ${PRIORITY_COLORS[a.priority] ?? ""}`}>{a.priority}</span>}
+                                {a.deadline && <span className="text-[10px] text-gray-400 flex items-center gap-0.5"><Clock size={9} />{a.deadline}</span>}
+                                <span className="text-[10px] text-gray-400">by {a.assignedByName ?? "Admin"}</span>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => unassignMutation.mutate(a.id)}
+                              disabled={unassignMutation.isPending}
+                              className="text-red-400 hover:text-red-600 transition-colors"
+                              title="Unassign"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="border-t pt-4">
+                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">New Assignment</h3>
+                    <div className="space-y-3">
+                      {/* Method */}
+                      <div>
+                        <Label className="text-xs">Assignment Method</Label>
+                        <Select value={assignMethod} onValueChange={setAssignMethod}>
+                          <SelectTrigger className="mt-1 h-8 text-sm"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {ASSIGN_METHODS.map(m => <SelectItem key={m.value} value={m.value} className="text-sm">{m.label}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Employee picker for individual/multiple */}
+                      {(assignMethod === "individual" || assignMethod === "multiple") && (
+                        <div>
+                          <Label className="text-xs">Select Employee{assignMethod === "multiple" ? "s" : ""}</Label>
+                          <div className="mt-1 border rounded-lg divide-y max-h-40 overflow-y-auto">
+                            {employees.filter(e => e.status === "active").map(emp => (
+                              <label key={emp.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                                <input
+                                  type={assignMethod === "individual" ? "radio" : "checkbox"}
+                                  checked={selectedEmployees.includes(emp.id)}
+                                  onChange={() => {
+                                    if (assignMethod === "individual") setSelectedEmployees([emp.id]);
+                                    else toggleEmployee(emp.id);
+                                  }}
+                                  className="accent-[#0f2044]"
+                                />
+                                <div>
+                                  <p className="text-sm font-medium">{emp.name}</p>
+                                  <p className="text-[10px] text-gray-400">{emp.designation} · {emp.department}</p>
+                                </div>
+                              </label>
+                            ))}
+                            {employees.filter(e => e.status === "active").length === 0 && (
+                              <p className="text-xs text-gray-400 p-3">No active employees found</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Department picker */}
+                      {assignMethod === "department" && (
+                        <div>
+                          <Label className="text-xs">Department</Label>
+                          <Select value={assignDept} onValueChange={setAssignDept}>
+                            <SelectTrigger className="mt-1 h-8 text-sm"><SelectValue placeholder="Select department" /></SelectTrigger>
+                            <SelectContent>
+                              {[...new Set(employees.map(e => e.department).filter(Boolean))].map(d => (
+                                <SelectItem key={d} value={d} className="text-sm">{d}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+
+                      {/* Info for auto methods */}
+                      {(assignMethod === "round_robin" || assignMethod === "auto") && (
+                        <div className="bg-blue-50 border border-blue-100 rounded-lg p-2.5 text-xs text-blue-700">
+                          {assignMethod === "round_robin" ? "Will assign to the next employee in rotation." : "Will assign to the employee with the fewest active leads."}
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <Label className="text-xs">Deadline</Label>
+                          <Input type="date" className="mt-1 h-8 text-xs" value={assignDeadline} onChange={e => setAssignDeadline(e.target.value)} />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Priority</Label>
+                          <Select value={assignPriority} onValueChange={setAssignPriority}>
+                            <SelectTrigger className="mt-1 h-8 text-xs"><SelectValue /></SelectTrigger>
+                            <SelectContent>{PRIORITIES.map(p => <SelectItem key={p} value={p} className="capitalize text-xs">{p}</SelectItem>)}</SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label className="text-xs">Assignment Notes</Label>
+                        <Textarea className="mt-1 text-sm" rows={2} placeholder="Any specific instructions…" value={assignNotes} onChange={e => setAssignNotes(e.target.value)} />
+                      </div>
+
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" checked={assignReplace} onChange={e => setAssignReplace(e.target.checked)} className="accent-[#0f2044]" />
+                        <span className="text-xs text-gray-600">Replace existing assignments</span>
+                      </label>
+
+                      <Button
+                        onClick={handleAssign}
+                        disabled={
+                          assignMutation.isPending ||
+                          ((assignMethod === "individual" || assignMethod === "multiple") && selectedEmployees.length === 0) ||
+                          (assignMethod === "department" && !assignDept)
+                        }
+                        className="w-full bg-[#0f2044] hover:bg-[#0f2044]/90 text-white h-9 text-sm"
+                      >
+                        <UserPlus size={14} className="mr-2" />
+                        {assignMutation.isPending ? "Assigning…" : "Assign Lead"}
+                      </Button>
+
+                      {assignMutation.isSuccess && (
+                        <p className="text-xs text-green-600 text-center">Lead assigned successfully!</p>
+                      )}
+                      {assignMutation.isError && (
+                        <p className="text-xs text-red-500 text-center">Assignment failed. Please try again.</p>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
             </>

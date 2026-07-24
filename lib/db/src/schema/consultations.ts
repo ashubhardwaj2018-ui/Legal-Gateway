@@ -60,6 +60,31 @@ export const leadTasksTable = pgTable("lead_tasks", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
 
+export const leadAssignmentsTable = pgTable("lead_assignments", {
+  id: serial("id").primaryKey(),
+  leadId: integer("lead_id").notNull(),
+  assignedToId: integer("assigned_to_id").notNull(),
+  assignedToName: text("assigned_to_name").notNull(),
+  assignedById: integer("assigned_by_id"),
+  assignedByName: text("assigned_by_name"),
+  deadline: text("deadline"),
+  priority: text("priority").default("medium"),
+  notes: text("notes"),
+  status: text("status").notNull().default("active"),
+  assignedAt: timestamp("assigned_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const leadTimelineTable = pgTable("lead_timeline", {
+  id: serial("id").primaryKey(),
+  leadId: integer("lead_id").notNull(),
+  actorId: integer("actor_id"),
+  actorName: text("actor_name").notNull().default("System"),
+  actionType: text("action_type").notNull(),
+  description: text("description").notNull(),
+  payload: text("payload"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const insertConsultationSchema = createInsertSchema(consultationsTable).omit({
   id: true,
   createdAt: true,

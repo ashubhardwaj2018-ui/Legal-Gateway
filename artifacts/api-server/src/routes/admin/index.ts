@@ -7,6 +7,7 @@ import lawyersRouter from "./lawyers";
 import settingsRouter from "./settings";
 import locationsRouter from "./locations";
 import leadsRouter from "./leads";
+import leadsAssignmentRouter from "./leads-assignment";
 import teamRouter from "./team";
 import indianCompaniesRouter from "./indian-companies";
 import tasksRouter from "./tasks";
@@ -70,6 +71,7 @@ router.use(makeModulePermissionMiddleware([
 ]));
 
 router.use(leadsRouter);
+router.use(leadsAssignmentRouter);
 router.use(invoicesRouter);
 router.use(chatRouter);
 router.use(dashboardRouter);

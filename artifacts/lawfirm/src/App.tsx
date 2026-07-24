@@ -12,6 +12,7 @@ import NotFound from "@/pages/not-found";
 import AdminLogin from "@/pages/admin/login";
 import AdminDashboard from "@/pages/admin/dashboard";
 import AdminLeads from "@/pages/admin/leads";
+import MyLeads from "@/pages/admin/my-leads";
 import AdminContacts from "@/pages/admin/contacts";
 import AdminQuotations from "@/pages/admin/quotations";
 import AdminSeo from "@/pages/admin/seo";
@@ -61,6 +62,7 @@ function Router() {
       {/* Admin Routes — no public Layout */}
       <Route path="/admin" component={AdminDashboard} />
       <Route path="/admin/leads" component={AdminLeads} />
+      <Route path="/admin/my-leads" component={MyLeads} />
       <Route path="/admin/contacts" component={AdminContacts} />
       <Route path="/admin/quotations" component={AdminQuotations} />
       <Route path="/admin/seo" component={AdminSeo} />

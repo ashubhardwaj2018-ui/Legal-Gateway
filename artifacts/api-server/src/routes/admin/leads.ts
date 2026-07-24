@@ -6,7 +6,9 @@ import {
   leadNotesTable,
   leadActivitiesTable,
   leadTasksTable,
+  leadTimelineTable,
 } from "@workspace/db";
+import type { AuthenticatedRequest } from "./auth";
 
 const router: IRouter = Router();
 
@@ -19,6 +21,20 @@ async function logActivity(
   metadata?: string,
 ) {
   await db.insert(leadActivitiesTable).values({ leadId, type, description, metadata: metadata ?? null });
+}
+
+async function logTimeline(
+  leadId: number,
+  actionType: string,
+  description: string,
+  req?: AuthenticatedRequest,
+) {
+  const actorName = req?.adminUser
+    ? (typeof req.adminUser.username === "string" ? req.adminUser.username : "Admin")
+    : "System";
+  const actorId = req?.adminUser?.userType === "employee" && typeof req.adminUser.userId === "number"
+    ? req.adminUser.userId : null;
+  await db.insert(leadTimelineTable).values({ leadId, actionType, description, actorName, actorId });
 }
 
 // ── GET /admin/leads ──────────────────────────────────────────────────────────
@@ -54,12 +70,12 @@ router.get("/admin/leads", async (req, res): Promise<void> => {
 });
 
 // ── POST /admin/leads ─────────────────────────────────────────────────────────
-router.post("/admin/leads", async (req, res): Promise<void> => {
+router.post("/admin/leads", async (req: AuthenticatedRequest, res): Promise<void> => {
   const body = req.body as {
     name: string; email: string; phone: string;
     serviceCategory: string; serviceInterest: string;
     company?: string; whatsapp?: string; city?: string; state?: string;
-    message?: string; priority?: string; source?: string;
+    message?: string; priority?: string; source?: string; status?: string;
     assignedTo?: string; expectedRevenue?: string;
     probability?: number; expectedClosingDate?: string; tags?: string;
   };
@@ -91,6 +107,7 @@ router.post("/admin/leads", async (req, res): Promise<void> => {
   }).returning();
 
   await logActivity(lead.id, "created", `Lead created manually`);
+  await logTimeline(lead.id, "created", `Lead created for ${body.name}`, req);
   req.log.info({ id: lead.id }, "Lead created");
   res.status(201).json(lead);
 });
@@ -140,6 +157,10 @@ router.patch("/admin/leads/:id", async (req, res): Promise<void> => {
 
   if (body.status && body.status !== before.status) {
     await logActivity(id, "status_change", `Status changed from "${before.status}" to "${body.status}"`);
+    await logTimeline(id, "status_changed", `Status changed from "${before.status}" to "${body.status}"`, req as AuthenticatedRequest);
+  }
+  if (body.assignedTo && body.assignedTo !== before.assignedTo) {
+    await logTimeline(id, "assigned", `Lead assigned to ${body.assignedTo}`, req as AuthenticatedRequest);
   }
 
   res.json(updated);
@@ -172,6 +193,7 @@ router.post("/admin/leads/:id/notes", async (req, res): Promise<void> => {
   }).returning();
 
   await logActivity(id, "note_added", `Note added: "${content.slice(0, 60)}${content.length > 60 ? "…" : ""}"`);
+  await logTimeline(id, "note_added", `Note added by ${createdBy ?? "Admin"}: "${content.slice(0, 80)}${content.length > 80 ? "…" : ""}"`, req as AuthenticatedRequest);
   res.status(201).json(note);
 });
 
@@ -205,6 +227,7 @@ router.post("/admin/leads/:id/tasks", async (req, res): Promise<void> => {
   }).returning();
 
   await logActivity(id, "task_created", `Task created: "${title}"`);
+  await logTimeline(id, "task_created", `Task created: "${title}"`, req as AuthenticatedRequest);
   res.status(201).json(task);
 });
 
