@@ -197,19 +197,25 @@ export function crudActivityMiddleware(req: AuthenticatedRequest, res: Response,
 }
 
 // ── URL-pattern based module permission middleware ────────────────────────────
-export function makeModulePermissionMiddleware(map: Array<[string, string]>) {
+// Each map entry: [urlPrefix, moduleName, extraAllowedActions?]
+// extraAllowedActions lets specific sub-routes (e.g. assign) pass the coarse
+// module gate without requiring the standard verb-mapped action. Fine-grained
+// checks are still enforced inside each route handler.
+export function makeModulePermissionMiddleware(
+  map: Array<[string, string] | [string, string, string[]]>
+) {
   return (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
     if (!req.adminUser || req.permissions?.all) { next(); return; }
     const entry = map.find(([prefix]) => req.path.startsWith(prefix));
     if (!entry) { next(); return; }
-    const [, module] = entry;
+    const [, module, extraActions] = entry as [string, string, string[] | undefined];
     const action = (req.method === "GET" || req.method === "HEAD") ? "view"
       : req.method === "POST" ? "create"
       : req.method === "DELETE" ? "delete"
       : "edit";
-    if (req.permissions?.map[module]?.[action] || req.permissions?.map[module]?.["manage"]) {
-      next(); return;
-    }
+    const perms = req.permissions?.map[module];
+    if (perms?.[action] || perms?.["manage"]) { next(); return; }
+    if (extraActions?.some(a => perms?.[a])) { next(); return; }
     res.status(403).json({ error: `Insufficient permissions: ${module}/${action}` });
   };
 }
