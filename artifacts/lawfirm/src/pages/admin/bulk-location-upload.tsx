@@ -5,26 +5,38 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import {
   Upload, Download, FileText, CheckCircle2, AlertCircle,
-  RefreshCw, X, MapPin, ArrowLeft, ChevronRight,
+  RefreshCw, MapPin, ArrowLeft, ChevronRight, ArrowRight,
 } from "lucide-react";
-import * as XLSX from "xlsx";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
-interface ParsedRow {
-  _idx: number;
-  country?: string;
-  state?: string;
-  district?: string;
+interface PreviewRow {
+  idx: number;
   city?: string;
-  town?: string;
-  village?: string;
-  pincode?: string;
+  state?: string;
+  country?: string;
+  slug?: string;
+  metaTitle?: string;
+  metaDescription?: string;
   latitude?: number;
   longitude?: number;
-  population?: number;
-  slug?: string;
   errors: string[];
+  isValid: boolean;
+}
+
+interface ColumnMapping {
+  source: string;
+  target: string;
+}
+
+interface ParsePreviewResponse {
+  totalRows: number;
+  validCount: number;
+  errorCount: number;
+  detectedColumns: string[];
+  columnMapping: ColumnMapping[];
+  rows: PreviewRow[];
+  validRows: PreviewRow[];
 }
 
 interface ImportResult {
@@ -46,58 +58,6 @@ interface UploadLog {
   createdAt: string;
 }
 
-function makeSlug(row: ParsedRow): string {
-  const primary = row.city || row.town || row.village || row.district || row.state || "";
-  return primary
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9\s-]/g, "")
-    .trim()
-    .replace(/\s+/g, "-");
-}
-
-function normalizeRow(raw: Record<string, unknown>, idx: number): ParsedRow {
-  const pick = (keys: string[]): string | undefined => {
-    for (const k of keys) {
-      const v = raw[k] ?? raw[k.toLowerCase()] ?? raw[k.toUpperCase()];
-      if (v != null && String(v).trim()) return String(v).trim();
-    }
-    return undefined;
-  };
-  const row: ParsedRow = {
-    _idx: idx,
-    country: pick(["Country", "country"]) ?? "India",
-    state: pick(["State", "state", "STATE"]),
-    district: pick(["District", "district"]),
-    city: pick(["City", "city", "CITY"]),
-    town: pick(["Town", "town"]),
-    village: pick(["Village", "village"]),
-    pincode: pick(["Pincode", "pincode", "PIN", "Zip"]),
-    latitude: Number(pick(["Latitude", "latitude", "lat"])) || undefined,
-    longitude: Number(pick(["Longitude", "longitude", "lng", "lon"])) || undefined,
-    population: Number(pick(["Population", "population"])) || undefined,
-    errors: [],
-  };
-  row.slug = makeSlug(row);
-  return row;
-}
-
-function validateRows(rows: ParsedRow[]): ParsedRow[] {
-  const slugsSeen = new Map<string, number>();
-  return rows.map((row) => {
-    const errors: string[] = [];
-    if (!row.state) errors.push("State is required");
-    if (!row.city && !row.town && !row.village && !row.district) errors.push("At least one of City / Town / Village / District required");
-    if (!row.slug) errors.push("Could not generate slug");
-    if (row.slug) {
-      if (slugsSeen.has(row.slug)) errors.push(`Duplicate slug within file (row ${(slugsSeen.get(row.slug) ?? 0) + 1})`);
-      else slugsSeen.set(row.slug, row._idx);
-    }
-    return { ...row, errors };
-  });
-}
-
 type Step = "pick" | "preview" | "done";
 
 export default function BulkLocationUpload() {
@@ -107,46 +67,49 @@ export default function BulkLocationUpload() {
   const [step, setStep] = useState<Step>("pick");
   const [dragOver, setDragOver] = useState(false);
   const [fileName, setFileName] = useState("");
-  const [rows, setRows] = useState<ParsedRow[]>([]);
+  const [parsing, setParsing] = useState(false);
+  const [preview, setPreview] = useState<ParsePreviewResponse | null>(null);
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [exportingCsv, setExportingCsv] = useState(false);
-  const [detectedColumns, setDetectedColumns] = useState<string[]>([]);
 
   const { data: uploadLogs = [] } = useQuery<UploadLog[]>({
     queryKey: ["upload-logs"],
     queryFn: () => fetch(`${BASE}/api/admin/location-upload-logs`).then((r) => r.json()),
   });
 
-  const validRows = rows.filter((r) => r.errors.length === 0);
-  const errorRows = rows.filter((r) => r.errors.length > 0);
-
-  const parseFile = useCallback(async (file: File) => {
+  const uploadForPreview = useCallback(async (file: File) => {
     const ext = file.name.split(".").pop()?.toLowerCase();
     if (!["xlsx", "xls", "csv"].includes(ext ?? "")) {
       toast({ title: "Unsupported file type", description: "Please upload .xlsx, .xls or .csv", variant: "destructive" });
       return;
     }
+    setParsing(true);
     try {
-      const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type: "array" });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws);
-      if (raw.length === 0) {
-        toast({ title: "Empty file", description: "No data rows found in the file.", variant: "destructive" });
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch(`${BASE}/api/admin/locations/parse-preview`, {
+        method: "POST",
+        body: fd,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({})) as { error?: string };
+        toast({ title: "Parse failed", description: err.error ?? "Server could not read the file.", variant: "destructive" });
         return;
       }
-      // Detect columns from first row
-      const cols = Object.keys(raw[0] ?? {});
-      setDetectedColumns(cols);
-      const parsed = raw.map((r, i) => normalizeRow(r, i + 1));
-      const validated = validateRows(parsed);
-      setRows(validated);
+      const data = await res.json() as ParsePreviewResponse;
+      if (data.totalRows === 0) {
+        toast({ title: "Empty file", description: "No data rows found.", variant: "destructive" });
+        return;
+      }
+      setPreview(data);
       setFileName(file.name);
       setStep("preview");
     } catch {
-      toast({ title: "Parse failed", description: "Could not read the file. Check it's a valid Excel or CSV.", variant: "destructive" });
+      toast({ title: "Upload failed", description: "Could not connect to server.", variant: "destructive" });
+    } finally {
+      setParsing(false);
     }
   }, [toast]);
 
@@ -154,31 +117,26 @@ export default function BulkLocationUpload() {
     e.preventDefault();
     setDragOver(false);
     const file = e.dataTransfer.files[0];
-    if (file) parseFile(file);
-  }, [parseFile]);
+    if (file) uploadForPreview(file);
+  }, [uploadForPreview]);
 
   const onFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) parseFile(file);
+    if (file) uploadForPreview(file);
     e.target.value = "";
   };
 
   async function doImport() {
-    if (validRows.length === 0) return;
+    if (!preview || preview.validCount === 0) return;
     setImporting(true);
     setImportProgress(10);
     try {
-      const records = validRows.map((r) => ({
+      const records = preview.validRows.map((r) => ({
         country: r.country ?? "India",
         state: r.state!,
-        district: r.district,
         city: r.city,
-        town: r.town,
-        village: r.village,
-        pincode: r.pincode,
         latitude: r.latitude,
         longitude: r.longitude,
-        population: r.population,
       }));
       setImportProgress(40);
       const res = await fetch(`${BASE}/api/admin/locations/bulk-upsert`, {
@@ -204,14 +162,13 @@ export default function BulkLocationUpload() {
 
   function reset() {
     setStep("pick");
-    setRows([]);
+    setPreview(null);
     setFileName("");
     setImportResult(null);
     setImportProgress(0);
-    setDetectedColumns([]);
   }
 
-  async function downloadTemplate() {
+  function downloadTemplate() {
     const a = document.createElement("a");
     a.href = `${BASE}/api/admin/locations/template`;
     a.download = "locations-template.xlsx";
@@ -269,55 +226,67 @@ export default function BulkLocationUpload() {
       {step === "pick" && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-5">
-            {/* Drop zone */}
             <div className="bg-white rounded-xl border border-gray-200 p-6">
-              <h2 className="font-semibold text-[#0f2044] mb-4 flex items-center gap-2"><Upload size={16} /> Select File</h2>
+              <h2 className="font-semibold text-[#0f2044] mb-4 flex items-center gap-2">
+                <Upload size={16} /> Select File
+              </h2>
+
               <div
                 onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
                 onDragLeave={() => setDragOver(false)}
                 onDrop={onDrop}
                 className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-colors ${dragOver ? "border-[#c9a227] bg-[#c9a227]/5" : "border-gray-200 hover:border-gray-300"}`}
               >
-                <Upload size={36} className="mx-auto text-gray-300 mb-3" />
-                <p className="font-medium text-gray-700 mb-1">Drag & drop your Excel or CSV file here</p>
-                <p className="text-xs text-gray-400 mb-5">Supported: .xlsx, .xls, .csv · Recommended max: 50,000 rows</p>
-                <label className="cursor-pointer">
-                  <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={onFileInput} />
-                  <span className="inline-block bg-[#0f2044] text-white text-sm font-medium px-6 py-2 rounded-lg hover:bg-[#1a3060] transition-colors">
-                    Browse File
-                  </span>
-                </label>
+                {parsing ? (
+                  <>
+                    <RefreshCw size={36} className="mx-auto text-[#c9a227] mb-3 animate-spin" />
+                    <p className="font-medium text-gray-700">Parsing file on server…</p>
+                    <p className="text-xs text-gray-400 mt-1">Validating rows and mapping columns</p>
+                  </>
+                ) : (
+                  <>
+                    <Upload size={36} className="mx-auto text-gray-300 mb-3" />
+                    <p className="font-medium text-gray-700 mb-1">Drag & drop your Excel or CSV file here</p>
+                    <p className="text-xs text-gray-400 mb-5">Supported: .xlsx, .xls, .csv · Max 50 MB</p>
+                    <label className="cursor-pointer">
+                      <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={onFileInput} disabled={parsing} />
+                      <span className="inline-block bg-[#0f2044] text-white text-sm font-medium px-6 py-2 rounded-lg hover:bg-[#1a3060] transition-colors">
+                        Browse File
+                      </span>
+                    </label>
+                  </>
+                )}
               </div>
 
               {/* Column guide */}
               <div className="mt-5 p-4 bg-gray-50 rounded-xl">
-                <p className="text-xs font-semibold text-gray-600 mb-2">Expected column names (case-insensitive):</p>
+                <p className="text-xs font-semibold text-gray-600 mb-2">Template column names:</p>
                 <div className="flex flex-wrap gap-1.5 mb-2">
                   {[
+                    { name: "City", required: true },
                     { name: "State", required: true },
-                    { name: "City", required: false },
-                    { name: "District", required: false },
-                    { name: "Town", required: false },
-                    { name: "Village", required: false },
                     { name: "Country", required: false },
-                    { name: "Pincode", required: false },
+                    { name: "Slug", required: false },
+                    { name: "Meta Title", required: false },
+                    { name: "Meta Description", required: false },
                     { name: "Latitude", required: false },
                     { name: "Longitude", required: false },
-                    { name: "Population", required: false },
                   ].map((col) => (
                     <span key={col.name} className={`text-xs px-2 py-0.5 rounded font-mono ${col.required ? "bg-[#0f2044] text-white" : "bg-gray-200 text-gray-700"}`}>
                       {col.name}{col.required ? " ✱" : ""}
                     </span>
                   ))}
                 </div>
-                <p className="text-xs text-gray-400">✱ Required. All others are optional. Duplicate slugs are updated (upsert).</p>
+                <p className="text-xs text-gray-400">✱ Required. Slug auto-generated from City if omitted. Duplicate slugs are updated (upsert).</p>
               </div>
             </div>
           </div>
 
           {/* Upload History */}
           <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <h2 className="font-semibold text-[#0f2044] mb-4 flex items-center gap-2"><RefreshCw size={16} /> Upload History</h2>
+            <h2 className="font-semibold text-[#0f2044] mb-4 flex items-center gap-2">
+              <RefreshCw size={16} /> Upload History
+            </h2>
             {uploadLogs.length === 0 ? (
               <p className="text-sm text-gray-400 text-center py-8">No uploads yet</p>
             ) : (
@@ -341,7 +310,7 @@ export default function BulkLocationUpload() {
       )}
 
       {/* ── Step 2: Preview & Validate ───────────────────────────── */}
-      {step === "preview" && (
+      {step === "preview" && preview && (
         <div className="space-y-5">
           {/* Summary bar */}
           <div className="bg-white rounded-xl border border-gray-200 p-5">
@@ -352,9 +321,11 @@ export default function BulkLocationUpload() {
                   <strong className="text-[#0f2044]">{fileName}</strong>
                 </div>
                 <div className="flex gap-3 text-sm flex-wrap">
-                  <span className="text-gray-500">{rows.length.toLocaleString()} total rows</span>
-                  <span className="text-green-700 font-semibold">{validRows.length.toLocaleString()} valid</span>
-                  {errorRows.length > 0 && <span className="text-red-600 font-semibold">{errorRows.length.toLocaleString()} errors</span>}
+                  <span className="text-gray-500">{preview.totalRows.toLocaleString()} total rows</span>
+                  <span className="text-green-700 font-semibold">{preview.validCount.toLocaleString()} valid</span>
+                  {preview.errorCount > 0 && (
+                    <span className="text-red-600 font-semibold">{preview.errorCount.toLocaleString()} errors</span>
+                  )}
                 </div>
               </div>
               <div className="flex gap-2">
@@ -364,31 +335,42 @@ export default function BulkLocationUpload() {
                 <Button
                   size="sm"
                   onClick={doImport}
-                  disabled={validRows.length === 0 || importing}
+                  disabled={preview.validCount === 0 || importing}
                   className="gap-1.5 bg-[#0f2044] hover:bg-[#1a3060] text-white"
                 >
-                  {importing ? <><RefreshCw size={13} className="animate-spin" /> Importing…</> : <><CheckCircle2 size={13} /> Import {validRows.length.toLocaleString()} rows</>}
+                  {importing ? (
+                    <><RefreshCw size={13} className="animate-spin" /> Importing…</>
+                  ) : (
+                    <><ArrowRight size={13} /> Import {preview.validCount.toLocaleString()} rows</>
+                  )}
                 </Button>
               </div>
             </div>
 
-            {/* Progress bar during import */}
+            {/* Import progress bar */}
             {importing && (
               <div className="mt-4">
                 <div className="w-full bg-gray-100 rounded-full h-2">
-                  <div className="bg-[#c9a227] h-2 rounded-full transition-all duration-300" style={{ width: `${importProgress}%` }} />
+                  <div
+                    className="bg-[#c9a227] h-2 rounded-full transition-all duration-500"
+                    style={{ width: `${importProgress}%` }}
+                  />
                 </div>
                 <p className="text-xs text-gray-400 mt-1 text-right">{importProgress}%</p>
               </div>
             )}
 
-            {/* Detected column mapping */}
-            {detectedColumns.length > 0 && (
+            {/* Column mapping from server */}
+            {preview.columnMapping.length > 0 && (
               <div className="mt-4 pt-4 border-t border-gray-100">
-                <p className="text-xs font-semibold text-gray-500 mb-1.5">Detected columns:</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {detectedColumns.map((col) => (
-                    <span key={col} className="text-xs px-2 py-0.5 rounded-full font-mono bg-blue-50 text-blue-700 border border-blue-100">{col}</span>
+                <p className="text-xs font-semibold text-gray-500 mb-2">Column mapping (detected → target):</p>
+                <div className="flex flex-wrap gap-2">
+                  {preview.columnMapping.map((m) => (
+                    <span key={m.source} className="text-xs flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 border border-blue-100 text-blue-700">
+                      <span className="font-mono">{m.source}</span>
+                      <ArrowRight size={10} />
+                      <span className="font-mono text-[#0f2044]">{m.target}</span>
+                    </span>
                   ))}
                 </div>
               </div>
@@ -398,10 +380,16 @@ export default function BulkLocationUpload() {
           {/* Preview table */}
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
             <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
-              <h2 className="font-semibold text-[#0f2044] text-sm">Row Preview (first 200 shown)</h2>
+              <h2 className="font-semibold text-[#0f2044] text-sm">
+                Row Preview {preview.rows.length > 200 ? "(first 200 shown)" : `(${preview.rows.length} rows)`}
+              </h2>
               <div className="flex items-center gap-3 text-xs">
-                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-400 inline-block"></span> Valid</span>
-                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-400 inline-block"></span> Error</span>
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-green-400 inline-block" /> Valid
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-red-400 inline-block" /> Error
+                </span>
               </div>
             </div>
             <div className="overflow-x-auto">
@@ -409,45 +397,49 @@ export default function BulkLocationUpload() {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-3 py-2.5 text-left font-semibold text-gray-500 w-10">#</th>
+                    <th className="px-3 py-2.5 text-left font-semibold text-gray-500">City</th>
                     <th className="px-3 py-2.5 text-left font-semibold text-gray-500">State</th>
-                    <th className="px-3 py-2.5 text-left font-semibold text-gray-500">City / Town</th>
-                    <th className="px-3 py-2.5 text-left font-semibold text-gray-500">District</th>
                     <th className="px-3 py-2.5 text-left font-semibold text-gray-500">Slug</th>
+                    <th className="px-3 py-2.5 text-left font-semibold text-gray-500">Meta Title</th>
                     <th className="px-3 py-2.5 text-left font-semibold text-gray-500">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {rows.slice(0, 200).map((row) => {
-                    const hasError = row.errors.length > 0;
-                    return (
-                      <tr key={row._idx} className={hasError ? "bg-red-50" : "hover:bg-gray-50"}>
-                        <td className="px-3 py-2 text-gray-400">{row._idx}</td>
-                        <td className={`px-3 py-2 font-medium ${!row.state ? "text-red-500" : "text-[#0f2044]"}`}>
-                          {row.state || <span className="italic text-red-400">missing</span>}
-                        </td>
-                        <td className="px-3 py-2 text-gray-600">{row.city || row.town || row.village || <span className="text-gray-300">—</span>}</td>
-                        <td className="px-3 py-2 text-gray-500">{row.district || <span className="text-gray-300">—</span>}</td>
-                        <td className="px-3 py-2 font-mono text-[#c9a227]">{row.slug || <span className="text-red-400 italic">none</span>}</td>
-                        <td className="px-3 py-2">
-                          {hasError ? (
-                            <div className="flex items-start gap-1">
-                              <AlertCircle size={12} className="text-red-500 shrink-0 mt-0.5" />
-                              <span className="text-red-600 text-[10px] leading-tight">{row.errors.join("; ")}</span>
-                            </div>
-                          ) : (
-                            <span className="flex items-center gap-1 text-green-600">
-                              <CheckCircle2 size={12} /> Valid
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {preview.rows.slice(0, 200).map((row) => (
+                    <tr key={row.idx} className={!row.isValid ? "bg-red-50" : "hover:bg-gray-50"}>
+                      <td className="px-3 py-2 text-gray-400">{row.idx}</td>
+                      <td className={`px-3 py-2 font-medium ${!row.city ? "text-red-500" : "text-[#0f2044]"}`}>
+                        {row.city || <span className="italic text-red-400">missing</span>}
+                      </td>
+                      <td className={`px-3 py-2 ${!row.state ? "text-red-500" : "text-gray-600"}`}>
+                        {row.state || <span className="italic text-red-400">missing</span>}
+                      </td>
+                      <td className="px-3 py-2 font-mono text-[#c9a227] text-[10px]">
+                        {row.slug || <span className="text-red-400 italic">none</span>}
+                      </td>
+                      <td className="px-3 py-2 text-gray-500 max-w-[200px] truncate">
+                        {row.metaTitle || <span className="text-gray-300">—</span>}
+                      </td>
+                      <td className="px-3 py-2">
+                        {!row.isValid ? (
+                          <div className="flex items-start gap-1">
+                            <AlertCircle size={12} className="text-red-500 shrink-0 mt-0.5" />
+                            <span className="text-red-600 text-[10px] leading-tight">{row.errors.join("; ")}</span>
+                          </div>
+                        ) : (
+                          <span className="flex items-center gap-1 text-green-600">
+                            <CheckCircle2 size={12} /> Valid
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
-              {rows.length > 200 && (
+              {preview.rows.length > 200 && (
                 <p className="text-xs text-gray-400 text-center py-3 border-t border-gray-100">
-                  Showing first 200 of {rows.length.toLocaleString()} rows — all {validRows.length.toLocaleString()} valid rows will be imported.
+                  Showing first 200 of {preview.rows.length.toLocaleString()} rows —{" "}
+                  all {preview.validCount.toLocaleString()} valid rows will be imported.
                 </p>
               )}
             </div>

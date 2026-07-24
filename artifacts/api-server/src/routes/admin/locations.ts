@@ -2,8 +2,10 @@ import { Router, type IRouter } from "express";
 import { eq, ilike, or, count, desc, sql, and, inArray } from "drizzle-orm";
 import { db, locationsTable, locationUploadLogsTable } from "@workspace/db";
 import * as XLSX from "xlsx";
+import multer from "multer";
 
 const router: IRouter = Router();
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
 function makeSlug(row: {
   city?: string | null;
@@ -26,22 +28,143 @@ function makeSlug(row: {
 
 router.get("/admin/locations/template", (_req, res): void => {
   const wb = XLSX.utils.book_new();
+  const headers = ["City", "State", "Country", "Slug", "Meta Title", "Meta Description", "Latitude", "Longitude"];
   const sampleData = [
-    { Country: "India", State: "Maharashtra", District: "Mumbai Suburban", City: "Mumbai", Town: "", Village: "", Pincode: "400001", Latitude: 19.076, Longitude: 72.8777, Population: 20667656 },
-    { Country: "India", State: "Karnataka", District: "Bangalore Urban", City: "Bangalore", Town: "", Village: "", Pincode: "560001", Latitude: 12.9716, Longitude: 77.5946, Population: 8443675 },
-    { Country: "India", State: "Tamil Nadu", District: "Chennai", City: "Chennai", Town: "", Village: "", Pincode: "600001", Latitude: 13.0827, Longitude: 80.2707, Population: 7088000 },
+    { City: "Mumbai", State: "Maharashtra", Country: "India", Slug: "mumbai", "Meta Title": "Top Lawyers in Mumbai | Vakil & Co", "Meta Description": "Expert legal services in Mumbai. Contact Vakil & Co for trademark, property, and corporate law.", Latitude: 19.076, Longitude: 72.8777 },
+    { City: "Bangalore", State: "Karnataka", Country: "India", Slug: "bangalore", "Meta Title": "Legal Services in Bangalore | Vakil & Co", "Meta Description": "Trusted law firm in Bangalore for startups, IP, NGO registration and more.", Latitude: 12.9716, Longitude: 77.5946 },
+    { City: "Chennai", State: "Tamil Nadu", Country: "India", Slug: "chennai", "Meta Title": "Lawyers in Chennai | Vakil & Co", "Meta Description": "Professional legal assistance in Chennai. Trademark, property, and business law experts.", Latitude: 13.0827, Longitude: 80.2707 },
   ];
-  const ws = XLSX.utils.json_to_sheet(sampleData, {
-    header: ["Country", "State", "District", "City", "Town", "Village", "Pincode", "Latitude", "Longitude", "Population"],
-  });
-  // Set column widths
-  ws["!cols"] = [12, 16, 20, 18, 14, 14, 10, 10, 10, 12].map((w) => ({ wch: w }));
+  const ws = XLSX.utils.json_to_sheet(sampleData, { header: headers });
+  ws["!cols"] = [16, 16, 12, 16, 40, 60, 10, 10].map((w) => ({ wch: w }));
   XLSX.utils.book_append_sheet(wb, ws, "Locations");
   const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
   res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   res.setHeader("Content-Disposition", "attachment; filename=\"locations-template.xlsx\"");
   res.send(Buffer.from(buf));
 });
+
+// ─── Server-side parse & preview ────────────────────────────────────────────
+
+interface ParsedPreviewRow {
+  idx: number;
+  city?: string;
+  state?: string;
+  country?: string;
+  slug?: string;
+  metaTitle?: string;
+  metaDescription?: string;
+  latitude?: number;
+  longitude?: number;
+  errors: string[];
+  isValid: boolean;
+}
+
+interface ColumnMapping {
+  source: string;
+  target: string;
+}
+
+function normalisePreviewRow(raw: Record<string, unknown>, idx: number): ParsedPreviewRow {
+  const pick = (...keys: string[]): string | undefined => {
+    for (const k of keys) {
+      const v = raw[k] ?? raw[k.toLowerCase()] ?? raw[k.toUpperCase()];
+      if (v != null && String(v).trim()) return String(v).trim();
+    }
+    return undefined;
+  };
+  const state = pick("State", "state");
+  const city = pick("City", "city");
+  const country = pick("Country", "country") ?? "India";
+  const slugInput = pick("Slug", "slug");
+  const metaTitle = pick("Meta Title", "meta_title", "metaTitle");
+  const metaDescription = pick("Meta Description", "meta_description", "metaDescription");
+  const lat = parseFloat(pick("Latitude", "latitude", "lat") ?? "");
+  const lng = parseFloat(pick("Longitude", "longitude", "lng", "lon") ?? "");
+  const generatedSlug = slugInput || makeSlug({ city, state: state ?? "", town: undefined, village: undefined, district: undefined });
+  const errors: string[] = [];
+  if (!state) errors.push("State is required");
+  if (!city) errors.push("City is required");
+  if (!generatedSlug) errors.push("Could not generate slug");
+  return {
+    idx,
+    city,
+    state,
+    country,
+    slug: generatedSlug || undefined,
+    metaTitle,
+    metaDescription,
+    latitude: isNaN(lat) ? undefined : lat,
+    longitude: isNaN(lng) ? undefined : lng,
+    errors,
+    isValid: errors.length === 0,
+  };
+}
+
+router.post(
+  "/admin/locations/parse-preview",
+  upload.single("file"),
+  (req, res): void => {
+    const file = req.file;
+    if (!file) {
+      res.status(400).json({ error: "No file uploaded" });
+      return;
+    }
+    try {
+      const wb = XLSX.read(file.buffer, { type: "buffer" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws);
+      if (rawRows.length === 0) {
+        res.status(422).json({ error: "File contains no data rows" });
+        return;
+      }
+
+      // Detect columns present in the file
+      const detectedColumns = Object.keys(rawRows[0] ?? {});
+
+      // Build column mapping (source → canonical target)
+      const mapping: ColumnMapping[] = [];
+      const colMap: Record<string, string> = {
+        City: "city", State: "state", Country: "country", Slug: "slug",
+        "Meta Title": "metaTitle", "Meta Description": "metaDescription",
+        Latitude: "latitude", Longitude: "longitude",
+      };
+      for (const col of detectedColumns) {
+        const target = colMap[col] ?? colMap[col.toLowerCase()] ?? col.toLowerCase().replace(/\s+/g, "_");
+        mapping.push({ source: col, target });
+      }
+
+      // Parse & validate rows
+      const rows = rawRows.map((r, i) => normalisePreviewRow(r, i + 1));
+
+      // Flag duplicate slugs within file
+      const slugSeen = new Map<string, number>();
+      for (const row of rows) {
+        if (!row.slug) continue;
+        if (slugSeen.has(row.slug)) {
+          row.errors.push(`Duplicate slug within file (first at row ${slugSeen.get(row.slug)})`);
+          row.isValid = false;
+        } else {
+          slugSeen.set(row.slug, row.idx);
+        }
+      }
+
+      const validRows = rows.filter((r) => r.isValid);
+      const errorRows = rows.filter((r) => !r.isValid);
+
+      res.json({
+        totalRows: rows.length,
+        validCount: validRows.length,
+        errorCount: errorRows.length,
+        detectedColumns,
+        columnMapping: mapping,
+        rows,        // full list (first 500 for preview)
+        validRows,   // only valid, for import payload
+      });
+    } catch {
+      res.status(422).json({ error: "Failed to parse file — check it is a valid Excel or CSV" });
+    }
+  },
+);
 
 // ─── CSV export ─────────────────────────────────────────────────────────────
 
@@ -193,6 +316,16 @@ router.post("/admin/locations/bulk-upsert", async (req, res): Promise<void> => {
   let errors = 0;
   const BATCH = 200;
 
+  // Pre-fetch all slugs that already exist so we can accurately count inserts vs updates
+  const allSlugs = records.map((r) => makeSlug(r)).filter(Boolean);
+  const existingSlugRows = allSlugs.length
+    ? await db
+        .select({ slug: locationsTable.slug })
+        .from(locationsTable)
+        .where(inArray(locationsTable.slug, allSlugs))
+    : [];
+  const existingSlugs = new Set(existingSlugRows.map((r) => r.slug));
+
   for (let i = 0; i < records.length; i += BATCH) {
     const batch = records.slice(i, i + BATCH);
     try {
@@ -211,7 +344,7 @@ router.post("/admin/locations/bulk-upsert", async (req, res): Promise<void> => {
         isActive: true,
       }));
 
-      const result = await db
+      await db
         .insert(locationsTable)
         .values(rows)
         .onConflictDoUpdate({
@@ -228,11 +361,13 @@ router.post("/admin/locations/bulk-upsert", async (req, res): Promise<void> => {
             population: sql`excluded.population`,
             updatedAt: new Date(),
           },
-        })
-        .returning({ id: locationsTable.id, slug: locationsTable.slug });
+        });
 
-      // Count inserted vs updated by checking which rows existed before
-      inserted += result.length;
+      // Accurately split batch into new inserts vs updates
+      for (const row of rows) {
+        if (existingSlugs.has(row.slug)) updated++;
+        else inserted++;
+      }
     } catch {
       errors += batch.length;
     }
