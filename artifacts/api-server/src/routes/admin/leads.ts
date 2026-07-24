@@ -61,11 +61,13 @@ async function requireLeadAccess(req: AuthenticatedRequest, leadId: number): Pro
 router.get("/admin/leads", async (req: AuthenticatedRequest, res): Promise<void> => {
   const { status, priority, source, search, assignedTo } = req.query as Record<string, string>;
 
-  // Employees can only see their own assigned leads via this endpoint
+  // Employees can only see their own assigned leads — unless they have team_view / manage permission
   const isEmployee = req.adminUser?.userType === "employee";
   const employeeId = isEmployee && typeof req.adminUser?.userId === "number" ? req.adminUser.userId : null;
+  const perms = (req as { permissions?: { all: boolean; map: Record<string, Record<string, boolean>> } }).permissions;
+  const hasTeamView = perms?.all || perms?.map["leads"]?.["team_view"] || perms?.map["leads"]?.["manage"];
 
-  if (isEmployee && employeeId) {
+  if (isEmployee && employeeId && !hasTeamView) {
     // Get lead IDs assigned to this employee
     const assignments = await db
       .select({ leadId: leadAssignmentsTable.leadId })
@@ -231,12 +233,14 @@ router.patch("/admin/leads/:id", async (req: AuthenticatedRequest, res): Promise
   res.json(updated);
 });
 
-// ── DELETE /admin/leads/:id — admin-only ──────────────────────────────────────
+// ── DELETE /admin/leads/:id — requires leads/delete or leads/manage permission ─
 router.delete("/admin/leads/:id", async (req: AuthenticatedRequest, res): Promise<void> => {
   const id = parseInt(req.params.id as string, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
 
-  if (req.adminUser?.userType === "employee") { res.status(403).json({ error: "Employees cannot delete leads" }); return; }
+  const perms = (req as { permissions?: { all: boolean; map: Record<string, Record<string, boolean>> } }).permissions;
+  const canDelete = perms?.all || perms?.map["leads"]?.["delete"] || perms?.map["leads"]?.["manage"];
+  if (!canDelete) { res.status(403).json({ error: "Insufficient permissions: leads/delete" }); return; }
 
   await db.delete(consultationsTable).where(eq(consultationsTable.id, id));
   res.status(204).end();

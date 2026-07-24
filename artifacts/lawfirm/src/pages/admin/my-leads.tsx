@@ -28,7 +28,8 @@ interface Lead {
   serviceCategory?: string; serviceInterest?: string; company?: string;
   status: string; priority?: string; source?: string; assignedTo?: string;
   message?: string; city?: string; state?: string; tags?: string;
-  expectedRevenue?: string; createdAt: string; updatedAt: string;
+  expectedRevenue?: string; probability?: number; expectedClosingDate?: string;
+  createdAt: string; updatedAt: string;
 }
 
 interface LeadNote { id: number; leadId: number; content: string; createdBy?: string; createdAt: string; }
@@ -253,6 +254,55 @@ function LeadDetailPanel({ leadId, onUpdated }: { leadId: number; onUpdated: () 
                 </div>
               </div>
             ))}
+
+            {/* Editable CRM fields: Probability & Expected Closing Date */}
+            <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-100 space-y-3">
+              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">CRM Updates</p>
+
+              {/* Probability */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[10px] text-gray-500">Win Probability</label>
+                  <span className="text-xs font-semibold text-[#0f2044]">{lead.probability ?? 0}%</span>
+                </div>
+                <input
+                  type="range" min={0} max={100} step={5}
+                  value={lead.probability ?? 0}
+                  onChange={e => updateMutation.mutate({ probability: parseInt(e.target.value, 10) })}
+                  className="w-full h-1.5 accent-[#c9a227] cursor-pointer"
+                />
+                <div className="flex justify-between text-[9px] text-gray-400 mt-0.5">
+                  <span>0%</span><span>50%</span><span>100%</span>
+                </div>
+              </div>
+
+              {/* Expected Closing Date */}
+              <div>
+                <label className="text-[10px] text-gray-500 block mb-1">Expected Closing Date</label>
+                <Input
+                  type="date"
+                  className="h-7 text-xs"
+                  value={lead.expectedClosingDate ?? ""}
+                  onChange={e => updateMutation.mutate({ expectedClosingDate: e.target.value || null })}
+                />
+              </div>
+
+              {/* Quotation / Invoice action hook */}
+              <div>
+                <label className="text-[10px] text-gray-500 block mb-1">Quick Action</label>
+                <Button
+                  variant="outline"
+                  className="w-full h-7 text-xs border-[#0f2044]/20 text-[#0f2044] hover:bg-[#0f2044]/5"
+                  onClick={() => {
+                    addTimelineMutation.mutate({ actionType: "document_uploaded", description: "Quotation / invoice shared with client" });
+                    setTab("timeline");
+                  }}
+                >
+                  <FileText size={11} className="mr-1" /> Log Quotation / Invoice Sent
+                </Button>
+              </div>
+            </div>
+
             {lead.message && (
               <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-100">
                 <p className="text-[10px] text-gray-400 mb-1">Remarks</p>
