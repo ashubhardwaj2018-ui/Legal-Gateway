@@ -61,7 +61,7 @@ export function Navbar() {
           </Link>
 
           {/* Desktop nav */}
-          <div className="hidden lg:flex items-center flex-1 min-w-0 overflow-hidden">
+          <div className="hidden lg:flex items-center flex-1 min-w-0">
             <Link href="/" className="px-2.5 py-2 text-sm font-medium text-foreground hover:text-secondary hover:bg-secondary/10 rounded-lg transition-all shrink-0">
               Home
             </Link>
