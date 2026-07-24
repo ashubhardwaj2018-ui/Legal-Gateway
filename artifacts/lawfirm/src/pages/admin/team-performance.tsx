@@ -27,10 +27,12 @@ interface MemberRow {
   meetings: number;
   followups: number;
   documents: number;
+  quotationsSent: number;
 }
 
 interface TeamData {
   rows: MemberRow[];
+  teamQuotationsSent: number;
   range: { start: string; end: string };
 }
 
@@ -63,6 +65,7 @@ const COLS: Array<{ key: SortKey; label: string; fmt?: (v: number) => string }> 
   { key: "meetings", label: "Meetings" },
   { key: "followups", label: "Follow-ups" },
   { key: "documents", label: "Docs" },
+  { key: "quotationsSent", label: "Quotations" },
 ];
 
 export default function TeamPerformance() {
@@ -104,7 +107,7 @@ export default function TeamPerformance() {
     const rows = sorted.map(r => [
       r.name, r.leadsAssigned, r.leadsWon, r.leadsLost, r.leadsPending,
       r.revenueGenerated.toFixed(0), r.conversionRate, r.calls,
-      r.meetings, r.followups, r.documents,
+      r.meetings, r.followups, r.documents, r.quotationsSent,
     ].map(String));
     const csv = [headers.join(","), ...rows.map(r => r.map(v => `"${v.replace(/"/g, '""')}"`).join(","))].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -124,6 +127,7 @@ export default function TeamPerformance() {
     calls: acc.calls + r.calls,
     meetings: acc.meetings + r.meetings,
   }), { leadsAssigned: 0, leadsWon: 0, revenue: 0, calls: 0, meetings: 0 });
+  const teamQuotationsSent = data?.teamQuotationsSent ?? 0;
 
   return (
     <AdminLayout

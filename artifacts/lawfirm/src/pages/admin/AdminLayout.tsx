@@ -135,7 +135,14 @@ export function AdminLayout({ children, title, subtitle, actions }: Props) {
     return location === href || location.startsWith(href + "/");
   };
 
-  const visibleNav = navItems.filter(item => canViewModule(permissions, item.module));
+  const isEmployee = adminUser?.userType === "employee";
+  const visibleNav = navItems.filter(item => {
+    // Hide main admin Dashboard from employees — they have My Dashboard instead
+    if (isEmployee && item.href === "/admin" && item.exact) return false;
+    // Hide My Dashboard from admins — it's the employee personal view
+    if (!isEmployee && item.href === "/admin/my-dashboard") return false;
+    return canViewModule(permissions, item.module);
+  });
 
   if (!authChecked) {
     return (

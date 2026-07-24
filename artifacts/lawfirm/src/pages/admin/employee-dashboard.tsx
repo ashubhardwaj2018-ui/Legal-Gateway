@@ -5,9 +5,9 @@ import {
   ResponsiveContainer, Legend,
 } from "recharts";
 import {
-  Users, PhoneCall, Calendar, CheckSquare, TrendingUp, TrendingDown,
+  Users, PhoneCall, CheckSquare, TrendingUp,
   IndianRupee, Target, FileText, Activity, RefreshCw, Video,
-  Award, Loader2,
+  Award, Loader2, MessageSquare,
 } from "lucide-react";
 import { AdminLayout } from "./AdminLayout";
 
@@ -22,6 +22,7 @@ interface KPIData {
   todayFollowUps: number;
   pendingTasks: number;
   upcomingMeetings: number;
+  newMessages: number;
   wonLeads: number;
   lostLeads: number;
   pendingLeads: number;
@@ -106,8 +107,8 @@ export default function EmployeeDashboard() {
             <KpiCard label="Assigned Leads" value={kpi.assignedLeads} icon={Users} color="text-[#0f2044]" bg="bg-[#0f2044]" accent />
             <KpiCard label="Today's Follow-ups" value={kpi.todayFollowUps} icon={RefreshCw} color="text-[#c9a227]" bg="bg-[#c9a227]" />
             <KpiCard label="Pending Tasks" value={kpi.pendingTasks} icon={CheckSquare} color="text-orange-600" bg="bg-orange-100" />
-            <KpiCard label="Meetings (Period)" value={kpi.meetings} icon={Video} color="text-purple-600" bg="bg-purple-100" />
-            <KpiCard label="Calls Logged" value={kpi.calls} icon={PhoneCall} color="text-blue-600" bg="bg-blue-100" />
+            <KpiCard label="Upcoming Meetings" value={kpi.upcomingMeetings} icon={Video} color="text-purple-600" bg="bg-purple-100" sub="Last 30 days" />
+            <KpiCard label="New Messages" value={kpi.newMessages} icon={MessageSquare} color="text-sky-600" bg="bg-sky-100" sub="Today" />
             <KpiCard
               label="Revenue Generated"
               value={fmt(kpi.revenueGenerated)}
@@ -120,7 +121,7 @@ export default function EmployeeDashboard() {
             <KpiCard label="Conversion Rate" value={`${kpi.conversionRate}%`} icon={TrendingUp} color="text-indigo-600" bg="bg-indigo-100" />
             <KpiCard label="Leads Won" value={kpi.wonLeads} icon={Award} color="text-green-700" bg="bg-green-100" sub="Total" />
             <KpiCard label="Pending Leads" value={kpi.pendingLeads} icon={Activity} color="text-yellow-700" bg="bg-yellow-100" />
-            <KpiCard label="Documents" value={kpi.documents} icon={FileText} color="text-teal-600" bg="bg-teal-100" />
+            <KpiCard label="Calls Logged" value={kpi.calls} icon={PhoneCall} color="text-blue-600" bg="bg-blue-100" />
           </div>
 
           {/* Monthly Target + Activity Summary */}
