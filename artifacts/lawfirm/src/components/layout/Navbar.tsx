@@ -48,10 +48,10 @@ export function Navbar() {
       isScrolled ? "bg-white/97 backdrop-blur-md border-border shadow-sm" : "bg-white border-transparent"
     )}>
       <div className="container mx-auto px-4 lg:px-6">
-        <div className="flex items-center h-16 gap-2">
+        <div className="flex items-center h-16 gap-1">
 
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 group shrink-0 mr-4">
+          <Link href="/" className="flex items-center gap-2 group shrink-0 mr-3">
             <div className="bg-primary text-secondary p-1.5 rounded-lg group-hover:bg-secondary group-hover:text-primary transition-colors">
               <Scale size={20} />
             </div>
@@ -62,16 +62,17 @@ export function Navbar() {
           </Link>
 
           {/* Desktop nav */}
-          <div className="hidden lg:flex items-center flex-1">
-            <Link href="/" className="px-3 py-2 text-sm font-medium text-foreground hover:text-secondary transition-colors shrink-0">
+          <div className="hidden lg:flex items-center flex-1 min-w-0 overflow-hidden">
+            <Link href="/" className="px-2.5 py-2 text-sm font-medium text-foreground hover:text-secondary hover:bg-secondary/10 rounded-lg transition-all shrink-0">
               Home
             </Link>
-            <Link href="/blog" className="px-3 py-2 text-sm font-medium text-foreground hover:text-secondary transition-colors shrink-0">
+            <Link href="/blog" className="px-2.5 py-2 text-sm font-medium text-foreground hover:text-secondary hover:bg-secondary/10 rounded-lg transition-all shrink-0">
               Blog
             </Link>
-            <Link href="/indian-companies" className="px-3 py-2 text-sm font-medium text-foreground hover:text-secondary transition-colors shrink-0 flex items-center gap-1">
+            <Link href="/indian-companies" className="px-2.5 py-2 text-sm font-medium text-foreground hover:text-secondary hover:bg-secondary/10 rounded-lg transition-all shrink-0 flex items-center gap-1">
               <Building2 size={13} className="text-secondary" />
-              Indian Companies
+              <span className="hidden xl:inline">Indian Companies</span>
+              <span className="xl:hidden">Companies</span>
             </Link>
 
             {NAV_ITEMS.map(item => {
@@ -80,8 +81,8 @@ export function Navbar() {
               return (
                 <div key={item.label} onMouseEnter={() => open(item.label)} onMouseLeave={close} className="relative shrink-0">
                   <button className={cn(
-                    "flex items-center gap-1 px-3 py-2 text-sm font-medium transition-colors",
-                    isOpen ? "text-secondary" : "text-foreground hover:text-secondary"
+                    "flex items-center gap-1 px-2.5 py-2 text-sm font-medium transition-all rounded-lg",
+                    isOpen ? "text-secondary bg-secondary/10" : "text-foreground hover:text-secondary hover:bg-secondary/10"
                   )}>
                     {item.label}
                     <ChevronDown size={13} className={cn("transition-transform duration-200", isOpen && "rotate-180")} />
@@ -124,7 +125,7 @@ export function Navbar() {
                           <Link
                             key={s.name}
                             href={`/services/${item.categories[0]}/${toSlug(s.name)}`}
-                            className="px-3 py-2 text-xs text-gray-600 hover:text-[#0f2044] hover:bg-gray-50 rounded-lg transition-all block"
+                            className="px-3 py-2 text-xs text-gray-600 hover:text-[#0f2044] hover:bg-[#c9a227]/10 rounded-lg transition-all block font-medium"
                           >
                             {s.name}
                           </Link>
@@ -144,13 +145,13 @@ export function Navbar() {
                                   <Link
                                     key={s.name}
                                     href={`/services/${catId}/${toSlug(s.name)}`}
-                                    className="block text-xs text-gray-500 hover:text-[#0f2044] py-1 pl-1 rounded transition-colors"
+                                    className="block text-xs text-gray-500 hover:text-[#0f2044] hover:bg-[#c9a227]/10 py-1 pl-2 pr-1 rounded-lg transition-all"
                                   >
                                     {s.name}
                                   </Link>
                                 ))}
                                 {cat.services.length > 5 && (
-                                  <Link href={`/services/${catId}`} className="block text-xs text-[#c9a227] hover:text-[#b08820] pl-1 pt-1">
+                                  <Link href={`/services/${catId}`} className="block text-xs text-[#c9a227] hover:text-[#b08820] pl-2 pt-1">
                                     +{cat.services.length - 5} more →
                                   </Link>
                                 )}
@@ -166,16 +167,17 @@ export function Navbar() {
             })}
           </div>
 
-          {/* Consult an Expert + CTA */}
-          <div className="hidden lg:flex items-center gap-3 ml-auto shrink-0">
-            <a href="tel:18001234567" className="flex items-center gap-1.5 text-primary text-sm font-medium hover:text-secondary transition-colors">
-              <Phone size={14} className="text-secondary" />
+          {/* Phone + CTA — only show phone on xl */}
+          <div className="hidden lg:flex items-center gap-2 ml-auto shrink-0">
+            <a href="tel:18001234567" className="hidden xl:flex items-center gap-1.5 text-primary text-sm font-medium hover:text-secondary transition-colors whitespace-nowrap">
+              <Phone size={14} className="text-secondary shrink-0" />
               1800-123-4567
             </a>
             <Link href="/services/consult-expert">
-              <Button className="bg-secondary text-primary hover:bg-secondary/90 font-bold h-9 px-4 text-sm flex items-center gap-1.5">
+              <Button className="bg-secondary text-primary hover:bg-secondary/90 font-bold h-9 px-3 xl:px-4 text-sm flex items-center gap-1.5 whitespace-nowrap">
                 <MessageCircle size={14} />
-                Consult an Expert
+                <span className="hidden xl:inline">Consult an Expert</span>
+                <span className="xl:hidden">Consult</span>
               </Button>
             </Link>
           </div>

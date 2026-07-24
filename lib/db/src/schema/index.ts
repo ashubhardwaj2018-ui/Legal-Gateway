@@ -18,3 +18,4 @@ export * from "./invoices";
 export * from "./chat";
 export * from "./email";
 export * from "./portal";
+export * from "./admin-users";

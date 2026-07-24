@@ -1,9 +1,10 @@
-import { ReactNode, useState } from "react";
+import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard, Users, MessageSquare, FileText, Search,
   Settings, Building2, Mail, User, Scale, Menu, X, ChevronRight,
   Briefcase, ExternalLink, MapPin, BookOpen, UserCog, CheckSquare, TrendingUp,
+  LogOut, ShieldCheck, Loader2,
 } from "lucide-react";
 
 const navItems = [
@@ -36,13 +37,44 @@ interface Props {
 }
 
 export function AdminLayout({ children, title, subtitle, actions }: Props) {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [adminUser, setAdminUser] = useState<{ username: string; role: string } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/admin/auth/me")
+      .then(r => {
+        if (!r.ok) { navigate("/admin/login"); return null; }
+        return r.json();
+      })
+      .then(d => {
+        if (d?.user) setAdminUser(d.user as { username: string; role: string });
+        setAuthChecked(true);
+      })
+      .catch(() => navigate("/admin/login"));
+  }, []);
+
+  const handleLogout = async () => {
+    await fetch("/api/admin/auth/logout", { method: "POST" });
+    navigate("/admin/login");
+  };
 
   const isActive = (href: string, exact?: boolean) => {
     if (exact) return location === href;
     return location === href || location.startsWith(href + "/");
   };
+
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen bg-[#0f2044] flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 size={28} className="animate-spin text-[#c9a227] mx-auto mb-3" />
+          <p className="text-white/40 text-sm">Verifying session…</p>
+        </div>
+      </div>
+    );
+  }
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
@@ -78,33 +110,46 @@ export function AdminLayout({ children, title, subtitle, actions }: Props) {
         })}
       </nav>
 
-      <div className="p-4 border-t border-white/10">
+      <div className="p-4 border-t border-white/10 space-y-2">
+        {adminUser && (
+          <div className="flex items-center gap-2 px-2 py-2 rounded-lg bg-white/5">
+            <ShieldCheck size={13} className="text-[#c9a227] shrink-0" />
+            <div className="min-w-0">
+              <div className="text-xs font-semibold text-white truncate">{adminUser.username}</div>
+              <div className="text-[10px] text-white/40 capitalize">{adminUser.role}</div>
+            </div>
+          </div>
+        )}
         <Link
           href="/"
-          className="flex items-center gap-2 text-xs text-white/50 hover:text-white transition-colors"
+          className="flex items-center gap-2 text-xs text-white/50 hover:text-white transition-colors px-2 py-1.5"
         >
           <ExternalLink size={12} />
           View Public Site
         </Link>
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-2 text-xs text-white/50 hover:text-red-400 transition-colors w-full px-2 py-1.5"
+        >
+          <LogOut size={12} />
+          Sign Out
+        </button>
       </div>
     </div>
   );
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-100">
-      {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div className="fixed inset-0 z-40 lg:hidden" onClick={() => setSidebarOpen(false)}>
           <div className="absolute inset-0 bg-black/50" />
         </div>
       )}
 
-      {/* Sidebar - desktop */}
       <aside className="hidden lg:flex w-56 xl:w-64 bg-[#0f2044] text-white flex-col shrink-0">
         <SidebarContent />
       </aside>
 
-      {/* Sidebar - mobile */}
       <aside
         className={`fixed inset-y-0 left-0 z-50 w-64 bg-[#0f2044] text-white flex-col lg:hidden transition-transform duration-300 flex ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
@@ -118,7 +163,6 @@ export function AdminLayout({ children, title, subtitle, actions }: Props) {
         <SidebarContent />
       </aside>
 
-      {/* Main */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <header className="bg-white border-b border-gray-200 px-4 lg:px-6 py-4 flex items-center gap-4 shrink-0">
           <button

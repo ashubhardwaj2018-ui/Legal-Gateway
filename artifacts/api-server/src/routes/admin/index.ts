@@ -15,8 +15,18 @@ import chatRouter from "./chat";
 import dashboardRouter from "./dashboard";
 import emailRouter from "./email";
 import reportsRouter from "./reports";
+import { authRouter, adminAuthMiddleware, seedDefaultAdmin } from "./auth";
 
 const router: IRouter = Router();
+
+// Seed default admin on startup
+seedDefaultAdmin().catch(() => {});
+
+// Public auth routes (no auth required)
+router.use(authRouter);
+
+// --- All routes below require valid admin session ---
+router.use(adminAuthMiddleware);
 
 router.use(leadsRouter);
 router.use(invoicesRouter);

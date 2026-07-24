@@ -9,6 +9,7 @@ import ServiceCategory from "@/pages/service-category";
 import ServiceDetail from "@/pages/service-detail";
 import ServiceLocation from "@/pages/service-location";
 import NotFound from "@/pages/not-found";
+import AdminLogin from "@/pages/admin/login";
 import AdminDashboard from "@/pages/admin/dashboard";
 import AdminLeads from "@/pages/admin/leads";
 import AdminContacts from "@/pages/admin/contacts";
@@ -34,6 +35,11 @@ import IndianCompanies from "@/pages/indian-companies";
 import CompanyDetail from "@/pages/company-detail";
 import BlogList from "@/pages/blog-list";
 import BlogPost from "@/pages/blog-post";
+import AboutUs from "@/pages/about";
+import Careers from "@/pages/careers";
+import PrivacyPolicy from "@/pages/privacy";
+import TermsOfUse from "@/pages/terms";
+import OurLawyers from "@/pages/our-lawyers";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -44,6 +50,9 @@ const queryClient = new QueryClient({
 function Router() {
   return (
     <Switch>
+      {/* Admin login — no layout */}
+      <Route path="/admin/login" component={AdminLogin} />
+
       {/* Admin Routes — no public Layout */}
       <Route path="/admin" component={AdminDashboard} />
       <Route path="/admin/leads" component={AdminLeads} />
@@ -74,6 +83,11 @@ function Router() {
         <Layout>
           <Switch>
             <Route path="/" component={Home} />
+            <Route path="/about" component={AboutUs} />
+            <Route path="/careers" component={Careers} />
+            <Route path="/privacy-policy" component={PrivacyPolicy} />
+            <Route path="/terms-of-use" component={TermsOfUse} />
+            <Route path="/our-lawyers" component={OurLawyers} />
             <Route path="/indian-companies" component={IndianCompanies} />
             <Route path="/company/:slug" component={CompanyDetail} />
             <Route path="/blog" component={BlogList} />

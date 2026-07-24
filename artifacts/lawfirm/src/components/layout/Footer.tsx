@@ -1,8 +1,23 @@
 import { Link } from "wouter";
 import { Scale, Mail, Phone, MapPin, ArrowRight } from "lucide-react";
 import { CATEGORIES } from "@/data/services";
+import { useState } from "react";
 
 export function Footer() {
+  const [email, setEmail] = useState("");
+  const [subStatus, setSubStatus] = useState<"idle" | "loading" | "done">("idle");
+
+  const handleSubscribe = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) return;
+    setSubStatus("loading");
+    try {
+      await fetch("/api/newsletter", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
+    } catch { /* ignore */ }
+    setSubStatus("done");
+    setEmail("");
+  };
+
   return (
     <footer className="bg-primary text-primary-foreground pt-20 pb-10 border-t border-primary-foreground/10">
       <div className="container mx-auto px-4 md:px-6">
@@ -34,7 +49,7 @@ export function Footer() {
             </div>
           </div>
 
-          {/* Practice Areas — split two mini-columns */}
+          {/* Practice Areas */}
           <div className="md:col-span-2 lg:col-span-1">
             <h3 className="font-serif font-semibold text-lg text-white mb-6">Practice Areas</h3>
             <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
@@ -50,17 +65,17 @@ export function Footer() {
             </div>
           </div>
 
-          {/* Resources */}
+          {/* Company */}
           <div>
             <h3 className="font-serif font-semibold text-lg text-white mb-6">Company</h3>
             <ul className="flex flex-col gap-3">
-              <li><a href="#" className="text-primary-foreground/70 hover:text-secondary transition-colors text-sm">About Us</a></li>
-              <li><a href="#" className="text-primary-foreground/70 hover:text-secondary transition-colors text-sm">Our Lawyers</a></li>
-              <li><a href="#" className="text-primary-foreground/70 hover:text-secondary transition-colors text-sm">Careers</a></li>
+              <li><Link href="/about" className="text-primary-foreground/70 hover:text-secondary transition-colors text-sm">About Us</Link></li>
+              <li><Link href="/our-lawyers" className="text-primary-foreground/70 hover:text-secondary transition-colors text-sm">Our Lawyers</Link></li>
+              <li><Link href="/careers" className="text-primary-foreground/70 hover:text-secondary transition-colors text-sm">Careers</Link></li>
               <li><Link href="/blog" className="text-primary-foreground/70 hover:text-secondary transition-colors text-sm">Legal Blog</Link></li>
               <li><Link href="/indian-companies" className="text-primary-foreground/70 hover:text-secondary transition-colors text-sm">Indian Companies DB</Link></li>
-              <li><a href="#" className="text-primary-foreground/70 hover:text-secondary transition-colors text-sm">Privacy Policy</a></li>
-              <li><a href="#" className="text-primary-foreground/70 hover:text-secondary transition-colors text-sm">Terms of Service</a></li>
+              <li><Link href="/privacy-policy" className="text-primary-foreground/70 hover:text-secondary transition-colors text-sm">Privacy Policy</Link></li>
+              <li><Link href="/terms-of-use" className="text-primary-foreground/70 hover:text-secondary transition-colors text-sm">Terms of Use</Link></li>
             </ul>
           </div>
 
@@ -84,16 +99,22 @@ export function Footer() {
             
             <div className="mt-6">
               <h4 className="text-sm font-medium text-white mb-3">Subscribe to Newsletter</h4>
-              <div className="flex">
-                <input 
-                  type="email" 
-                  placeholder="Email address" 
-                  className="bg-white/10 border border-white/20 rounded-l-md px-3 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:border-secondary w-full"
-                />
-                <button className="bg-secondary text-primary px-3 py-2 rounded-r-md hover:bg-secondary/90 transition-colors">
-                  <ArrowRight size={18} />
-                </button>
-              </div>
+              {subStatus === "done" ? (
+                <p className="text-secondary text-sm font-medium">✓ Subscribed! Thank you.</p>
+              ) : (
+                <form onSubmit={handleSubscribe} className="flex">
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    placeholder="Email address"
+                    className="bg-white/10 border border-white/20 rounded-l-md px-3 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:border-secondary w-full"
+                  />
+                  <button type="submit" disabled={subStatus === "loading"} className="bg-secondary text-primary px-3 py-2 rounded-r-md hover:bg-secondary/90 transition-colors">
+                    <ArrowRight size={18} />
+                  </button>
+                </form>
+              )}
             </div>
           </div>
         </div>
@@ -102,6 +123,10 @@ export function Footer() {
           <p className="text-primary-foreground/50 text-xs">
             © {new Date().getFullYear()} Vakil & Co. Legal Associates. All rights reserved.
           </p>
+          <div className="flex items-center gap-4">
+            <Link href="/privacy-policy" className="text-primary-foreground/40 hover:text-primary-foreground/70 text-xs transition-colors">Privacy Policy</Link>
+            <Link href="/terms-of-use" className="text-primary-foreground/40 hover:text-primary-foreground/70 text-xs transition-colors">Terms of Use</Link>
+          </div>
           <p className="text-primary-foreground/50 text-xs text-center md:text-right">
             The information provided on this website does not constitute legal advice. <br className="hidden md:block" /> Use of this site does not create an attorney-client relationship.
           </p>
