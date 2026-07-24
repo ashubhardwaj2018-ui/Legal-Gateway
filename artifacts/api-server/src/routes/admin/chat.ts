@@ -1,8 +1,9 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { eq, desc, asc, lt, and, gt, inArray } from "drizzle-orm";
+import { eq, desc, asc, lt, and, gt, inArray, ilike } from "drizzle-orm";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
+import type { AuthenticatedRequest } from "./auth";
 
 const UPLOADS_DIR = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
@@ -26,18 +27,32 @@ function broadcast(channelId: number, event: string, data: object) {
   }
 }
 
+function actorName(req: Request): string {
+  const u = (req as AuthenticatedRequest).adminUser;
+  return typeof u?.username === "string" ? u.username : "anonymous";
+}
+
+function isAdminRole(req: Request): boolean {
+  const u = (req as AuthenticatedRequest).adminUser;
+  return u?.role === "admin" || u?.userType === "admin";
+}
+
 // ─── Presence ─────────────────────────────────────────────────────────────────
 
 router.get("/admin/chat/presence", async (_req, res): Promise<void> => {
-  const cutoff = new Date(Date.now() - 3 * 60 * 1000); // 3 minutes
-  const online = await db.select().from(userPresenceTable).where(gt(userPresenceTable.lastSeenAt, cutoff));
-  res.json(online.map(u => u.userName));
+  const cutoff = new Date(Date.now() - 3 * 60 * 1000);
+  const all = await db.select().from(userPresenceTable).orderBy(desc(userPresenceTable.lastSeenAt));
+  res.json(all.map(u => ({
+    userName: u.userName,
+    lastSeenAt: u.lastSeenAt.toISOString(),
+    isOnline: u.lastSeenAt > cutoff,
+  })));
 });
 
+// Server derives userName from session — client param ignored for security
 router.post("/admin/chat/presence/heartbeat", async (req, res): Promise<void> => {
-  const { userName } = req.body as { userName?: string };
-  if (!userName) { res.sendStatus(204); return; }
-  // Upsert — ON CONFLICT requires raw SQL; simulate with delete+insert
+  const userName = actorName(req);
+  if (!userName || userName === "anonymous") { res.sendStatus(204); return; }
   await db.delete(userPresenceTable).where(eq(userPresenceTable.userName, userName));
   await db.insert(userPresenceTable).values({ userName, lastSeenAt: new Date() });
   res.sendStatus(204);
@@ -45,9 +60,42 @@ router.post("/admin/chat/presence/heartbeat", async (req, res): Promise<void> =>
 
 // ─── Channels ────────────────────────────────────────────────────────────────
 
-router.get("/admin/chat/channels", async (_req, res): Promise<void> => {
-  const channels = await db.select().from(chatChannelsTable).orderBy(asc(chatChannelsTable.name));
-  res.json(channels);
+async function ensureDepartmentChannels() {
+  try {
+    const rows = await db.select({ dept: teamMembersTable.department }).from(teamMembersTable);
+    const depts = [...new Set(rows.map(r => r.dept).filter(Boolean))];
+    for (const dept of depts) {
+      const slug = `dept-${dept.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
+      const existing = await db.select({ id: chatChannelsTable.id }).from(chatChannelsTable).where(eq(chatChannelsTable.slug, slug));
+      if (existing.length === 0) {
+        await db.insert(chatChannelsTable).values({
+          name: dept,
+          slug,
+          type: "department",
+          description: `${dept} department channel`,
+          members: null,
+        });
+      }
+    }
+  } catch { /* non-fatal */ }
+}
+
+router.get("/admin/chat/channels", async (req, res): Promise<void> => {
+  await ensureDepartmentChannels();
+
+  const username = actorName(req);
+  const isAdmin = isAdminRole(req);
+
+  const all = await db.select().from(chatChannelsTable).orderBy(asc(chatChannelsTable.name));
+
+  const visible = all.filter(ch => {
+    if (ch.type === "public" || ch.type === "department") return true;
+    if (isAdmin) return true;
+    const members: string[] = (() => { try { return JSON.parse(ch.members ?? "[]") as string[]; } catch { return []; } })();
+    return members.includes(username);
+  });
+
+  res.json(visible);
 });
 
 // ─── DM channel — find or create (must be BEFORE /:id routes) ────────────────
@@ -56,7 +104,6 @@ router.get("/admin/chat/channels/dm", async (req, res): Promise<void> => {
   const b = String(req.query.b ?? "");
   if (!a || !b) { res.status(400).json({ error: "a and b required" }); return; }
 
-  // Find existing DM channel that contains both participants
   const all = await db.select().from(chatChannelsTable).where(eq(chatChannelsTable.type, "direct"));
   for (const ch of all) {
     let members: string[] = [];
@@ -66,7 +113,6 @@ router.get("/admin/chat/channels/dm", async (req, res): Promise<void> => {
     }
   }
 
-  // Create new DM channel
   const slug = `dm-${[a, b].sort().map(n => n.replace(/[^a-z0-9]/gi, "").toLowerCase()).join("-")}-${Date.now()}`;
   const name = `dm:${[a, b].sort().join(":")}`;
   const members = JSON.stringify([a, b]);
@@ -76,14 +122,34 @@ router.get("/admin/chat/channels/dm", async (req, res): Promise<void> => {
   res.status(201).json(ch);
 });
 
+// ─── Message history search ───────────────────────────────────────────────────
+
+router.get("/admin/chat/search", async (req, res): Promise<void> => {
+  const q = String(req.query.q ?? "").trim();
+  const channelId = req.query.channelId ? parseInt(String(req.query.channelId), 10) : null;
+  if (!q) { res.json([]); return; }
+  const results = channelId
+    ? await db.select().from(chatMessagesTable)
+        .where(and(eq(chatMessagesTable.channelId, channelId), ilike(chatMessagesTable.content, `%${q}%`)))
+        .orderBy(desc(chatMessagesTable.createdAt)).limit(30)
+    : await db.select().from(chatMessagesTable)
+        .where(ilike(chatMessagesTable.content, `%${q}%`))
+        .orderBy(desc(chatMessagesTable.createdAt)).limit(30);
+  res.json(results);
+});
+
 router.post("/admin/chat/channels", async (req, res): Promise<void> => {
-  const { name, description, type, members } = req.body as { name?: string; description?: string; type?: string; members?: string };
+  const { name, description, type } = req.body as { name?: string; description?: string; type?: string };
   if (!name?.trim()) { res.status(400).json({ error: "Name required" }); return; }
   const slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + "-" + Date.now();
+  // For new group/private channels, creator is the first member
+  const creator = actorName(req);
+  const chanType = type ?? "public";
+  const members = chanType === "private" ? JSON.stringify([creator]) : null;
   const [ch] = await db.insert(chatChannelsTable).values({
-    name: name.trim(), slug, type: type ?? "public",
+    name: name.trim(), slug, type: chanType,
     description: description?.trim() ?? null,
-    members: members ?? null,
+    members,
   }).returning();
   res.status(201).json(ch);
 });
@@ -93,6 +159,40 @@ router.delete("/admin/chat/channels/:id", async (req, res): Promise<void> => {
   await db.delete(chatMessagesTable).where(eq(chatMessagesTable.channelId, id));
   await db.delete(chatChannelsTable).where(eq(chatChannelsTable.id, id));
   res.sendStatus(204);
+});
+
+// ─── Channel membership management ───────────────────────────────────────────
+
+router.get("/admin/chat/channels/:id/members", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id, 10);
+  const [ch] = await db.select().from(chatChannelsTable).where(eq(chatChannelsTable.id, id));
+  if (!ch) { res.status(404).json({ error: "Not found" }); return; }
+  const members: string[] = (() => { try { return JSON.parse(ch.members ?? "[]") as string[]; } catch { return []; } })();
+  res.json(members);
+});
+
+router.post("/admin/chat/channels/:id/members", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id, 10);
+  const { memberName } = req.body as { memberName?: string };
+  if (!memberName?.trim()) { res.status(400).json({ error: "memberName required" }); return; }
+  const [ch] = await db.select().from(chatChannelsTable).where(eq(chatChannelsTable.id, id));
+  if (!ch) { res.status(404).json({ error: "Not found" }); return; }
+  const members: string[] = (() => { try { return JSON.parse(ch.members ?? "[]") as string[]; } catch { return []; } })();
+  if (!members.includes(memberName.trim())) {
+    members.push(memberName.trim());
+    await db.update(chatChannelsTable).set({ members: JSON.stringify(members) }).where(eq(chatChannelsTable.id, id));
+  }
+  res.json(members);
+});
+
+router.delete("/admin/chat/channels/:id/members/:name", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id, 10);
+  const targetName = String(req.params.name ?? "");
+  const [ch] = await db.select().from(chatChannelsTable).where(eq(chatChannelsTable.id, id));
+  if (!ch) { res.status(404).json({ error: "Not found" }); return; }
+  const members: string[] = (() => { try { return (JSON.parse(ch.members ?? "[]") as string[]).filter(m => m !== targetName); } catch { return []; } })();
+  await db.update(chatChannelsTable).set({ members: JSON.stringify(members) }).where(eq(chatChannelsTable.id, id));
+  res.json(members);
 });
 
 // ─── Messages ────────────────────────────────────────────────────────────────
@@ -113,14 +213,16 @@ router.get("/admin/chat/channels/:id/messages", async (req, res): Promise<void> 
   res.json(msgs.reverse());
 });
 
+// Server derives senderName from session — client-supplied value is ignored
 router.post("/admin/chat/channels/:id/messages", async (req, res): Promise<void> => {
   const channelId = parseInt(req.params.id, 10);
-  const { senderName, senderColor, content, msgType, fileName, fileUrl, replyToId, replyPreview } = req.body as Record<string, string | number | undefined>;
+  const senderName = actorName(req);
+  const { senderColor, content, msgType, fileName, fileUrl, replyToId, replyPreview } = req.body as Record<string, string | number | undefined>;
   if (!content?.toString().trim() && !fileUrl) { res.status(400).json({ error: "Content required" }); return; }
 
   const [msg] = await db.insert(chatMessagesTable).values({
     channelId,
-    senderName: String(senderName ?? "Anonymous"),
+    senderName,
     senderColor: String(senderColor ?? "#0f2044"),
     content: String(content ?? ""),
     msgType: String(msgType ?? "text"),
@@ -141,7 +243,7 @@ router.post("/admin/chat/channels/:id/messages", async (req, res): Promise<void>
     const [channel] = await db.select().from(chatChannelsTable).where(eq(chatChannelsTable.id, channelId));
     if (channel?.type === "direct" && channel.members) {
       const participants = JSON.parse(channel.members) as string[];
-      const otherName = participants.find(n => n !== String(senderName ?? ""));
+      const otherName = participants.find(n => n !== senderName);
       if (otherName) {
         const [member] = await db.select().from(teamMembersTable).where(eq(teamMembersTable.name, otherName));
         if (member) {
@@ -165,15 +267,15 @@ router.post("/admin/chat/channels/:id/messages", async (req, res): Promise<void>
 
 // ─── Read receipts ────────────────────────────────────────────────────────────
 
+// Server derives readerName from session — client-supplied value is ignored
 router.post("/admin/chat/channels/:id/mark-read", async (req, res): Promise<void> => {
   const channelId = parseInt(req.params.id, 10);
-  const { readerName, messageIds } = req.body as { readerName?: string; messageIds?: number[] };
+  const readerName = actorName(req);
+  const { messageIds } = req.body as { messageIds?: number[] };
   if (!readerName || !Array.isArray(messageIds) || messageIds.length === 0) {
     res.sendStatus(204); return;
   }
 
-  // Insert read records for each unread message (ignore conflicts via delete+insert pattern)
-  // First fetch existing reads to avoid duplicates
   const existing = await db.select({ messageId: messageReadsTable.messageId })
     .from(messageReadsTable)
     .where(and(eq(messageReadsTable.channelId, channelId), eq(messageReadsTable.readerName, readerName)));
@@ -190,8 +292,7 @@ router.post("/admin/chat/channels/:id/mark-read", async (req, res): Promise<void
 
 router.get("/admin/chat/channels/:id/read-status", async (req, res): Promise<void> => {
   const channelId = parseInt(req.params.id, 10);
-  const { readerName } = req.query as { readerName?: string };
-  if (!readerName) { res.json({}); return; }
+  const readerName = actorName(req);
 
   const reads = await db.select({ messageId: messageReadsTable.messageId, readAt: messageReadsTable.readAt })
     .from(messageReadsTable)
@@ -202,8 +303,7 @@ router.get("/admin/chat/channels/:id/read-status", async (req, res): Promise<voi
   res.json(result);
 });
 
-// ─── Get read-by for a set of messages ───────────────────────────────────────
-
+// Get read-by for a set of messages
 router.get("/admin/chat/channels/:id/readers", async (req, res): Promise<void> => {
   const channelId = parseInt(req.params.id, 10);
   const ids = String(req.query.ids ?? "").split(",").map(Number).filter(n => !isNaN(n) && n > 0);
@@ -238,10 +338,12 @@ router.delete("/admin/chat/messages/:id", async (req, res): Promise<void> => {
   res.sendStatus(204);
 });
 
+// Server derives userName from session for reactions — client-supplied value is ignored
 router.patch("/admin/chat/messages/:id/react", async (req, res): Promise<void> => {
   const id = parseInt(req.params.id, 10);
-  const { emoji, userName } = req.body as { emoji?: string; userName?: string };
-  if (!emoji || !userName) { res.status(400).json({ error: "emoji and userName required" }); return; }
+  const userName = actorName(req);
+  const { emoji } = req.body as { emoji?: string };
+  if (!emoji) { res.status(400).json({ error: "emoji required" }); return; }
 
   const [existing] = await db.select().from(chatMessagesTable).where(eq(chatMessagesTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
@@ -275,10 +377,11 @@ router.get("/admin/chat/channels/:id/typing", async (req, res): Promise<void> =>
   res.json(typing.map(t => t.memberName));
 });
 
+// Server derives memberName from session — client-supplied value is ignored
 router.post("/admin/chat/channels/:id/typing", async (req, res): Promise<void> => {
   const channelId = parseInt(req.params.id, 10);
-  const { memberName } = req.body as { memberName?: string };
-  if (!memberName) { res.sendStatus(204); return; }
+  const memberName = actorName(req);
+  if (!memberName || memberName === "anonymous") { res.sendStatus(204); return; }
   await db.delete(chatTypingTable).where(and(eq(chatTypingTable.channelId, channelId), eq(chatTypingTable.memberName, memberName)));
   await db.insert(chatTypingTable).values({ channelId, memberName });
   res.sendStatus(204);
@@ -320,7 +423,6 @@ router.get("/admin/chat/members", async (_req, res): Promise<void> => {
 
 // ─── File upload (base64) ─────────────────────────────────────────────────────
 
-// Extensions that can execute scripts if served from same origin — blocked
 const BLOCKED_EXTS = new Set([
   ".html",".htm",".xhtml",".js",".mjs",".cjs",".jsx",".ts",".tsx",
   ".php",".py",".rb",".sh",".bash",".bat",".cmd",".ps1",".vbs",
@@ -343,13 +445,11 @@ router.post("/admin/chat/upload", async (req, res): Promise<void> => {
   }
 });
 
-// ─── Serve uploaded files (forced download — prevents same-origin script exec) ──
-
+// Serve uploaded files (forced download — prevents same-origin script exec)
 router.get("/admin/chat/files/:filename", (req: Request, res: Response): void => {
   const filename = String(req.params["filename"]).replace(/\.\./g, "");
   const filePath = path.join(UPLOADS_DIR, filename);
   if (!fs.existsSync(filePath)) { res.status(404).json({ error: "Not found" }); return; }
-  // Force download so browser cannot execute content as page/script
   res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.sendFile(filePath);

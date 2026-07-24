@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
   X, Send, Hash, Lock, Plus, Smile, Paperclip, Pin, Pencil, Trash2,
-  CornerUpLeft, Search, MessageSquare, Loader2, Check, CheckCheck,
+  CornerUpLeft, Search, MessageSquare, Loader2, Check, CheckCheck, Users, X as XIcon,
 } from "lucide-react";
 
 interface Channel { id: number; name: string; slug: string; type: string; description: string | null; members?: string; }
@@ -12,6 +12,7 @@ interface Msg {
   isEdited: boolean; isDeleted: boolean; isPinned: boolean; createdAt: string;
 }
 interface Member { id: number; name: string; department: string; designation: string; }
+interface PresenceEntry { userName: string; lastSeenAt: string; isOnline: boolean; }
 
 const EMOJIS = ["👍","❤️","😂","😮","🎉","🔥","🙏","👏","✅","🚀","😢","💯","🎊","💡","⚡","🌟","🤝","👀","🔑","✨"];
 const MEMBER_COLORS = ["#7c3aed","#2563eb","#059669","#dc2626","#ea580c","#0891b2","#be185d","#d97706"];
@@ -27,6 +28,15 @@ function fmtDate(d: string) {
   const yest = new Date(now.getTime() - 86400000);
   if (dt.toDateString() === yest.toDateString()) return "Yesterday";
   return dt.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+}
+function fmtLastSeen(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  const min = Math.floor(ms / 60000);
+  if (min < 1) return "just now";
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  return `${Math.floor(hr / 24)}d ago`;
 }
 
 interface Props {
@@ -53,32 +63,45 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
   const [pinned, setPinned] = useState<Msg[]>([]);
   const [showPinned, setShowPinned] = useState(false);
   const [loadingMsgs, setLoadingMsgs] = useState(false);
-  const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
-  // Track which messages the OTHER party has read (for double-tick)
+  const [presenceData, setPresenceData] = useState<PresenceEntry[]>([]);
   const [readers, setReaders] = useState<Record<number, string[]>>({});
+  // Message search
+  const [showMsgSearch, setShowMsgSearch] = useState(false);
+  const [msgSearchQuery, setMsgSearchQuery] = useState("");
+  const [msgSearchResults, setMsgSearchResults] = useState<Msg[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  // Member management
+  const [showMembers, setShowMembers] = useState(false);
+  const [channelMembers, setChannelMembers] = useState<string[]>([]);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const sseRef = useRef<EventSource | null>(null);
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Presence heartbeat — update server every 60s, fetch online list every 30s
+  function isUserOnline(name: string): boolean {
+    return presenceData.some(p => p.userName === name && p.isOnline);
+  }
+  function userLastSeenText(name: string): string | null {
+    const p = presenceData.find(p => p.userName === name);
+    if (!p) return null;
+    return p.isOnline ? null : `Last seen ${fmtLastSeen(p.lastSeenAt)}`;
+  }
+
+  // Presence heartbeat — server derives userName from auth session
   useEffect(() => {
-    if (!open || !currentUser) return;
+    if (!open) return;
     const heartbeat = () =>
-      fetch("/api/admin/chat/presence/heartbeat", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userName: currentUser }),
-      }).catch(() => {});
+      fetch("/api/admin/chat/presence/heartbeat", { method: "POST" }).catch(() => {});
     heartbeat();
     const hb = setInterval(heartbeat, 60000);
     const poll = setInterval(async () => {
       const r = await fetch("/api/admin/chat/presence");
-      if (r.ok) setOnlineUsers(await r.json() as string[]);
+      if (r.ok) setPresenceData(await r.json() as PresenceEntry[]);
     }, 30000);
-    fetch("/api/admin/chat/presence").then(r => r.ok ? r.json() : []).then(d => setOnlineUsers(d as string[])).catch(() => {});
+    fetch("/api/admin/chat/presence").then(r => r.ok ? r.json() : []).then(d => setPresenceData(d as PresenceEntry[])).catch(() => {});
     return () => { clearInterval(hb); clearInterval(poll); };
-  }, [open, currentUser]);
+  }, [open]);
 
   // Load channels and members on open
   useEffect(() => {
@@ -96,12 +119,12 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
         const msgs = await r.json() as Msg[];
         setMessages(msgs);
 
-        // Mark all visible messages as read
+        // Mark all visible messages as read — server derives readerName from auth
         const unreadIds = msgs.filter(m => m.senderName !== currentUser && !m.isDeleted).map(m => m.id);
         if (unreadIds.length > 0) {
           fetch(`/api/admin/chat/channels/${ch.id}/mark-read`, {
             method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ readerName: currentUser, messageIds: unreadIds }),
+            body: JSON.stringify({ messageIds: unreadIds }),
           }).catch(() => {});
         }
 
@@ -131,11 +154,11 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
     es.addEventListener("message", (e: MessageEvent) => {
       const msg = JSON.parse(e.data as string) as Msg;
       setMessages(prev => [...prev.filter(m => m.id !== msg.id), msg]);
-      // Auto-mark as read if not our own message
+      // Auto-mark as read if not our own message — server derives readerName from auth
       if (msg.senderName !== currentUser && !msg.isDeleted) {
         fetch(`/api/admin/chat/channels/${active.id}/mark-read`, {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ readerName: currentUser, messageIds: [msg.id] }),
+          body: JSON.stringify({ messageIds: [msg.id] }),
         }).catch(() => {});
       }
     });
@@ -158,7 +181,6 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
       const r = await fetch(`/api/admin/chat/channels/${active.id}/typing`);
       if (r.ok) setTyping((await r.json() as string[]).filter(n => n !== currentUser));
 
-      // Refresh read receipts for sent messages
       const myIds = messages.filter(m => m.senderName === currentUser).map(m => m.id);
       if (myIds.length > 0) {
         const r2 = await fetch(`/api/admin/chat/channels/${active.id}/readers?ids=${myIds.join(",")}`);
@@ -172,17 +194,18 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
     setInput(e.target.value);
     if (!active) return;
     if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    // Server derives memberName from auth session
     fetch(`/api/admin/chat/channels/${active.id}/typing`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ memberName: currentUser }),
+      body: JSON.stringify({}),
     }).catch(() => {});
     typingTimerRef.current = setTimeout(() => {}, 3000);
   }
 
   async function sendMessage() {
     if (!active || !input.trim()) return;
+    // senderName is derived from auth on the server — not sent in body
     const body: Record<string, unknown> = {
-      senderName: currentUser,
       senderColor: nameColor(currentUser),
       content: input.trim(),
       msgType: "text",
@@ -209,9 +232,10 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
       });
       if (r.ok) {
         const { url } = await r.json() as { url: string };
+        // senderName derived from auth on server
         await fetch(`/api/admin/chat/channels/${active.id}/messages`, {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ senderName: currentUser, senderColor: nameColor(currentUser), content: file.name, msgType: "file", fileName: file.name, fileUrl: url }),
+          body: JSON.stringify({ senderColor: nameColor(currentUser), content: file.name, msgType: "file", fileName: file.name, fileUrl: url }),
         });
       }
     };
@@ -238,19 +262,53 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
     setPinned(prev => updated.isPinned ? [...prev, updated] : prev.filter(m => m.id !== updated.id));
   }
 
+  // userName is derived from auth on the server — not sent in body
   async function react(msgId: number, emoji: string) {
     await fetch(`/api/admin/chat/messages/${msgId}/react`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ emoji, userName: currentUser }),
+      body: JSON.stringify({ emoji }),
     });
   }
 
-  // Server-side DM dedup: GET /admin/chat/channels/dm?a=&b=
+  // Message history search
+  async function runMsgSearch(q: string) {
+    if (!q.trim()) { setMsgSearchResults([]); return; }
+    setSearchLoading(true);
+    try {
+      const url = active
+        ? `/api/admin/chat/search?q=${encodeURIComponent(q)}&channelId=${active.id}`
+        : `/api/admin/chat/search?q=${encodeURIComponent(q)}`;
+      const r = await fetch(url);
+      if (r.ok) setMsgSearchResults(await r.json() as Msg[]);
+    } finally { setSearchLoading(false); }
+  }
+
+  // Load channel members for member management panel
+  async function loadChannelMembers(chId: number) {
+    const r = await fetch(`/api/admin/chat/channels/${chId}/members`);
+    if (r.ok) setChannelMembers(await r.json() as string[]);
+  }
+
+  async function addChannelMember(name: string) {
+    if (!active) return;
+    await fetch(`/api/admin/chat/channels/${active.id}/members`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ memberName: name }),
+    });
+    await loadChannelMembers(active.id);
+  }
+
+  async function removeChannelMember(name: string) {
+    if (!active) return;
+    await fetch(`/api/admin/chat/channels/${active.id}/members/${encodeURIComponent(name)}`, { method: "DELETE" });
+    await loadChannelMembers(active.id);
+  }
+
+  // Server-side DM dedup
   async function openDm(member: Member) {
     const r = await fetch(`/api/admin/chat/channels/dm?a=${encodeURIComponent(currentUser)}&b=${encodeURIComponent(member.name)}`);
     if (!r.ok) return;
     const ch = await r.json() as Channel;
-    // Add to channels list if not already there
     setChannels(prev => prev.some(c => c.id === ch.id) ? prev : [...prev, ch]);
     selectChannel(ch);
     setTab("channels");
@@ -258,7 +316,10 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
 
   function selectChannel(ch: Channel) {
     setActive(ch); setMessages([]); setReaders({}); setShowPinned(false);
+    setShowMsgSearch(false); setMsgSearchQuery(""); setMsgSearchResults([]);
+    setShowMembers(false);
     loadMessages(ch);
+    if (ch.type === "private") loadChannelMembers(ch.id);
   }
 
   async function createChannel() {
@@ -304,7 +365,6 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
     else grouped.push({ date: d, msgs: [msg] });
   }
 
-  // Read receipt for a message: check if anyone other than sender has read it
   function getReadReceipt(msg: Msg): "none" | "sent" | "read" {
     if (msg.senderName !== currentUser) return "none";
     const readBy = readers[msg.id] ?? [];
@@ -354,7 +414,6 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
           <div className="flex-1 overflow-y-auto py-2 px-2 space-y-0.5">
             {tab === "channels" && (
               <>
-                {/* Public/private channels */}
                 {publicChannels.map(ch => (
                   <button key={ch.id} onClick={() => selectChannel(ch)}
                     className={`w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all text-left ${active?.id === ch.id ? "bg-[#c9a227] text-[#0f2044] font-semibold" : "text-white/70 hover:bg-white/10 hover:text-white"}`}>
@@ -362,13 +421,13 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
                     <span className="truncate">{ch.name}</span>
                   </button>
                 ))}
-                {/* DM channels shown in Channels tab too */}
                 {dmChannels.length > 0 && (
                   <div className="text-[9px] text-white/30 uppercase tracking-wider px-2 pt-2 pb-1">Direct</div>
                 )}
                 {dmChannels.map(ch => {
                   const other = dmLabel(ch);
-                  const isOnline = onlineUsers.includes(other);
+                  const online = isUserOnline(other);
+                  const lastSeen = userLastSeenText(other);
                   return (
                     <button key={ch.id} onClick={() => selectChannel(ch)}
                       className={`w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all text-left ${active?.id === ch.id ? "bg-[#c9a227] text-[#0f2044] font-semibold" : "text-white/70 hover:bg-white/10 hover:text-white"}`}>
@@ -376,9 +435,12 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
                         <div className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold" style={{ background: nameColor(other) }}>
                           {initials(other)}
                         </div>
-                        {isOnline && <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-green-400 rounded-full border border-[#0f2044]" />}
+                        {online && <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-green-400 rounded-full border border-[#0f2044]" />}
                       </div>
-                      <span className="truncate">{other}</span>
+                      <div className="min-w-0">
+                        <div className="truncate">{other}</div>
+                        {lastSeen && <div className="text-[8px] text-white/30 truncate">{lastSeen}</div>}
+                      </div>
                     </button>
                   );
                 })}
@@ -401,7 +463,8 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
             {tab === "dms" && (
               <>
                 {filteredMembers.map(m => {
-                  const isOnline = onlineUsers.includes(m.name);
+                  const online = isUserOnline(m.name);
+                  const lastSeen = userLastSeenText(m.name);
                   return (
                     <button key={m.id} onClick={() => openDm(m)}
                       className="w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs text-white/70 hover:bg-white/10 hover:text-white transition-all text-left">
@@ -409,13 +472,15 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
                         <div className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold" style={{ background: nameColor(m.name) }}>
                           {initials(m.name)}
                         </div>
-                        {isOnline && <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-green-400 rounded-full border border-[#0f2044]" />}
+                        {online && <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-green-400 rounded-full border border-[#0f2044]" />}
                       </div>
                       <div className="min-w-0">
                         <div className="truncate">{m.name}</div>
-                        <div className="text-[9px] text-white/30 truncate">{m.designation}</div>
+                        <div className="text-[9px] text-white/30 truncate">
+                          {online ? "Online" : lastSeen ?? m.designation}
+                        </div>
                       </div>
-                      {isOnline && <div className="ml-auto text-[9px] text-green-400 shrink-0">●</div>}
+                      {online && <div className="ml-auto text-[9px] text-green-400 shrink-0">●</div>}
                     </button>
                   );
                 })}
@@ -436,14 +501,16 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
                       <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-bold" style={{ background: nameColor(dmLabel(active)) }}>
                         {initials(dmLabel(active))}
                       </div>
-                      {onlineUsers.includes(dmLabel(active)) && (
+                      {isUserOnline(dmLabel(active)) && (
                         <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-400 rounded-full border-2 border-white" />
                       )}
                     </div>
                     <div>
                       <div className="font-semibold text-[#0f2044] text-sm">{dmLabel(active)}</div>
-                      <div className={`text-[10px] ${onlineUsers.includes(dmLabel(active)) ? "text-green-500" : "text-gray-400"}`}>
-                        {onlineUsers.includes(dmLabel(active)) ? "Online" : "Offline"}
+                      <div className={`text-[10px] ${isUserOnline(dmLabel(active)) ? "text-green-500" : "text-gray-400"}`}>
+                        {isUserOnline(dmLabel(active))
+                          ? "Online"
+                          : userLastSeenText(dmLabel(active)) ?? "Offline"}
                       </div>
                     </div>
                   </>
@@ -454,13 +521,88 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
                     {active.description && <span className="text-xs text-gray-400 truncate">{active.description}</span>}
                   </>
                 )}
-                <div className="ml-auto flex items-center gap-2">
+                <div className="ml-auto flex items-center gap-1">
+                  <button onClick={() => { setShowMsgSearch(v => !v); setMsgSearchQuery(""); setMsgSearchResults([]); }}
+                    title="Search messages"
+                    className={`p-1.5 rounded-lg transition-colors ${showMsgSearch ? "bg-[#c9a227] text-[#0f2044]" : "text-gray-400 hover:bg-gray-100"}`}>
+                    <Search size={13} />
+                  </button>
+                  {active.type === "private" && (
+                    <button onClick={() => { setShowMembers(v => !v); if (!showMembers) loadChannelMembers(active.id); }}
+                      title="Manage members"
+                      className={`p-1.5 rounded-lg transition-colors ${showMembers ? "bg-[#c9a227] text-[#0f2044]" : "text-gray-400 hover:bg-gray-100"}`}>
+                      <Users size={13} />
+                    </button>
+                  )}
                   <button onClick={() => setShowPinned(v => !v)} title="Pinned messages"
                     className={`p-1.5 rounded-lg transition-colors ${showPinned ? "bg-[#c9a227] text-[#0f2044]" : "text-gray-400 hover:bg-gray-100"}`}>
                     <Pin size={13} />
                   </button>
                 </div>
               </div>
+
+              {/* Message search bar */}
+              {showMsgSearch && (
+                <div className="px-4 py-2 border-b border-gray-100 bg-amber-50 shrink-0">
+                  <div className="flex items-center gap-2">
+                    <Search size={13} className="text-gray-400" />
+                    <input
+                      value={msgSearchQuery}
+                      onChange={e => { setMsgSearchQuery(e.target.value); runMsgSearch(e.target.value); }}
+                      placeholder="Search messages in this channel…"
+                      className="flex-1 text-xs outline-none bg-transparent placeholder-gray-400"
+                      autoFocus
+                    />
+                    {searchLoading && <Loader2 size={12} className="animate-spin text-gray-400" />}
+                    {msgSearchQuery && (
+                      <button onClick={() => { setMsgSearchQuery(""); setMsgSearchResults([]); }} className="text-gray-400 hover:text-gray-600">
+                        <XIcon size={12} />
+                      </button>
+                    )}
+                  </div>
+                  {msgSearchResults.length > 0 && (
+                    <div className="mt-2 space-y-1 max-h-40 overflow-y-auto">
+                      {msgSearchResults.map(m => (
+                        <div key={m.id} className="text-[11px] bg-white rounded-lg px-2 py-1.5 border border-gray-100">
+                          <span className="font-semibold text-[#0f2044]">{m.senderName}</span>
+                          <span className="text-gray-400 ml-1">{fmtTime(m.createdAt)}</span>
+                          <div className="text-gray-700 truncate mt-0.5">{m.content}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {msgSearchQuery && !searchLoading && msgSearchResults.length === 0 && (
+                    <div className="mt-1 text-[11px] text-gray-400">No messages found.</div>
+                  )}
+                </div>
+              )}
+
+              {/* Member management panel */}
+              {showMembers && active.type === "private" && (
+                <div className="px-4 py-2 border-b border-gray-100 bg-blue-50 shrink-0">
+                  <div className="text-[11px] font-semibold text-[#0f2044] mb-1 flex items-center gap-1">
+                    <Users size={11} /> Members ({channelMembers.length})
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {channelMembers.map(name => (
+                      <span key={name} className="flex items-center gap-1 bg-white border border-gray-200 rounded-full px-2 py-0.5 text-[10px]">
+                        {name}
+                        <button onClick={() => removeChannelMember(name)} className="text-red-400 hover:text-red-600">
+                          <XIcon size={9} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {members.filter(m => !channelMembers.includes(m.name)).slice(0, 8).map(m => (
+                      <button key={m.id} onClick={() => addChannelMember(m.name)}
+                        className="text-[10px] text-blue-600 hover:text-blue-800 flex items-center gap-0.5">
+                        <Plus size={9} />{m.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Pinned messages panel */}
               {showPinned && pinned.length > 0 && (
@@ -524,7 +666,6 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
                                     {msg.isEdited && <span className="text-[9px] opacity-50 ml-1">(edited)</span>}
                                     <div className={`flex items-center gap-1 mt-0.5 ${isMe ? "justify-end" : ""}`}>
                                       <span className={`text-[9px] ${isMe ? "text-white/40" : "text-gray-400"}`}>{fmtTime(msg.createdAt)}</span>
-                                      {/* Read receipt ticks */}
                                       {isMe && receipt === "read" && (
                                         <span title="Read"><CheckCheck size={10} className="text-blue-300" /></span>
                                       )}
@@ -554,17 +695,19 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
                                   <button onClick={() => setReplyTo(msg)} className="p-0.5 text-gray-400 hover:text-gray-600 rounded" title="Reply">
                                     <CornerUpLeft size={11} />
                                   </button>
+                                  {isMe && (
+                                    <>
+                                      <button onClick={() => { setEditId(msg.id); setEditVal(msg.content); }} className="p-0.5 text-gray-400 hover:text-gray-600 rounded" title="Edit">
+                                        <Pencil size={11} />
+                                      </button>
+                                      <button onClick={() => deleteMsg(msg.id)} className="p-0.5 text-red-400 hover:text-red-600 rounded" title="Delete">
+                                        <Trash2 size={11} />
+                                      </button>
+                                    </>
+                                  )}
                                   <button onClick={() => togglePin(msg)} className={`p-0.5 rounded ${msg.isPinned ? "text-[#c9a227]" : "text-gray-400 hover:text-gray-600"}`} title="Pin">
                                     <Pin size={11} />
                                   </button>
-                                  {isMe && <>
-                                    <button onClick={() => { setEditId(msg.id); setEditVal(msg.content); }} className="p-0.5 text-gray-400 hover:text-gray-600 rounded" title="Edit">
-                                      <Pencil size={11} />
-                                    </button>
-                                    <button onClick={() => deleteMsg(msg.id)} className="p-0.5 text-red-400 hover:text-red-600 rounded" title="Delete">
-                                      <Trash2 size={11} />
-                                    </button>
-                                  </>}
                                 </div>
                               </div>
                             </div>
@@ -574,24 +717,28 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
                     </div>
                   ))
                 )}
-                {typing.length > 0 && (
-                  <div className="text-[11px] text-gray-400 italic px-1">{typing.join(", ")} {typing.length === 1 ? "is" : "are"} typing…</div>
-                )}
                 <div ref={bottomRef} />
               </div>
 
-              {/* Reply preview */}
+              {/* Typing indicator */}
+              {typing.length > 0 && (
+                <div className="px-4 py-1 text-[10px] text-gray-400 italic shrink-0">
+                  {typing.join(", ")} {typing.length === 1 ? "is" : "are"} typing…
+                </div>
+              )}
+
+              {/* Reply bar */}
               {replyTo && (
-                <div className="px-4 py-2 bg-amber-50 border-t border-amber-200 flex items-center gap-2 shrink-0">
-                  <CornerUpLeft size={12} className="text-amber-600" />
-                  <span className="text-xs text-amber-700 flex-1 truncate">Replying to: {replyTo.content.slice(0, 60)}</span>
-                  <button onClick={() => setReplyTo(null)} className="text-amber-500 hover:text-amber-700"><X size={12} /></button>
+                <div className="px-4 py-1.5 bg-amber-50 border-t border-amber-100 flex items-center gap-2 shrink-0">
+                  <CornerUpLeft size={12} className="text-[#c9a227]" />
+                  <span className="text-[11px] text-amber-700 truncate flex-1">Replying to: {replyTo.content.slice(0, 60)}</span>
+                  <button onClick={() => setReplyTo(null)} className="text-gray-400 hover:text-gray-600"><X size={12} /></button>
                 </div>
               )}
 
               {/* Emoji picker */}
               {showEmoji && (
-                <div className="px-4 py-2 bg-white border-t border-gray-100 flex flex-wrap gap-1.5 shrink-0">
+                <div className="px-4 py-2 border-t border-gray-100 flex flex-wrap gap-1 shrink-0 bg-white">
                   {EMOJIS.map(e => (
                     <button key={e} onClick={() => { setInput(v => v + e); setShowEmoji(false); }}
                       className="text-lg hover:scale-110 transition-transform">{e}</button>
@@ -599,40 +746,38 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
                 </div>
               )}
 
-              {/* Input */}
-              <div className="px-3 py-3 border-t border-gray-100 bg-white flex items-end gap-2 shrink-0">
-                <input ref={fileRef} type="file" className="hidden" onChange={handleFile}
-                  accept=".pdf,.docx,.doc,.xlsx,.xls,.csv,.zip,.png,.jpg,.jpeg,.webp" />
-                <button onClick={() => fileRef.current?.click()}
-                  className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors shrink-0">
-                  <Paperclip size={16} />
-                </button>
-                <button onClick={() => setShowEmoji(v => !v)}
-                  className={`p-2 rounded-lg transition-colors shrink-0 ${showEmoji ? "bg-[#c9a227] text-[#0f2044]" : "text-gray-400 hover:text-gray-700 hover:bg-gray-100"}`}>
-                  <Smile size={16} />
-                </button>
-                <textarea
-                  value={input}
-                  onChange={onInputChange}
-                  onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-                  placeholder={active.type === "direct" ? `Message ${dmLabel(active)}…` : `Message #${active.name}…`}
-                  rows={1}
-                  className="flex-1 resize-none text-sm border border-gray-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-[#c9a227]/30 focus:border-[#c9a227] max-h-24 overflow-y-auto"
-                />
-                <button
-                  onClick={sendMessage}
-                  disabled={!input.trim()}
-                  className="p-2 bg-[#0f2044] text-white rounded-xl hover:bg-[#0f2044]/80 disabled:opacity-40 transition-colors shrink-0"
-                >
-                  <Send size={16} />
-                </button>
+              {/* Input area */}
+              <div className="px-4 py-3 border-t border-gray-100 bg-white shrink-0">
+                <div className="flex items-end gap-2 bg-gray-50 rounded-2xl px-3 py-2 border border-gray-200 focus-within:border-[#c9a227] transition-colors">
+                  <textarea
+                    value={input}
+                    onChange={onInputChange}
+                    onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+                    placeholder={`Message ${isDmChannel(active) ? dmLabel(active) : "#" + active.name}`}
+                    rows={1}
+                    className="flex-1 bg-transparent text-xs resize-none outline-none placeholder-gray-400 max-h-20 leading-relaxed"
+                  />
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button onClick={() => setShowEmoji(v => !v)} className="p-1 text-gray-400 hover:text-[#c9a227] transition-colors">
+                      <Smile size={14} />
+                    </button>
+                    <button onClick={() => fileRef.current?.click()} className="p-1 text-gray-400 hover:text-[#c9a227] transition-colors">
+                      <Paperclip size={14} />
+                    </button>
+                    <input ref={fileRef} type="file" className="hidden" onChange={handleFile} />
+                    <button onClick={sendMessage} disabled={!input.trim()}
+                      className="p-1.5 bg-[#0f2044] text-white rounded-xl hover:bg-[#1a3060] transition-colors disabled:opacity-40">
+                      <Send size={13} />
+                    </button>
+                  </div>
+                </div>
               </div>
             </>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
-              <MessageSquare size={36} className="mb-3 opacity-20" />
-              <p className="text-sm font-medium">Select a channel to start chatting</p>
-              <p className="text-xs mt-1">or pick a team member for a direct message</p>
+            <div className="flex-1 flex flex-col items-center justify-center text-gray-400 gap-3">
+              <MessageSquare size={32} className="opacity-20" />
+              <div className="text-sm font-medium">Select a channel to start chatting</div>
+              <div className="text-xs text-gray-300">Or start a direct message from the Direct tab</div>
             </div>
           )}
         </div>
