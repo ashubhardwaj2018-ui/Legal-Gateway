@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
   X, Send, Hash, Lock, Plus, Smile, Paperclip, Pin, Pencil, Trash2,
-  CornerUpLeft, Search, Users, MessageSquare, ChevronRight, Loader2,
-  Check, CheckCheck,
+  CornerUpLeft, Search, MessageSquare, Loader2, Check, CheckCheck,
 } from "lucide-react";
 
 interface Channel { id: number; name: string; slug: string; type: string; description: string | null; members?: string; }
@@ -33,7 +32,7 @@ function fmtDate(d: string) {
 interface Props {
   open: boolean;
   onClose: () => void;
-  currentUser: string; // display name of logged-in user
+  currentUser: string;
 }
 
 export function ChatSlideIn({ open, onClose, currentUser }: Props) {
@@ -54,13 +53,34 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
   const [pinned, setPinned] = useState<Msg[]>([]);
   const [showPinned, setShowPinned] = useState(false);
   const [loadingMsgs, setLoadingMsgs] = useState(false);
+  const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
+  // Track which messages the OTHER party has read (for double-tick)
+  const [readers, setReaders] = useState<Record<number, string[]>>({});
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const sseRef = useRef<EventSource | null>(null);
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Load channels and members on mount
+  // Presence heartbeat — update server every 60s, fetch online list every 30s
+  useEffect(() => {
+    if (!open || !currentUser) return;
+    const heartbeat = () =>
+      fetch("/api/admin/chat/presence/heartbeat", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userName: currentUser }),
+      }).catch(() => {});
+    heartbeat();
+    const hb = setInterval(heartbeat, 60000);
+    const poll = setInterval(async () => {
+      const r = await fetch("/api/admin/chat/presence");
+      if (r.ok) setOnlineUsers(await r.json() as string[]);
+    }, 30000);
+    fetch("/api/admin/chat/presence").then(r => r.ok ? r.json() : []).then(d => setOnlineUsers(d as string[])).catch(() => {});
+    return () => { clearInterval(hb); clearInterval(poll); };
+  }, [open, currentUser]);
+
+  // Load channels and members on open
   useEffect(() => {
     if (!open) return;
     fetch("/api/admin/chat/channels").then(r => r.json()).then(d => setChannels(d as Channel[])).catch(() => {});
@@ -72,17 +92,37 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
     setLoadingMsgs(true);
     try {
       const r = await fetch(`/api/admin/chat/channels/${ch.id}/messages?limit=60`);
-      if (r.ok) { const d = await r.json(); setMessages(d as Msg[]); }
+      if (r.ok) {
+        const msgs = await r.json() as Msg[];
+        setMessages(msgs);
+
+        // Mark all visible messages as read
+        const unreadIds = msgs.filter(m => m.senderName !== currentUser && !m.isDeleted).map(m => m.id);
+        if (unreadIds.length > 0) {
+          fetch(`/api/admin/chat/channels/${ch.id}/mark-read`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ readerName: currentUser, messageIds: unreadIds }),
+          }).catch(() => {});
+        }
+
+        // Fetch who has read my messages
+        const myIds = msgs.filter(m => m.senderName === currentUser).map(m => m.id);
+        if (myIds.length > 0) {
+          const r2 = await fetch(`/api/admin/chat/channels/${ch.id}/readers?ids=${myIds.join(",")}`);
+          if (r2.ok) setReaders(await r2.json() as Record<number, string[]>);
+        }
+      }
     } finally { setLoadingMsgs(false); }
-    // Pinned
+
+    // Pinned messages
     const r2 = await fetch(`/api/admin/chat/channels/${ch.id}/messages?limit=100`);
     if (r2.ok) {
       const all = await r2.json() as Msg[];
       setPinned(all.filter(m => m.isPinned));
     }
-  }, []);
+  }, [currentUser]);
 
-  // SSE connection for active channel
+  // SSE for real-time messages
   useEffect(() => {
     if (!active) return;
     sseRef.current?.close();
@@ -91,28 +131,42 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
     es.addEventListener("message", (e: MessageEvent) => {
       const msg = JSON.parse(e.data as string) as Msg;
       setMessages(prev => [...prev.filter(m => m.id !== msg.id), msg]);
+      // Auto-mark as read if not our own message
+      if (msg.senderName !== currentUser && !msg.isDeleted) {
+        fetch(`/api/admin/chat/channels/${active.id}/mark-read`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ readerName: currentUser, messageIds: [msg.id] }),
+        }).catch(() => {});
+      }
     });
     es.addEventListener("update", (e: MessageEvent) => {
       const msg = JSON.parse(e.data as string) as Msg;
       setMessages(prev => prev.map(m => m.id === msg.id ? msg : m));
     });
     return () => { es.close(); sseRef.current = null; };
-  }, [active?.id]);
+  }, [active?.id, currentUser]);
 
-  // Scroll to bottom when messages change
+  // Scroll to bottom on new messages
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
 
-  // Poll typing
+  // Poll typing + read receipts for my messages
   useEffect(() => {
     if (!active) return;
     const t = setInterval(async () => {
       const r = await fetch(`/api/admin/chat/channels/${active.id}/typing`);
       if (r.ok) setTyping((await r.json() as string[]).filter(n => n !== currentUser));
-    }, 2500);
+
+      // Refresh read receipts for sent messages
+      const myIds = messages.filter(m => m.senderName === currentUser).map(m => m.id);
+      if (myIds.length > 0) {
+        const r2 = await fetch(`/api/admin/chat/channels/${active.id}/readers?ids=${myIds.join(",")}`);
+        if (r2.ok) setReaders(await r2.json() as Record<number, string[]>);
+      }
+    }, 3000);
     return () => clearInterval(t);
-  }, [active?.id, currentUser]);
+  }, [active?.id, currentUser, messages]);
 
   function onInputChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
     setInput(e.target.value);
@@ -137,12 +191,10 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
       body.replyToId = replyTo.id;
       body.replyPreview = replyTo.content.slice(0, 80);
     }
-    const r = await fetch(`/api/admin/chat/channels/${active.id}/messages`, {
+    await fetch(`/api/admin/chat/channels/${active.id}/messages`, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
     });
-    if (r.ok) {
-      setInput(""); setReplyTo(null); setShowEmoji(false);
-    }
+    setInput(""); setReplyTo(null); setShowEmoji(false);
   }
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -193,25 +245,19 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
     });
   }
 
+  // Server-side DM dedup: GET /admin/chat/channels/dm?a=&b=
   async function openDm(member: Member) {
-    // Look for existing direct channel with this member
-    const slug = `dm-${Math.min(0, member.id)}-${member.id}`;
-    const existing = channels.find(c => c.type === "direct" && c.members?.includes(String(member.id)));
-    if (existing) { selectChannel(existing); return; }
-    // Create DM channel
-    const r = await fetch("/api/admin/chat/channels", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: `dm-${currentUser.replace(/\s/g, "")}-${member.name.replace(/\s/g, "")}`, type: "direct", description: `DM: ${currentUser} ↔ ${member.name}`, members: JSON.stringify([currentUser, member.name]) }),
-    });
-    if (r.ok) {
-      const ch = await r.json() as Channel;
-      setChannels(prev => [...prev, ch]);
-      selectChannel(ch);
-    }
+    const r = await fetch(`/api/admin/chat/channels/dm?a=${encodeURIComponent(currentUser)}&b=${encodeURIComponent(member.name)}`);
+    if (!r.ok) return;
+    const ch = await r.json() as Channel;
+    // Add to channels list if not already there
+    setChannels(prev => prev.some(c => c.id === ch.id) ? prev : [...prev, ch]);
+    selectChannel(ch);
+    setTab("channels");
   }
 
   function selectChannel(ch: Channel) {
-    setActive(ch); setMessages([]); setTab("channels");
+    setActive(ch); setMessages([]); setReaders({}); setShowPinned(false);
     loadMessages(ch);
   }
 
@@ -229,12 +275,24 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
     }
   }
 
-  const filteredChannels = channels.filter(c =>
-    (tab === "channels" ? c.type !== "direct" : c.type === "direct") &&
-    c.name.toLowerCase().includes(search.toLowerCase())
+  function isDmChannel(ch: Channel) { return ch.type === "direct"; }
+  function dmLabel(ch: Channel): string {
+    if (!isDmChannel(ch)) return ch.name;
+    try {
+      const participants = JSON.parse(ch.members ?? "[]") as string[];
+      const other = participants.find(n => n !== currentUser);
+      return other ?? ch.name;
+    } catch { return ch.name; }
+  }
+
+  const publicChannels = channels.filter(c =>
+    c.type !== "direct" && c.name.toLowerCase().includes(search.toLowerCase())
+  );
+  const dmChannels = channels.filter(c =>
+    c.type === "direct" && dmLabel(c).toLowerCase().includes(search.toLowerCase())
   );
   const filteredMembers = members.filter(m =>
-    m.name.toLowerCase().includes(search.toLowerCase())
+    m.name !== currentUser && m.name.toLowerCase().includes(search.toLowerCase())
   );
 
   // Group messages by date
@@ -246,6 +304,14 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
     else grouped.push({ date: d, msgs: [msg] });
   }
 
+  // Read receipt for a message: check if anyone other than sender has read it
+  function getReadReceipt(msg: Msg): "none" | "sent" | "read" {
+    if (msg.senderName !== currentUser) return "none";
+    const readBy = readers[msg.id] ?? [];
+    const otherReads = readBy.filter(n => n !== currentUser);
+    return otherReads.length > 0 ? "read" : "sent";
+  }
+
   if (!open) return null;
 
   return (
@@ -254,9 +320,9 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
       <div className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm" onClick={onClose} />
 
       {/* Panel */}
-      <div className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-2xl bg-white shadow-2xl flex" style={{ maxWidth: 680 }}>
+      <div className="fixed right-0 top-0 bottom-0 z-50 bg-white shadow-2xl flex" style={{ width: 680, maxWidth: "95vw" }}>
         {/* Left: Channel/DM list */}
-        <div className="w-52 bg-[#0f2044] flex flex-col">
+        <div className="w-52 bg-[#0f2044] flex flex-col shrink-0">
           <div className="p-3 border-b border-white/10 flex items-center gap-2">
             <MessageSquare size={15} className="text-[#c9a227]" />
             <span className="text-sm font-bold text-white">Team Chat</span>
@@ -288,13 +354,34 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
           <div className="flex-1 overflow-y-auto py-2 px-2 space-y-0.5">
             {tab === "channels" && (
               <>
-                {filteredChannels.map(ch => (
+                {/* Public/private channels */}
+                {publicChannels.map(ch => (
                   <button key={ch.id} onClick={() => selectChannel(ch)}
                     className={`w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all text-left ${active?.id === ch.id ? "bg-[#c9a227] text-[#0f2044] font-semibold" : "text-white/70 hover:bg-white/10 hover:text-white"}`}>
                     {ch.type === "private" ? <Lock size={11} className="shrink-0" /> : <Hash size={11} className="shrink-0" />}
                     <span className="truncate">{ch.name}</span>
                   </button>
                 ))}
+                {/* DM channels shown in Channels tab too */}
+                {dmChannels.length > 0 && (
+                  <div className="text-[9px] text-white/30 uppercase tracking-wider px-2 pt-2 pb-1">Direct</div>
+                )}
+                {dmChannels.map(ch => {
+                  const other = dmLabel(ch);
+                  const isOnline = onlineUsers.includes(other);
+                  return (
+                    <button key={ch.id} onClick={() => selectChannel(ch)}
+                      className={`w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all text-left ${active?.id === ch.id ? "bg-[#c9a227] text-[#0f2044] font-semibold" : "text-white/70 hover:bg-white/10 hover:text-white"}`}>
+                      <div className="relative shrink-0">
+                        <div className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold" style={{ background: nameColor(other) }}>
+                          {initials(other)}
+                        </div>
+                        {isOnline && <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-green-400 rounded-full border border-[#0f2044]" />}
+                      </div>
+                      <span className="truncate">{other}</span>
+                    </button>
+                  );
+                })}
                 <button onClick={() => setCreating(v => !v)}
                   className="w-full flex items-center gap-2 px-2 py-2 text-white/40 hover:text-white text-xs rounded-lg transition-colors mt-1">
                   <Plus size={11} /> New channel
@@ -313,15 +400,25 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
             )}
             {tab === "dms" && (
               <>
-                {filteredMembers.filter(m => m.name !== currentUser).map(m => (
-                  <button key={m.id} onClick={() => openDm(m)}
-                    className="w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs text-white/70 hover:bg-white/10 hover:text-white transition-all text-left">
-                    <div className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold shrink-0" style={{ background: nameColor(m.name) }}>
-                      {initials(m.name)}
-                    </div>
-                    <span className="truncate">{m.name}</span>
-                  </button>
-                ))}
+                {filteredMembers.map(m => {
+                  const isOnline = onlineUsers.includes(m.name);
+                  return (
+                    <button key={m.id} onClick={() => openDm(m)}
+                      className="w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs text-white/70 hover:bg-white/10 hover:text-white transition-all text-left">
+                      <div className="relative shrink-0">
+                        <div className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold" style={{ background: nameColor(m.name) }}>
+                          {initials(m.name)}
+                        </div>
+                        {isOnline && <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-green-400 rounded-full border border-[#0f2044]" />}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="truncate">{m.name}</div>
+                        <div className="text-[9px] text-white/30 truncate">{m.designation}</div>
+                      </div>
+                      {isOnline && <div className="ml-auto text-[9px] text-green-400 shrink-0">●</div>}
+                    </button>
+                  );
+                })}
               </>
             )}
           </div>
@@ -333,9 +430,30 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
             <>
               {/* Channel header */}
               <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2 bg-white shrink-0">
-                <Hash size={14} className="text-gray-400" />
-                <span className="font-semibold text-[#0f2044] text-sm">{active.name}</span>
-                {active.description && <span className="text-xs text-gray-400 truncate">{active.description}</span>}
+                {isDmChannel(active) ? (
+                  <>
+                    <div className="relative">
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-bold" style={{ background: nameColor(dmLabel(active)) }}>
+                        {initials(dmLabel(active))}
+                      </div>
+                      {onlineUsers.includes(dmLabel(active)) && (
+                        <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-400 rounded-full border-2 border-white" />
+                      )}
+                    </div>
+                    <div>
+                      <div className="font-semibold text-[#0f2044] text-sm">{dmLabel(active)}</div>
+                      <div className={`text-[10px] ${onlineUsers.includes(dmLabel(active)) ? "text-green-500" : "text-gray-400"}`}>
+                        {onlineUsers.includes(dmLabel(active)) ? "Online" : "Offline"}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <Hash size={14} className="text-gray-400" />
+                    <span className="font-semibold text-[#0f2044] text-sm">{active.name}</span>
+                    {active.description && <span className="text-xs text-gray-400 truncate">{active.description}</span>}
+                  </>
+                )}
                 <div className="ml-auto flex items-center gap-2">
                   <button onClick={() => setShowPinned(v => !v)} title="Pinned messages"
                     className={`p-1.5 rounded-lg transition-colors ${showPinned ? "bg-[#c9a227] text-[#0f2044]" : "text-gray-400 hover:bg-gray-100"}`}>
@@ -370,6 +488,7 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
                         {msgs.map(msg => {
                           const isMe = msg.senderName === currentUser;
                           const reactions = JSON.parse(msg.reactions || "{}") as Record<string, string[]>;
+                          const receipt = getReadReceipt(msg);
                           return (
                             <div key={msg.id} className={`flex gap-2 group ${isMe ? "flex-row-reverse" : ""}`}>
                               {!isMe && (
@@ -400,10 +519,19 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
                                     <Paperclip size={12} /> {msg.fileName ?? "File"}
                                   </a>
                                 ) : (
-                                  <div className={`px-3 py-2 rounded-2xl text-xs leading-relaxed relative ${isMe ? "bg-[#0f2044] text-white rounded-tr-sm" : "bg-white text-gray-800 shadow-sm rounded-tl-sm"} ${msg.isPinned ? "ring-1 ring-[#c9a227]" : ""}`}>
+                                  <div className={`px-3 py-2 rounded-2xl text-xs leading-relaxed ${isMe ? "bg-[#0f2044] text-white rounded-tr-sm" : "bg-white text-gray-800 shadow-sm rounded-tl-sm"} ${msg.isPinned ? "ring-1 ring-[#c9a227]" : ""}`}>
                                     {msg.content}
                                     {msg.isEdited && <span className="text-[9px] opacity-50 ml-1">(edited)</span>}
-                                    <div className={`text-[9px] mt-0.5 ${isMe ? "text-white/40 text-right" : "text-gray-400"}`}>{fmtTime(msg.createdAt)}</div>
+                                    <div className={`flex items-center gap-1 mt-0.5 ${isMe ? "justify-end" : ""}`}>
+                                      <span className={`text-[9px] ${isMe ? "text-white/40" : "text-gray-400"}`}>{fmtTime(msg.createdAt)}</span>
+                                      {/* Read receipt ticks */}
+                                      {isMe && receipt === "read" && (
+                                        <span title="Read"><CheckCheck size={10} className="text-blue-300" /></span>
+                                      )}
+                                      {isMe && receipt === "sent" && (
+                                        <span title="Sent"><Check size={10} className="text-white/40" /></span>
+                                      )}
+                                    </div>
                                   </div>
                                 )}
                                 {/* Reactions */}
@@ -421,7 +549,7 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
                                 <div className={`opacity-0 group-hover:opacity-100 flex gap-1 transition-opacity ${isMe ? "flex-row-reverse" : ""}`}>
                                   {EMOJIS.slice(0, 4).map(emoji => (
                                     <button key={emoji} onClick={() => react(msg.id, emoji)}
-                                      className="text-[11px] hover:scale-110 transition-transform" title={`React ${emoji}`}>{emoji}</button>
+                                      className="text-[11px] hover:scale-110 transition-transform">{emoji}</button>
                                   ))}
                                   <button onClick={() => setReplyTo(msg)} className="p-0.5 text-gray-400 hover:text-gray-600 rounded" title="Reply">
                                     <CornerUpLeft size={11} />
@@ -487,7 +615,7 @@ export function ChatSlideIn({ open, onClose, currentUser }: Props) {
                   value={input}
                   onChange={onInputChange}
                   onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-                  placeholder={`Message #${active.name}…`}
+                  placeholder={active.type === "direct" ? `Message ${dmLabel(active)}…` : `Message #${active.name}…`}
                   rows={1}
                   className="flex-1 resize-none text-sm border border-gray-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-[#c9a227]/30 focus:border-[#c9a227] max-h-24 overflow-y-auto"
                 />

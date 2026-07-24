@@ -1,4 +1,6 @@
 import { Router, type IRouter } from "express";
+import { createNotification } from "./notifications";
+import type { AuthenticatedRequest } from "./auth";
 import { eq, ilike, and, desc, count, asc } from "drizzle-orm";
 import { db, invoicesTable, invoicePaymentsTable } from "@workspace/db";
 
@@ -94,6 +96,24 @@ router.post("/admin/invoices", async (req, res): Promise<void> => {
     notes: body.notes ? String(body.notes) : null,
     terms: body.terms ? String(body.terms) : null,
   }).returning();
+
+  // Notify the actor who created the invoice (admin or employee)
+  const actorReq = req as AuthenticatedRequest;
+  const actorId = typeof actorReq.adminUser?.userId === "number" ? actorReq.adminUser.userId : null;
+  const actorType = (actorReq.adminUser?.userType as string) === "employee" ? "employee" : "admin";
+  if (actorId) {
+    await createNotification({
+      recipientId: actorId,
+      recipientType: actorType,
+      type: "invoice_generated",
+      title: `${type === "quotation" ? "Quotation" : "Invoice"} #${number} Created`,
+      body: `For ${String(body.clientName)} — ₹${total}`,
+      entityType: "invoice",
+      entityId: inv.id,
+      link: `/admin/invoices`,
+    });
+  }
+
   res.status(201).json(inv);
 });
 
@@ -184,6 +204,23 @@ router.post("/admin/invoices/:id/payments", async (req, res): Promise<void> => {
   await db.update(invoicesTable)
     .set({ paidAmount: totalPaid.toFixed(2), status: newStatus, updatedAt: new Date() })
     .where(eq(invoicesTable.id, id));
+
+  // Notify the actor who recorded the payment
+  const pmtReq = req as AuthenticatedRequest;
+  const pmtActorId = typeof pmtReq.adminUser?.userId === "number" ? pmtReq.adminUser.userId : null;
+  const pmtActorType = (pmtReq.adminUser?.userType as string) === "employee" ? "employee" : "admin";
+  if (pmtActorId && inv) {
+    await createNotification({
+      recipientId: pmtActorId,
+      recipientType: pmtActorType,
+      type: "payment_received",
+      title: "Payment Recorded",
+      body: `₹${body.amount} received for Invoice #${inv.number}`,
+      entityType: "invoice",
+      entityId: id,
+      link: `/admin/invoices`,
+    });
+  }
 
   res.status(201).json(pmt);
 });

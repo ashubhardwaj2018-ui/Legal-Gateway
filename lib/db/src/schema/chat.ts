@@ -39,5 +39,24 @@ export const chatTypingTable = pgTable("chat_typing", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const messageReadsTable = pgTable("message_reads", {
+  id: serial("id").primaryKey(),
+  messageId: integer("message_id").notNull(),
+  channelId: integer("channel_id").notNull(),
+  readerName: text("reader_name").notNull(),
+  readAt: timestamp("read_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  channelIdx: index("message_reads_channel_idx").on(t.channelId),
+  msgIdx: index("message_reads_msg_idx").on(t.messageId),
+}));
+
+export const userPresenceTable = pgTable("user_presence", {
+  id: serial("id").primaryKey(),
+  userName: text("user_name").notNull().unique(),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export type ChatChannel = typeof chatChannelsTable.$inferSelect;
 export type ChatMessage = typeof chatMessagesTable.$inferSelect;
+export type MessageRead = typeof messageReadsTable.$inferSelect;
+export type UserPresence = typeof userPresenceTable.$inferSelect;

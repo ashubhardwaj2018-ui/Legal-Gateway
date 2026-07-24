@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, ilike, or, count, desc, and, asc } from "drizzle-orm";
 import { db, tasksTable, taskCommentsTable, teamMembersTable } from "@workspace/db";
+import { createNotification } from "./notifications";
 
 const router: IRouter = Router();
 
@@ -48,6 +49,21 @@ router.post("/admin/tasks", async (req, res): Promise<void> => {
     leadId: leadId ? Number(leadId) : null,
     estimatedHours: estimatedHours ? String(estimatedHours) : null,
   }).returning();
+
+  // Notify assigned employee
+  if (assignedToId) {
+    await createNotification({
+      recipientId: Number(assignedToId),
+      recipientType: "employee",
+      type: "task_assigned",
+      title: "New Task Assigned",
+      body: String(title),
+      entityType: "task",
+      entityId: task.id,
+      link: "/admin/tasks",
+    });
+  }
+
   res.status(201).json(task);
 });
 
