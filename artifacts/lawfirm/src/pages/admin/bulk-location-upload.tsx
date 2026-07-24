@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AdminLayout } from "./AdminLayout";
 import { Button } from "@/components/ui/button";
@@ -47,6 +47,17 @@ interface ImportResult {
   errors: number;
 }
 
+interface JobStatus {
+  status: "pending" | "running" | "done" | "error";
+  total: number;
+  processed: number;
+  inserted: number;
+  updated: number;
+  duplicates: number;
+  errors: number;
+  message?: string;
+}
+
 interface UploadLog {
   id: number;
   fileName: string;
@@ -70,9 +81,10 @@ export default function BulkLocationUpload() {
   const [parsing, setParsing] = useState(false);
   const [preview, setPreview] = useState<ParsePreviewResponse | null>(null);
   const [importing, setImporting] = useState(false);
-  const [importProgress, setImportProgress] = useState(0);
+  const [jobStatus, setJobStatus] = useState<JobStatus | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [exportingCsv, setExportingCsv] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const { data: uploadLogs = [] } = useQuery<UploadLog[]>({
     queryKey: ["upload-logs"],
@@ -129,33 +141,67 @@ export default function BulkLocationUpload() {
   async function doImport() {
     if (!preview || preview.validCount === 0) return;
     setImporting(true);
-    setImportProgress(10);
+    setJobStatus(null);
+
     try {
+      // Include slug so the server uses the admin-provided/validated slug, not a re-generated one
       const records = preview.validRows.map((r) => ({
+        slug: r.slug,
         country: r.country ?? "India",
         state: r.state!,
         city: r.city,
         latitude: r.latitude,
         longitude: r.longitude,
       }));
-      setImportProgress(40);
-      const res = await fetch(`${BASE}/api/admin/locations/bulk-upsert`, {
+
+      const startRes = await fetch(`${BASE}/api/admin/locations/start-import`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ fileName, records }),
       });
-      setImportProgress(85);
-      const result = await res.json() as ImportResult;
-      setImportResult(result);
-      setImportProgress(100);
-      setStep("done");
-      qc.invalidateQueries({ queryKey: ["locations-list"] });
-      qc.invalidateQueries({ queryKey: ["location-stats"] });
-      qc.invalidateQueries({ queryKey: ["upload-logs"] });
-      toast({ title: `Import complete — ${result.inserted} inserted, ${result.updated} updated` });
+      if (!startRes.ok) {
+        const err = await startRes.json().catch(() => ({})) as { error?: string };
+        toast({ title: "Import failed", description: err.error ?? "Server error starting import.", variant: "destructive" });
+        setImporting(false);
+        return;
+      }
+      const { jobId } = await startRes.json() as { jobId: string };
+
+      // Poll for live row-count progress every 600 ms
+      if (pollRef.current) clearInterval(pollRef.current);
+      pollRef.current = setInterval(async () => {
+        try {
+          const statusRes = await fetch(`${BASE}/api/admin/locations/import-status/${jobId}`);
+          if (!statusRes.ok) return;
+          const status = await statusRes.json() as JobStatus;
+          setJobStatus(status);
+
+          if (status.status === "done" || status.status === "error") {
+            clearInterval(pollRef.current!);
+            pollRef.current = null;
+            setImporting(false);
+
+            if (status.status === "error") {
+              toast({ title: "Import failed", description: status.message ?? "Unknown error.", variant: "destructive" });
+              return;
+            }
+            setImportResult({
+              totalRows: status.total,
+              inserted: status.inserted,
+              updated: status.updated,
+              duplicates: status.duplicates,
+              errors: status.errors,
+            });
+            setStep("done");
+            qc.invalidateQueries({ queryKey: ["locations-list"] });
+            qc.invalidateQueries({ queryKey: ["location-stats"] });
+            qc.invalidateQueries({ queryKey: ["upload-logs"] });
+            toast({ title: `Import complete — ${status.inserted} inserted, ${status.updated} updated` });
+          }
+        } catch { /* transient poll failure — keep polling */ }
+      }, 600);
     } catch {
-      toast({ title: "Import failed", description: "Server error during import.", variant: "destructive" });
-    } finally {
+      toast({ title: "Import failed", description: "Could not connect to server.", variant: "destructive" });
       setImporting(false);
     }
   }
@@ -165,7 +211,8 @@ export default function BulkLocationUpload() {
     setPreview(null);
     setFileName("");
     setImportResult(null);
-    setImportProgress(0);
+    setJobStatus(null);
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
   }
 
   function downloadTemplate() {
@@ -347,16 +394,30 @@ export default function BulkLocationUpload() {
               </div>
             </div>
 
-            {/* Import progress bar */}
+            {/* Import progress bar — driven by live processed/total from server */}
             {importing && (
               <div className="mt-4">
-                <div className="w-full bg-gray-100 rounded-full h-2">
-                  <div
-                    className="bg-[#c9a227] h-2 rounded-full transition-all duration-500"
-                    style={{ width: `${importProgress}%` }}
-                  />
-                </div>
-                <p className="text-xs text-gray-400 mt-1 text-right">{importProgress}%</p>
+                {jobStatus && jobStatus.total > 0 ? (
+                  <>
+                    <div className="w-full bg-gray-100 rounded-full h-2">
+                      <div
+                        className="bg-[#c9a227] h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${Math.round((jobStatus.processed / jobStatus.total) * 100)}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-400 mt-1">
+                      <span>{jobStatus.processed.toLocaleString()} / {jobStatus.total.toLocaleString()} rows processed</span>
+                      <span>{Math.round((jobStatus.processed / jobStatus.total) * 100)}%</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                      <div className="bg-[#c9a227] h-2 w-1/3 rounded-full animate-pulse" />
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">Starting import…</p>
+                  </>
+                )}
               </div>
             )}
 

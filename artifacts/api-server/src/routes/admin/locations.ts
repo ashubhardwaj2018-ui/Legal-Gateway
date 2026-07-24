@@ -284,48 +284,35 @@ router.get("/admin/locations/states", async (req, res): Promise<void> => {
   res.json(rows.map((r) => r.state));
 });
 
-// Bulk upsert (from frontend Excel parse)
-interface LocationRecord {
-  country?: string;
-  state: string;
-  district?: string;
-  city?: string;
-  town?: string;
-  village?: string;
-  pincode?: string;
-  latitude?: number;
-  longitude?: number;
-  population?: number;
-}
+// ─── In-memory import job store ─────────────────────────────────────────────
 
-router.post("/admin/locations/bulk-upsert", async (req, res): Promise<void> => {
-  const body = req.body as { fileName?: unknown; records?: unknown };
-  const fileName = typeof body.fileName === "string" ? body.fileName : "upload.xlsx";
-  if (!Array.isArray(body.records)) {
-    res.status(400).json({ error: "records array required" });
-    return;
-  }
-  const records = body.records as LocationRecord[];
-  if (records.some((r) => !r.state)) {
-    res.status(400).json({ error: "Each record must have a state" });
-    return;
-  }
-  let inserted = 0;
-  let updated = 0;
-  let duplicates = 0;
-  let errors = 0;
-  const BATCH = 200;
+type JobStatus = "pending" | "running" | "done" | "error";
+interface ImportJob {
+  status: JobStatus;
+  fileName: string;
+  total: number;
+  processed: number;
+  inserted: number;
+  updated: number;
+  duplicates: number;
+  errors: number;
+  message?: string;
+}
+const importJobs = new Map<string, ImportJob>();
+
+// Background import runner — mutates job state in-place
+async function runImportJob(jobId: string, fileName: string, records: LocationRecord[]): Promise<void> {
+  const job = importJobs.get(jobId)!;
+  job.status = "running";
 
   // Pre-fetch all slugs that already exist so we can accurately count inserts vs updates
-  const allSlugs = records.map((r) => makeSlug(r)).filter(Boolean);
+  const allSlugs = records.map((r) => r.slug || makeSlug(r)).filter(Boolean);
   const existingSlugRows = allSlugs.length
-    ? await db
-        .select({ slug: locationsTable.slug })
-        .from(locationsTable)
-        .where(inArray(locationsTable.slug, allSlugs))
+    ? await db.select({ slug: locationsTable.slug }).from(locationsTable).where(inArray(locationsTable.slug, allSlugs))
     : [];
   const existingSlugs = new Set(existingSlugRows.map((r) => r.slug));
 
+  const BATCH = 100;
   for (let i = 0; i < records.length; i += BATCH) {
     const batch = records.slice(i, i + BATCH);
     try {
@@ -340,7 +327,8 @@ router.post("/admin/locations/bulk-upsert", async (req, res): Promise<void> => {
         latitude: r.latitude ?? null,
         longitude: r.longitude ?? null,
         population: r.population ?? null,
-        slug: makeSlug(r),
+        // Use admin-provided slug if present; otherwise generate from city/state
+        slug: r.slug || makeSlug(r),
         isActive: true,
       }));
 
@@ -363,27 +351,123 @@ router.post("/admin/locations/bulk-upsert", async (req, res): Promise<void> => {
           },
         });
 
-      // Accurately split batch into new inserts vs updates
       for (const row of rows) {
-        if (existingSlugs.has(row.slug)) updated++;
-        else inserted++;
+        if (existingSlugs.has(row.slug)) job.updated++;
+        else job.inserted++;
       }
     } catch {
-      errors += batch.length;
+      job.errors += batch.length;
     }
+    job.processed += batch.length;
   }
 
   // Log the upload
-  await db.insert(locationUploadLogsTable).values({
+  try {
+    await db.insert(locationUploadLogsTable).values({
+      fileName,
+      totalRows: records.length,
+      inserted: job.inserted,
+      updated: job.updated,
+      duplicates: job.duplicates,
+      errors: job.errors,
+    });
+  } catch { /* non-fatal */ }
+
+  job.status = "done";
+}
+
+// ─── Async import: start job ─────────────────────────────────────────────────
+
+interface LocationRecord {
+  slug?: string;
+  country?: string;
+  state: string;
+  district?: string;
+  city?: string;
+  town?: string;
+  village?: string;
+  pincode?: string;
+  latitude?: number;
+  longitude?: number;
+  population?: number;
+}
+
+router.post("/admin/locations/start-import", (req, res): void => {
+  const body = req.body as { fileName?: unknown; records?: unknown };
+  const fileName = typeof body.fileName === "string" ? body.fileName : "upload.xlsx";
+  if (!Array.isArray(body.records)) {
+    res.status(400).json({ error: "records array required" });
+    return;
+  }
+  const records = body.records as LocationRecord[];
+  if (records.some((r) => !r.state)) {
+    res.status(400).json({ error: "Each record must have a state" });
+    return;
+  }
+
+  const jobId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const job: ImportJob = {
+    status: "pending",
     fileName,
-    totalRows: records.length,
-    inserted,
-    updated,
-    duplicates,
-    errors,
+    total: records.length,
+    processed: 0,
+    inserted: 0,
+    updated: 0,
+    duplicates: 0,
+    errors: 0,
+  };
+  importJobs.set(jobId, job);
+
+  // Fire-and-forget background processing
+  runImportJob(jobId, fileName, records).catch((err: unknown) => {
+    const j = importJobs.get(jobId);
+    if (j) { j.status = "error"; j.message = String(err); }
   });
 
-  res.json({ totalRows: records.length, inserted, updated, duplicates, errors });
+  res.json({ jobId, total: records.length });
+});
+
+// ─── Async import: poll status ───────────────────────────────────────────────
+
+router.get("/admin/locations/import-status/:jobId", (req, res): void => {
+  const job = importJobs.get(req.params.jobId);
+  if (!job) {
+    res.status(404).json({ error: "Job not found" });
+    return;
+  }
+  res.json({
+    status: job.status,
+    total: job.total,
+    processed: job.processed,
+    inserted: job.inserted,
+    updated: job.updated,
+    duplicates: job.duplicates,
+    errors: job.errors,
+    message: job.message,
+  });
+});
+
+// ─── Legacy synchronous bulk-upsert (kept for backward compat) ──────────────
+
+router.post("/admin/locations/bulk-upsert", async (req, res): Promise<void> => {
+  const body = req.body as { fileName?: unknown; records?: unknown };
+  const fileName = typeof body.fileName === "string" ? body.fileName : "upload.xlsx";
+  if (!Array.isArray(body.records)) {
+    res.status(400).json({ error: "records array required" });
+    return;
+  }
+  const records = body.records as LocationRecord[];
+  if (records.some((r) => !r.state)) {
+    res.status(400).json({ error: "Each record must have a state" });
+    return;
+  }
+
+  const jobId = `sync_${Date.now()}`;
+  const job: ImportJob = { status: "pending", fileName, total: records.length, processed: 0, inserted: 0, updated: 0, duplicates: 0, errors: 0 };
+  importJobs.set(jobId, job);
+  await runImportJob(jobId, fileName, records);
+  const done = importJobs.get(jobId)!;
+  res.json({ totalRows: records.length, inserted: done.inserted, updated: done.updated, duplicates: done.duplicates, errors: done.errors });
 });
 
 // Create single location
