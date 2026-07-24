@@ -4,12 +4,16 @@ import {
   LayoutDashboard, Users, MessageSquare, FileText, Search,
   Settings, Building2, Mail, User, Scale, Menu, X, ChevronRight,
   Briefcase, ExternalLink, MapPin, BookOpen, UserCog, CheckSquare, TrendingUp,
-  LogOut, ShieldCheck, Loader2, Layers,
+  LogOut, ShieldCheck, Loader2, Layers, Shield, History, Activity,
 } from "lucide-react";
 
 const navItems = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { href: "/admin/leads", label: "CRM — Leads", icon: Users },
+  { href: "/admin/employees", label: "Employees", icon: Users },
+  { href: "/admin/roles", label: "Roles & Permissions", icon: Shield },
+  { href: "/admin/login-history", label: "Login History", icon: History },
+  { href: "/admin/activity-log", label: "Activity Log", icon: Activity },
   { href: "/admin/team", label: "Team & HR", icon: UserCog },
   { href: "/admin/indian-companies", label: "Indian Companies DB", icon: Building2 },
   { href: "/admin/tasks", label: "Task Management", icon: CheckSquare },

@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import crypto from "crypto";
-import { eq, or } from "drizzle-orm";
-import { db, adminUsersTable } from "@workspace/db";
+import { eq, or, sql } from "drizzle-orm";
+import { db, adminUsersTable, teamMembersTable, rolesTable, rolePermissionsTable, loginHistoryTable, activityLogsTable } from "@workspace/db";
 
 export const authRouter: IRouter = Router();
 
@@ -59,18 +59,58 @@ export async function seedDefaultAdmin() {
   });
 }
 
-// ── Auth Middleware ───────────────────────────────────────────────────────────
-// Only protects /api/admin/* routes (but not /api/admin/auth/*)
-export function adminAuthMiddleware(req: Request, res: Response, next: NextFunction): void {
-  const isAdminPath = req.path.startsWith("/api/admin/");
-  const isAuthPath = req.path.startsWith("/api/admin/auth/");
-  if (!isAdminPath || isAuthPath) { next(); return; }
+// ── Seed default roles ────────────────────────────────────────────────────────
+const DEFAULT_ROLES = [
+  "Super Admin", "Admin", "Sales Manager", "Sales Executive",
+  "Accounts", "HR", "SEO Executive", "Digital Marketing Executive",
+  "Content Writer", "Customer Support", "Legal Team",
+  "Finance Manager", "Developer", "Customer",
+];
 
+export async function seedDefaultRoles() {
+  const existing = await db.select().from(rolesTable).limit(1);
+  if (existing.length > 0) return;
+  await db.insert(rolesTable).values(
+    DEFAULT_ROLES.map(name => ({ name, isSystem: true }))
+  );
+}
+
+// ── Activity logger ───────────────────────────────────────────────────────────
+export async function logActivity(
+  userId: number | null,
+  username: string,
+  userType: "admin" | "employee",
+  module: string,
+  action: string,
+  entityId?: number,
+  details?: object,
+) {
+  try {
+    await db.insert(activityLogsTable).values({
+      userId,
+      username,
+      userType,
+      module,
+      action,
+      entityId: entityId ?? null,
+      details: details ? JSON.stringify(details) : null,
+    });
+  } catch {
+    // non-fatal
+  }
+}
+
+// ── Auth Middleware ───────────────────────────────────────────────────────────
+export interface AuthenticatedRequest extends Request {
+  adminUser?: Record<string, unknown>;
+}
+
+export function adminAuthMiddleware(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
   const token = req.cookies?.[TOKEN_COOKIE] as string | undefined;
   if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
   const payload = verifyToken(token);
   if (!payload) { res.status(401).json({ error: "Session expired" }); return; }
-  (req as Request & { adminUser: unknown }).adminUser = payload;
+  req.adminUser = payload;
   next();
 }
 
@@ -80,18 +120,67 @@ authRouter.post("/admin/auth/login", async (req, res): Promise<void> => {
   const { username, password } = req.body as { username?: string; password?: string };
   if (!username || !password) { res.status(400).json({ error: "Username and password required" }); return; }
 
-  const [user] = await db.select().from(adminUsersTable)
+  const ip = (req.ip ?? req.socket.remoteAddress ?? "unknown") as string;
+  const uaRaw = req.headers["user-agent"];
+  const ua = Array.isArray(uaRaw) ? (uaRaw[0] ?? "") : (uaRaw ?? "");
+
+  // Check admin users first
+  const [adminUser] = await db.select().from(adminUsersTable)
     .where(or(eq(adminUsersTable.username, username), eq(adminUsersTable.email, username)));
 
-  if (!user || !user.isActive) { res.status(401).json({ error: "Invalid credentials" }); return; }
-  if (!verifyPassword(password, user.passwordHash)) { res.status(401).json({ error: "Invalid credentials" }); return; }
+  if (adminUser && adminUser.isActive) {
+    if (!verifyPassword(password, adminUser.passwordHash)) {
+      await db.insert(loginHistoryTable).values({ userId: adminUser.id, username: adminUser.username, userType: "admin", ipAddress: ip, userAgent: ua, status: "failed" });
+      res.status(401).json({ error: "Invalid credentials" }); return;
+    }
+    const token = signToken({ userId: adminUser.id, username: adminUser.username, role: adminUser.role, userType: "admin", exp: Date.now() + TOKEN_TTL_MS });
+    res.cookie(TOKEN_COOKIE, token, { httpOnly: true, sameSite: "lax", maxAge: TOKEN_TTL_MS, path: "/" });
+    await db.insert(loginHistoryTable).values({ userId: adminUser.id, username: adminUser.username, userType: "admin", ipAddress: ip, userAgent: ua, status: "success" });
+    await logActivity(adminUser.id, adminUser.username, "admin", "auth", "login");
+    res.json({ ok: true, user: { id: adminUser.id, username: adminUser.username, email: adminUser.email, role: adminUser.role, userType: "admin" } });
+    return;
+  }
 
-  const token = signToken({ userId: user.id, username: user.username, role: user.role, exp: Date.now() + TOKEN_TTL_MS });
-  res.cookie(TOKEN_COOKIE, token, { httpOnly: true, sameSite: "lax", maxAge: TOKEN_TTL_MS, path: "/" });
-  res.json({ ok: true, user: { id: user.id, username: user.username, email: user.email, role: user.role } });
+  // Check employees
+  const [employee] = await db.select().from(teamMembersTable)
+    .where(or(eq(teamMembersTable.username, username), eq(teamMembersTable.email, username)));
+
+  if (employee && employee.status === "active" && employee.username && employee.passwordHash) {
+    if (!verifyPassword(password, employee.passwordHash)) {
+      await db.insert(loginHistoryTable).values({ userId: employee.id, username: employee.username, userType: "employee", ipAddress: ip, userAgent: ua, status: "failed" });
+      res.status(401).json({ error: "Invalid credentials" }); return;
+    }
+    const token = signToken({
+      userId: employee.id, username: employee.username, role: employee.role,
+      employeeId: employee.employeeId, userType: "employee",
+      forcePasswordChange: employee.forcePasswordChange,
+      exp: Date.now() + TOKEN_TTL_MS,
+    });
+    res.cookie(TOKEN_COOKIE, token, { httpOnly: true, sameSite: "lax", maxAge: TOKEN_TTL_MS, path: "/" });
+    await db.update(teamMembersTable).set({ lastLoginAt: new Date() }).where(eq(teamMembersTable.id, employee.id));
+    await db.insert(loginHistoryTable).values({ userId: employee.id, username: employee.username, userType: "employee", ipAddress: ip, userAgent: ua, status: "success" });
+    await logActivity(employee.id, employee.username, "employee", "auth", "login");
+    res.json({ ok: true, user: { id: employee.id, username: employee.username, email: employee.email, role: employee.role, userType: "employee", employeeId: employee.employeeId, forcePasswordChange: employee.forcePasswordChange } });
+    return;
+  }
+
+  await db.insert(loginHistoryTable).values({ userId: null, username, userType: "admin", ipAddress: ip, userAgent: ua, status: "failed" });
+  res.status(401).json({ error: "Invalid credentials" });
 });
 
-authRouter.post("/admin/auth/logout", (_req, res): void => {
+authRouter.post("/admin/auth/logout", async (req, res): Promise<void> => {
+  const token = req.cookies?.[TOKEN_COOKIE] as string | undefined;
+  if (token) {
+    const payload = verifyToken(token);
+    if (payload) {
+      await logActivity(
+        typeof payload.userId === "number" ? payload.userId : null,
+        typeof payload.username === "string" ? payload.username : "unknown",
+        (payload.userType as "admin" | "employee") ?? "admin",
+        "auth", "logout",
+      );
+    }
+  }
   res.clearCookie(TOKEN_COOKIE, { path: "/" });
   res.json({ ok: true });
 });
@@ -104,9 +193,41 @@ authRouter.get("/admin/auth/me", (req, res): void => {
   res.json({ ok: true, user: payload });
 });
 
+authRouter.get("/admin/auth/permissions", async (req, res): Promise<void> => {
+  const token = req.cookies?.[TOKEN_COOKIE] as string | undefined;
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const payload = verifyToken(token);
+  if (!payload) { res.status(401).json({ error: "Session expired" }); return; }
+
+  const role = typeof payload.role === "string" ? payload.role : "";
+  // Super Admin / admin get all permissions
+  if (role === "admin" || role === "super_admin" || role === "Super Admin" || role === "Admin") {
+    res.json({ all: true, permissions: {} });
+    return;
+  }
+
+  // Look up role in roles table
+  const [roleRow] = await db.select().from(rolesTable).where(eq(rolesTable.name, role));
+  if (!roleRow) { res.json({ all: false, permissions: {} }); return; }
+
+  const perms = await db.select().from(rolePermissionsTable)
+    .where(eq(rolePermissionsTable.roleId, roleRow.id));
+
+  const map: Record<string, Record<string, boolean>> = {};
+  for (const p of perms) {
+    if (!map[p.module]) map[p.module] = {};
+    map[p.module][p.action] = p.allowed;
+  }
+  res.json({ all: false, permissions: map });
+});
+
 // ── User management (admin only) ──────────────────────────────────────────────
 authRouter.get("/admin/auth/users", adminAuthMiddleware, async (_req, res): Promise<void> => {
-  const users = await db.select({ id: adminUsersTable.id, username: adminUsersTable.username, email: adminUsersTable.email, role: adminUsersTable.role, isActive: adminUsersTable.isActive, createdAt: adminUsersTable.createdAt }).from(adminUsersTable);
+  const users = await db.select({
+    id: adminUsersTable.id, username: adminUsersTable.username,
+    email: adminUsersTable.email, role: adminUsersTable.role,
+    isActive: adminUsersTable.isActive, createdAt: adminUsersTable.createdAt,
+  }).from(adminUsersTable);
   res.json(users);
 });
 
@@ -120,11 +241,11 @@ authRouter.post("/admin/auth/users", adminAuthMiddleware, async (req, res): Prom
 authRouter.patch("/admin/auth/users/:id/password", adminAuthMiddleware, async (req, res): Promise<void> => {
   const { password } = req.body as { password?: string };
   if (!password || password.length < 6) { res.status(400).json({ error: "Password must be at least 6 characters" }); return; }
-  await db.update(adminUsersTable).set({ passwordHash: hashPassword(password) }).where(eq(adminUsersTable.id, parseInt(req.params.id, 10)));
+  await db.update(adminUsersTable).set({ passwordHash: hashPassword(password) }).where(eq(adminUsersTable.id, parseInt(String(req.params["id"]), 10)));
   res.json({ ok: true });
 });
 
 authRouter.delete("/admin/auth/users/:id", adminAuthMiddleware, async (req, res): Promise<void> => {
-  await db.delete(adminUsersTable).where(eq(adminUsersTable.id, parseInt(req.params.id, 10)));
+  await db.delete(adminUsersTable).where(eq(adminUsersTable.id, parseInt(String(req.params["id"]), 10)));
   res.sendStatus(204);
 });

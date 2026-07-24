@@ -30,6 +30,10 @@ import AdminChat from "@/pages/admin/chat";
 import AdminEmail from "@/pages/admin/email";
 import AdminReports from "@/pages/admin/reports";
 import AdminPageEditor from "@/pages/admin/page-editor";
+import AdminEmployees from "@/pages/admin/employees";
+import AdminRoles from "@/pages/admin/roles";
+import AdminLoginHistory from "@/pages/admin/login-history";
+import AdminActivityLog from "@/pages/admin/activity-log";
 import PortalLogin from "@/pages/portal/login";
 import PortalDashboard from "@/pages/portal/dashboard";
 import IndianCompanies from "@/pages/indian-companies";
@@ -75,6 +79,10 @@ function Router() {
       <Route path="/admin/email" component={AdminEmail} />
       <Route path="/admin/reports" component={AdminReports} />
       <Route path="/admin/page-editor" component={AdminPageEditor} />
+      <Route path="/admin/employees" component={AdminEmployees} />
+      <Route path="/admin/roles" component={AdminRoles} />
+      <Route path="/admin/login-history" component={AdminLoginHistory} />
+      <Route path="/admin/activity-log" component={AdminActivityLog} />
 
       {/* Customer Portal */}
       <Route path="/portal" component={PortalLogin} />

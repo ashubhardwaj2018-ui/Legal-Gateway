@@ -15,13 +15,18 @@ import chatRouter from "./chat";
 import dashboardRouter from "./dashboard";
 import emailRouter from "./email";
 import reportsRouter from "./reports";
-import { authRouter, adminAuthMiddleware, seedDefaultAdmin } from "./auth";
+import { authRouter, adminAuthMiddleware, seedDefaultAdmin, seedDefaultRoles } from "./auth";
 import pagesRouter from "./pages";
+import employeesRouter from "./employees";
+import rolesRouter from "./roles";
+import loginHistoryRouter from "./login-history";
+import activityLogsRouter from "./activity-logs";
 
 const router: IRouter = Router();
 
-// Seed default admin on startup
+// Seed defaults on startup
 seedDefaultAdmin().catch(() => {});
+seedDefaultRoles().catch(() => {});
 
 // Public auth routes (no auth required)
 router.use(authRouter);
@@ -46,5 +51,9 @@ router.use(lawyersRouter);
 router.use(settingsRouter);
 router.use(locationsRouter);
 router.use(pagesRouter);
+router.use(employeesRouter);
+router.use(rolesRouter);
+router.use(loginHistoryRouter);
+router.use(activityLogsRouter);
 
 export default router;

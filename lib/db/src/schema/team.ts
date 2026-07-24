@@ -1,14 +1,20 @@
-import { pgTable, text, serial, timestamp, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, integer, boolean } from "drizzle-orm/pg-core";
 
 export const teamMembersTable = pgTable("team_members", {
   id: serial("id").primaryKey(),
+  employeeId: text("employee_id").unique(),
   name: text("name").notNull(),
   email: text("email").notNull(),
   phone: text("phone"),
   department: text("department").notNull(),
   designation: text("designation").notNull(),
   role: text("role").notNull().default("staff"),
+  roleId: integer("role_id"),
   permissions: text("permissions").default("view"),
+  reportingManagerId: integer("reporting_manager_id"),
+  username: text("username").unique(),
+  passwordHash: text("password_hash"),
+  forcePasswordChange: boolean("force_password_change").default(false),
   salary: text("salary"),
   joiningDate: text("joining_date"),
   status: text("status").notNull().default("active"),
@@ -16,6 +22,8 @@ export const teamMembersTable = pgTable("team_members", {
   emergencyContact: text("emergency_contact"),
   avatar: text("avatar"),
   notes: text("notes"),
+  twoFactorEnabled: boolean("two_factor_enabled").default(false),
+  lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
