@@ -88,10 +88,16 @@ export function AdminLayout({ children, title, subtitle, actions }: Props) {
       })
       .then(d => {
         if (d?.user) {
-          setAdminUser(d.user as { username: string; role: string; userType?: string });
-          if (d.user.forcePasswordChange === true) {
+          const user = d.user as { username: string; role: string; userType?: string; forcePasswordChange?: boolean };
+          setAdminUser(user);
+          if (user.forcePasswordChange === true) {
             setForceChangePwd(true);
             setAuthChecked(true);
+            return;
+          }
+          // Redirect employees away from the admin-only main dashboard
+          if (user.userType === "employee" && (window.location.pathname === "/admin" || window.location.pathname === "/admin/")) {
+            navigate("/admin/my-dashboard");
             return;
           }
           fetch("/api/admin/auth/permissions")

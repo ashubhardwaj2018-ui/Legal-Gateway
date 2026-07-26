@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
@@ -102,13 +102,27 @@ const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?:
 export default function AdminDashboard() {
   const [stats, setStats] = useState<DashStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [forbidden, setForbidden] = useState(false);
+  const [, navigate] = useLocation();
 
   useEffect(() => {
     fetch("/api/admin/dashboard")
-      .then(r => r.json())
-      .then(d => { setStats(d); setLoading(false); })
+      .then(r => {
+        if (r.status === 403) {
+          // Employee accounts don't have dashboard access — redirect to their own dashboard
+          setForbidden(true);
+          setLoading(false);
+          navigate("/admin/my-dashboard");
+          return null;
+        }
+        if (!r.ok) { setLoading(false); return null; }
+        return r.json();
+      })
+      .then(d => { if (d) { setStats(d as DashStats); setLoading(false); } })
       .catch(() => setLoading(false));
   }, []);
+
+  if (forbidden) return null;
 
   const S = stats;
 
