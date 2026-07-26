@@ -100,6 +100,19 @@ function normalisePreviewRow(raw: Record<string, unknown>, idx: number): ParsedP
   };
 }
 
+// In-memory store: server holds parsed validRows so client never needs to send them back
+interface ParsedLocBatch {
+  validRows: ParsedPreviewRow[];
+  createdAt: number;
+}
+const locParsedStore = new Map<string, ParsedLocBatch>();
+setInterval(() => {
+  const cutoff = Date.now() - 2 * 60 * 60 * 1000;
+  for (const [id, b] of locParsedStore.entries()) {
+    if (b.createdAt < cutoff) locParsedStore.delete(id);
+  }
+}, 30 * 60 * 1000);
+
 router.post(
   "/admin/locations/parse-preview",
   upload.single("file"),
@@ -149,16 +162,19 @@ router.post(
       }
 
       const validRows = rows.filter((r) => r.isValid);
-      const errorRows = rows.filter((r) => !r.isValid);
+
+      // Store valid rows server-side so import uses parseId (no double round-trip)
+      const parseId = `loc_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      locParsedStore.set(parseId, { validRows, createdAt: Date.now() });
 
       res.json({
+        parseId,
         totalRows: rows.length,
         validCount: validRows.length,
-        errorCount: errorRows.length,
+        errorCount: rows.filter((r) => !r.isValid).length,
         detectedColumns,
         columnMapping: mapping,
-        rows,        // full list (first 500 for preview)
-        validRows,   // only valid, for import payload
+        rows: rows.slice(0, 500), // preview only — validRows NOT sent back to save bandwidth
       });
     } catch {
       res.status(422).json({ error: "Failed to parse file — check it is a valid Excel or CSV" });
@@ -393,15 +409,35 @@ interface LocationRecord {
 }
 
 router.post("/admin/locations/start-import", (req, res): void => {
-  const body = req.body as { fileName?: unknown; records?: unknown };
+  const body = req.body as { fileName?: unknown; records?: unknown; parseId?: unknown };
   const fileName = typeof body.fileName === "string" ? body.fileName : "upload.xlsx";
-  if (!Array.isArray(body.records)) {
-    res.status(400).json({ error: "records array required" });
-    return;
-  }
-  const records = body.records as LocationRecord[];
-  if (records.some((r) => !r.state)) {
-    res.status(400).json({ error: "Each record must have a state" });
+
+  let records: LocationRecord[];
+
+  // Prefer parseId (server-stored rows — no double round-trip for large files)
+  if (typeof body.parseId === "string") {
+    const stored = locParsedStore.get(body.parseId);
+    if (!stored) {
+      res.status(404).json({ error: "Parse session expired — please re-upload the file" });
+      return;
+    }
+    records = stored.validRows.map((r) => ({
+      slug: r.slug,
+      country: r.country ?? "India",
+      state: r.state!,
+      city: r.city,
+      latitude: r.latitude,
+      longitude: r.longitude,
+    }));
+  } else if (Array.isArray(body.records)) {
+    // Backward-compat: client sends records directly
+    records = body.records as LocationRecord[];
+    if (records.some((r) => !r.state)) {
+      res.status(400).json({ error: "Each record must have a state" });
+      return;
+    }
+  } else {
+    res.status(400).json({ error: "Provide parseId (recommended) or records array" });
     return;
   }
 

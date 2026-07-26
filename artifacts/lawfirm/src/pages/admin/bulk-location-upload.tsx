@@ -30,13 +30,14 @@ interface ColumnMapping {
 }
 
 interface ParsePreviewResponse {
+  parseId: string;
   totalRows: number;
   validCount: number;
   errorCount: number;
   detectedColumns: string[];
   columnMapping: ColumnMapping[];
   rows: PreviewRow[];
-  validRows: PreviewRow[];
+  // validRows NOT returned — server stores them keyed by parseId to avoid double round-trip
 }
 
 interface ImportResult {
@@ -144,20 +145,11 @@ export default function BulkLocationUpload() {
     setJobStatus(null);
 
     try {
-      // Include slug so the server uses the admin-provided/validated slug, not a re-generated one
-      const records = preview.validRows.map((r) => ({
-        slug: r.slug,
-        country: r.country ?? "India",
-        state: r.state!,
-        city: r.city,
-        latitude: r.latitude,
-        longitude: r.longitude,
-      }));
-
+      // Send parseId — server looks up the stored validRows (no double round-trip for large files)
       const startRes = await fetch(`${BASE}/api/admin/locations/start-import`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fileName, records }),
+        body: JSON.stringify({ fileName, parseId: preview.parseId }),
       });
       if (!startRes.ok) {
         const err = await startRes.json().catch(() => ({})) as { error?: string };
