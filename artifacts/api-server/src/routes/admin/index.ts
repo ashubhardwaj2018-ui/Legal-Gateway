@@ -16,7 +16,7 @@ import chatRouter from "./chat";
 import dashboardRouter from "./dashboard";
 import emailRouter from "./email";
 import reportsRouter from "./reports";
-import { authRouter, adminAuthMiddleware, seedDefaultAdmin, seedDefaultRoles, crudActivityMiddleware, makeModulePermissionMiddleware } from "./auth";
+import { authRouter, adminAuthMiddleware, seedDefaultAdmin, seedDefaultRoles, seedDefaultRolePermissions, crudActivityMiddleware, makeModulePermissionMiddleware } from "./auth";
 import { adminBlogsRouter } from "./blogs";
 import pagesRouter from "./pages";
 import employeesRouter from "./employees";
@@ -31,6 +31,7 @@ const router: IRouter = Router();
 // Seed defaults on startup
 seedDefaultAdmin().catch(() => {});
 seedDefaultRoles().catch(() => {});
+seedDefaultRolePermissions().catch(() => {});
 
 // Public auth routes (no auth required)
 router.use(authRouter);

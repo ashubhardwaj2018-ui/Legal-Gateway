@@ -18,7 +18,13 @@ import { useToast } from "@/hooks/use-toast";
 
 const api = async (path: string, opts?: RequestInit) => {
   const r = await fetch(`/api${path}`, opts);
-  if (!r.ok) throw new Error(`${r.status}`);
+  if (!r.ok) {
+    let msg = `${r.status}`;
+    try { const j = await r.json(); msg = j.error ?? msg; } catch { /* ignore */ }
+    const err = new Error(msg) as Error & { status: number };
+    err.status = r.status;
+    throw err;
+  }
   return r.json();
 };
 
@@ -50,7 +56,7 @@ interface ChatMessage {
 }
 
 interface EmailLog {
-  id: number; to: string; subject: string; status: string;
+  id: number; toEmail: string; toName: string | null; subject: string; status: string;
   createdAt: string; openedAt: string | null;
 }
 
@@ -240,7 +246,7 @@ function LeadsTab() {
   const [submittingNote, setSubmittingNote] = useState(false);
   const [followUpDate, setFollowUpDate] = useState("");
 
-  const { data: leads = [], isLoading } = useQuery<Lead[]>({
+  const { data: leads = [], isLoading, error: leadsError } = useQuery<Lead[]>({
     queryKey: ["my-leads", statusFilter, search],
     queryFn: () => {
       const params = new URLSearchParams();
@@ -249,6 +255,7 @@ function LeadsTab() {
       return api(`/admin/leads?${params}`);
     },
     refetchInterval: 30000,
+    retry: (count, err) => (err as { status?: number }).status !== 403 && count < 2,
   });
 
   const updateStatus = useMutation({
@@ -310,10 +317,19 @@ function LeadsTab() {
 
       {isLoading ? (
         <div className="flex justify-center py-16"><Loader2 size={24} className="animate-spin text-[#c9a227]" /></div>
+      ) : leadsError ? (
+        <div className="text-center py-16 text-gray-400">
+          <AlertCircle size={32} className="mx-auto mb-2 text-red-300" />
+          <p className="text-sm font-medium text-red-500">
+            {(leadsError as { status?: number }).status === 403
+              ? "You don't have permission to view leads. Ask your admin to enable the Leads module for your role."
+              : `Failed to load leads: ${(leadsError as Error).message}`}
+          </p>
+        </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-16 text-gray-400">
           <Users size={32} className="mx-auto mb-2 text-gray-300" />
-          <p className="text-sm">No leads found. {statusFilter !== "all" ? "Try a different status filter." : ""}</p>
+          <p className="text-sm">No leads assigned to you yet.{statusFilter !== "all" ? " Try clearing the status filter." : ""}</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -447,9 +463,10 @@ function ChatTab() {
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const { data: channels = [], isLoading: channelsLoading } = useQuery<Channel[]>({
+  const { data: channels = [], isLoading: channelsLoading, error: channelsError } = useQuery<Channel[]>({
     queryKey: ["chat-channels"],
     queryFn: () => api("/admin/chat/channels"),
+    retry: (count, err) => (err as { status?: number }).status !== 403 && count < 2,
   });
 
   const { data: messages = [], refetch: refetchMessages } = useQuery<ChatMessage[]>({
@@ -498,6 +515,15 @@ function ChatTab() {
           </div>
           {channelsLoading ? (
             <div className="flex justify-center py-8"><Loader2 size={16} className="animate-spin text-gray-400" /></div>
+          ) : channelsError ? (
+            <div className="px-3 py-6 text-center">
+              <AlertCircle size={20} className="mx-auto mb-1 text-red-300" />
+              <p className="text-[10px] text-red-400">
+                {(channelsError as { status?: number }).status === 403
+                  ? "No chat permission. Ask admin to enable Chat for your role."
+                  : "Failed to load channels"}
+              </p>
+            </div>
           ) : (
             <div className="flex-1 overflow-y-auto py-1">
               {channels.map(ch => (
@@ -610,7 +636,7 @@ function EmailTab() {
       await api("/admin/email/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to: to.trim(), subject: subject.trim(), htmlBody: body, useTemplate: false }),
+        body: JSON.stringify({ toEmail: to.trim(), subject: subject.trim(), htmlBody: body, type: "custom" }),
       });
       toast({ title: "Email sent successfully" });
       setTo(""); setSubject(""); setBody("");
@@ -664,7 +690,7 @@ function EmailTab() {
               </div>
               {logs.map(log => (
                 <div key={log.id} className="px-4 py-3 grid grid-cols-12 text-sm items-center hover:bg-gray-50 transition-colors">
-                  <span className="col-span-3 text-gray-600 truncate text-xs">{log.to}</span>
+                  <span className="col-span-3 text-gray-600 truncate text-xs">{log.toName ?? log.toEmail}</span>
                   <span className="col-span-5 font-medium text-[#0f2044] truncate">{log.subject}</span>
                   <span className="col-span-2">
                     {log.status === "sent" ? (

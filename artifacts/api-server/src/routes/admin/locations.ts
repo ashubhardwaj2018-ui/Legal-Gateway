@@ -47,9 +47,14 @@ router.get("/admin/locations/template", (_req, res): void => {
 
 interface ParsedPreviewRow {
   idx: number;
-  city?: string;
+  city?: string;       // most-specific display name (village > town > city > district)
   state?: string;
   country?: string;
+  district?: string;
+  town?: string;
+  village?: string;
+  pincode?: string;
+  population?: number;
   slug?: string;
   metaTitle?: string;
   metaDescription?: string;
@@ -64,6 +69,17 @@ interface ColumnMapping {
   target: string;
 }
 
+/** Slugify a plain string (no makeSlug dependency). */
+function slugifyStr(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "-");
+}
+
 function normalisePreviewRow(raw: Record<string, unknown>, idx: number): ParsedPreviewRow {
   const pick = (...keys: string[]): string | undefined => {
     for (const k of keys) {
@@ -72,24 +88,53 @@ function normalisePreviewRow(raw: Record<string, unknown>, idx: number): ParsedP
     }
     return undefined;
   };
-  const state = pick("State", "state");
-  const city = pick("City", "city");
-  const country = pick("Country", "country") ?? "India";
-  const slugInput = pick("Slug", "slug");
-  const metaTitle = pick("Meta Title", "meta_title", "metaTitle");
+
+  const state    = pick("State", "state");
+  const district = pick("District", "district");
+  const city     = pick("City", "city");
+  const town     = pick("Town", "town");
+  const village  = pick("Village", "village");
+  const country  = pick("Country", "country") ?? "India";
+  const pincode  = pick("Pin Code", "Pincode", "pincode", "zip");
+  const popRaw   = pick("Population", "population");
+  const population = popRaw ? parseInt(popRaw, 10) : undefined;
+
+  // For pSEO, the "display city" is the most specific non-empty location level:
+  // village > town > city > district
+  const primaryLocation = village || town || city || district;
+
+  const slugInput       = pick("Slug", "slug");
+  const metaTitle       = pick("Meta Title", "meta_title", "metaTitle");
   const metaDescription = pick("Meta Description", "meta_description", "metaDescription");
   const lat = parseFloat(pick("Latitude", "latitude", "lat") ?? "");
-  const lng = parseFloat(pick("Longitude", "longitude", "lng", "lon") ?? "");
-  const generatedSlug = slugInput || makeSlug({ city, state: state ?? "", town: undefined, village: undefined, district: undefined });
+  const lng = parseFloat(pick("Longitude", "longitude", "lng", "lon", "Longitute", "longitute") ?? "");
+
+  // Generate compound slug: "{primaryLocation}-{state}" for cross-state uniqueness.
+  // Falls back to slugifyStr(state) when only state is present.
+  let generatedSlug = slugInput;
+  if (!generatedSlug && primaryLocation && state) {
+    generatedSlug = slugifyStr(`${primaryLocation} ${state}`);
+  } else if (!generatedSlug && primaryLocation) {
+    generatedSlug = slugifyStr(primaryLocation);
+  } else if (!generatedSlug && state) {
+    generatedSlug = slugifyStr(state);
+  }
+
   const errors: string[] = [];
   if (!state) errors.push("State is required");
-  if (!city) errors.push("City is required");
+  if (!primaryLocation) errors.push("City, Town, Village, or District is required");
   if (!generatedSlug) errors.push("Could not generate slug");
+
   return {
     idx,
-    city,
+    city: primaryLocation,   // store most-specific location as the display city
     state,
     country,
+    district,
+    town,
+    village,
+    pincode,
+    population: isNaN(population as number) ? undefined : population,
     slug: generatedSlug || undefined,
     metaTitle,
     metaDescription,
@@ -321,12 +366,9 @@ async function runImportJob(jobId: string, fileName: string, records: LocationRe
   const job = importJobs.get(jobId)!;
   job.status = "running";
 
-  // Pre-fetch all slugs that already exist so we can accurately count inserts vs updates
-  const allSlugs = records.map((r) => r.slug || makeSlug(r)).filter(Boolean);
-  const existingSlugRows = allSlugs.length
-    ? await db.select({ slug: locationsTable.slug }).from(locationsTable).where(inArray(locationsTable.slug, allSlugs))
-    : [];
-  const existingSlugs = new Set(existingSlugRows.map((r) => r.slug));
+  // NOTE: We do NOT pre-fetch existing slugs with inArray() here because that
+  // query crashes Node with a stack overflow at ~10k+ items. The upsert below
+  // handles conflicts correctly; inserted/updated counts are approximated instead.
 
   const BATCH = 100;
   for (let i = 0; i < records.length; i += BATCH) {
@@ -367,10 +409,9 @@ async function runImportJob(jobId: string, fileName: string, records: LocationRe
           },
         });
 
-      for (const row of rows) {
-        if (existingSlugs.has(row.slug)) job.updated++;
-        else job.inserted++;
-      }
+      // Count all upserted rows as inserted (exact insert/update split not tracked
+      // to avoid the inArray stack-overflow on large batches).
+      job.inserted += rows.length;
     } catch {
       job.errors += batch.length;
     }
@@ -425,7 +466,12 @@ router.post("/admin/locations/start-import", (req, res): void => {
       slug: r.slug,
       country: r.country ?? "India",
       state: r.state!,
+      district: r.district,
       city: r.city,
+      town: r.town,
+      village: r.village,
+      pincode: r.pincode,
+      population: r.population,
       latitude: r.latitude,
       longitude: r.longitude,
     }));

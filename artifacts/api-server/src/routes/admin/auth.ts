@@ -75,6 +75,49 @@ export async function seedDefaultRoles() {
   );
 }
 
+// ── Seed default employee role permissions ────────────────────────────────────
+// Runs once on startup for employee roles that have NO permissions set yet.
+// Grants minimal access so the employee dashboard (leads, chat, email) works
+// out-of-the-box. Admins can always tighten or expand via the Roles UI.
+const EMPLOYEE_ROLE_NAMES = [
+  "Sales Manager", "Sales Executive", "Accounts", "HR",
+  "SEO Executive", "Digital Marketing Executive", "Content Writer",
+  "Customer Support", "Legal Team", "Finance Manager", "Developer", "Customer",
+];
+
+const EMPLOYEE_BASE_PERMISSIONS: Array<[string, string]> = [
+  ["leads",     "view"],
+  ["leads",     "edit"],
+  ["leads",     "create"],
+  ["chat",      "view"],
+  ["chat",      "create"],
+  ["email",     "view"],
+  ["email",     "send"],
+  ["dashboard", "view"],
+  ["contacts",  "view"],
+];
+
+export async function seedDefaultRolePermissions() {
+  for (const roleName of EMPLOYEE_ROLE_NAMES) {
+    const [role] = await db.select().from(rolesTable).where(eq(rolesTable.name, roleName)).limit(1);
+    if (!role) continue;
+    // Only seed if this role has NO permissions at all yet
+    const existing = await db.select({ id: rolePermissionsTable.id })
+      .from(rolePermissionsTable)
+      .where(eq(rolePermissionsTable.roleId, role.id))
+      .limit(1);
+    if (existing.length > 0) continue;
+    await db.insert(rolePermissionsTable).values(
+      EMPLOYEE_BASE_PERMISSIONS.map(([module, action]) => ({
+        roleId: role.id,
+        module,
+        action,
+        allowed: true,
+      }))
+    );
+  }
+}
+
 // ── Activity logger ───────────────────────────────────────────────────────────
 export async function logActivity(
   userId: number | null,

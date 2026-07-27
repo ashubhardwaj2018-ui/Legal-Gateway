@@ -8,6 +8,7 @@ import {
   leadTasksTable,
   leadTimelineTable,
   leadAssignmentsTable,
+  teamMembersTable,
 } from "@workspace/db";
 import type { AuthenticatedRequest } from "./auth";
 import { createNotification } from "./notifications";
@@ -40,12 +41,15 @@ async function logTimeline(
 }
 
 /** Returns true if the requesting user is allowed to access/modify a specific lead.
- *  Admins always pass. Employees must have an active assignment for the lead. */
+ *  Admins always pass. Employees must have an active assignment OR be named in the
+ *  legacy assignedTo text field. */
 async function requireLeadAccess(req: AuthenticatedRequest, leadId: number): Promise<boolean> {
   if (!req.adminUser) return false;
   if (req.adminUser.userType !== "employee") return true;
   const uid = typeof req.adminUser.userId === "number" ? req.adminUser.userId : null;
   if (!uid) return false;
+
+  // Fast path: check leadAssignmentsTable (proper assignment)
   const [row] = await db
     .select({ id: leadAssignmentsTable.id })
     .from(leadAssignmentsTable)
@@ -55,7 +59,29 @@ async function requireLeadAccess(req: AuthenticatedRequest, leadId: number): Pro
       eq(leadAssignmentsTable.status, "active"),
     ))
     .limit(1);
-  return !!row;
+  if (row) return true;
+
+  // Fallback: check the legacy assignedTo text field against the employee's name
+  const [[lead], [member]] = await Promise.all([
+    db.select({ assignedTo: consultationsTable.assignedTo })
+      .from(consultationsTable)
+      .where(eq(consultationsTable.id, leadId))
+      .limit(1),
+    db.select({ name: teamMembersTable.name })
+      .from(teamMembersTable)
+      .where(eq(teamMembersTable.id, uid))
+      .limit(1),
+  ]);
+  if (lead?.assignedTo && member?.name) {
+    const assignedLower = lead.assignedTo.toLowerCase();
+    const memberLower = member.name.toLowerCase();
+    // Direct containment either way (handles short forms vs full names)
+    if (assignedLower.includes(memberLower) || memberLower.includes(assignedLower)) return true;
+    // Token fallback: any significant word from the member name appears in assignedTo
+    const tokens = memberLower.split(/\s+/).filter(w => w.length > 2 && !w.endsWith("."));
+    return tokens.some(t => assignedLower.includes(t));
+  }
+  return false;
 }
 
 // ── GET /admin/leads ──────────────────────────────────────────────────────────
@@ -69,16 +95,45 @@ router.get("/admin/leads", async (req: AuthenticatedRequest, res): Promise<void>
   const hasTeamView = perms?.all || perms?.map["leads"]?.["team_view"] || perms?.map["leads"]?.["manage"];
 
   if (isEmployee && employeeId && !hasTeamView) {
-    // Get lead IDs assigned to this employee
+    // Fetch this employee's name for the legacy assignedTo text-field fallback
+    const [member] = await db
+      .select({ name: teamMembersTable.name })
+      .from(teamMembersTable)
+      .where(eq(teamMembersTable.id, employeeId))
+      .limit(1);
+    const memberName = member?.name ?? null;
+
+    // Get lead IDs from the proper leadAssignmentsTable
     const assignments = await db
       .select({ leadId: leadAssignmentsTable.leadId })
       .from(leadAssignmentsTable)
       .where(and(eq(leadAssignmentsTable.assignedToId, employeeId), eq(leadAssignmentsTable.status, "active")));
     const leadIds = [...new Set(assignments.map(a => a.leadId))];
-    if (!leadIds.length) { res.json([]); return; }
+
+    // Build text-field ilike conditions using name tokens so that
+    // "Adv. Rajesh Sharma" matches leads assigned to "Adv. Sharma" etc.
+    let textFieldCondition;
+    if (memberName) {
+      // Extract significant words (skip titles like "Adv.", short words)
+      const tokens = memberName.trim().split(/\s+/).filter(w => w.length > 2 && !w.endsWith("."));
+      const fragments = tokens.length > 0 ? tokens : [memberName];
+      const tokenConditions = fragments.map(f => ilike(consultationsTable.assignedTo, `%${f}%`));
+      textFieldCondition = tokenConditions.length === 1 ? tokenConditions[0] : or(...tokenConditions);
+    }
+
+    // Build base condition: proper assignment OR legacy assignedTo text field
+    let baseCondition;
+    if (leadIds.length > 0 && textFieldCondition) {
+      baseCondition = or(inArray(consultationsTable.id, leadIds), textFieldCondition);
+    } else if (leadIds.length > 0) {
+      baseCondition = inArray(consultationsTable.id, leadIds);
+    } else if (textFieldCondition) {
+      baseCondition = textFieldCondition;
+    } else {
+      res.json([]); return;
+    }
 
     // Apply additional filters within the employee's assigned set
-    const baseCondition = inArray(consultationsTable.id, leadIds);
     const extraConditions: ReturnType<typeof eq>[] = [];
     if (status && status !== "all") extraConditions.push(eq(consultationsTable.status, status));
     if (priority && priority !== "all") extraConditions.push(eq(consultationsTable.priority, priority));
@@ -244,8 +299,54 @@ router.patch("/admin/leads/:id", async (req: AuthenticatedRequest, res): Promise
       });
     }
   }
-  if (body.assignedTo && body.assignedTo !== before.assignedTo) {
-    await logTimeline(id, "assigned", `Lead assigned to ${body.assignedTo}`, req as AuthenticatedRequest);
+  if (body.assignedTo !== undefined && body.assignedTo !== before.assignedTo) {
+    await logTimeline(id, "assigned", `Lead assigned to ${body.assignedTo || "nobody"}`, req as AuthenticatedRequest);
+
+    // Sync leadAssignmentsTable: when assignedTo text changes, try to find a
+    // matching active employee and create a proper assignment entry so the
+    // employee can see the lead in their dashboard.
+    if (body.assignedTo && typeof body.assignedTo === "string") {
+      const matchingEmployees = await db
+        .select({ id: teamMembersTable.id, name: teamMembersTable.name })
+        .from(teamMembersTable)
+        .where(and(
+          eq(teamMembersTable.status, "active"),
+          ilike(teamMembersTable.name, `%${body.assignedTo}%`),
+        ));
+      if (matchingEmployees.length === 1) {
+        const emp = matchingEmployees[0];
+        const actorName = typeof req.adminUser?.username === "string" ? req.adminUser.username : "Admin";
+        // Deactivate any existing assignments for this lead
+        await db.update(leadAssignmentsTable)
+          .set({ status: "removed" })
+          .where(and(eq(leadAssignmentsTable.leadId, id), eq(leadAssignmentsTable.status, "active")));
+        // Create the proper assignment entry
+        await db.insert(leadAssignmentsTable).values({
+          leadId: id,
+          assignedToId: emp.id,
+          assignedToName: emp.name,
+          assignedByName: actorName,
+          priority: "medium",
+          status: "active",
+        });
+        // Notify the assigned employee
+        await createNotification({
+          recipientId: emp.id,
+          recipientType: "employee",
+          type: "lead_assigned",
+          title: "New Lead Assigned",
+          body: `Lead "${before.name}" has been assigned to you.`,
+          entityType: "lead",
+          entityId: id,
+          link: `/admin/my-dashboard`,
+        });
+      }
+    } else if (!body.assignedTo) {
+      // assignedTo cleared — deactivate all existing assignments
+      await db.update(leadAssignmentsTable)
+        .set({ status: "removed" })
+        .where(and(eq(leadAssignmentsTable.leadId, id), eq(leadAssignmentsTable.status, "active")));
+    }
   }
 
   res.json(updated);
