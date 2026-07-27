@@ -1,5 +1,4 @@
 uploads = []
-outputs = []
 
 [[generated]]
 id = "FXEjFwmJzi0B5M5OtP_rI"
@@ -12,3 +11,9 @@ id = "7ObNK4WO3HmXkzHepurL5"
 uri = "file://artifacts/lawfirm/public/lawyers-team.png"
 type = "image"
 title = "Group of professional lawyers"
+
+[[outputs]]
+id = "GQGtnbpGKSOSM7gTl2cHS"
+uri = "file://attached_assets/service-city-reference.xlsx"
+type = "table"
+title = "Service × City Cross-Reference (143 Services × 5000 Cities + pSEO URLs)"

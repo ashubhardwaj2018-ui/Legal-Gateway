@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { SERVICES_DATA, CATEGORIES } from "@/data/services";
 import { toSlug } from "@/lib/slug";
 import NotFound from "./not-found";
+import { Helmet } from "react-helmet-async";
 
 export default function ServiceCategory() {
   const [match, params] = useRoute("/services/:id");
@@ -16,7 +17,26 @@ export default function ServiceCategory() {
 
   const category = SERVICES_DATA[categoryId as keyof typeof SERVICES_DATA];
 
+  const metaTitle = `${category.title} Services in India | Vakil & Co. Legal Associates`;
+  const metaDescription = `${category.description} Expert legal professionals at Vakil & Co. help you with ${category.services.slice(0, 3).map(s => s.name).join(", ")} and more. Fast, affordable, online.`;
+  const canonicalUrl = `https://vakil.co.in/services/${category.id}`;
+
   return (
+    <>
+    <Helmet>
+      <title>{metaTitle}</title>
+      <meta name="description" content={metaDescription} />
+      <meta name="keywords" content={`${category.title}, ${category.services.slice(0, 5).map(s => s.name).join(", ")}, legal services India, Vakil & Co`} />
+      <link rel="canonical" href={canonicalUrl} />
+      <meta property="og:title" content={metaTitle} />
+      <meta property="og:description" content={metaDescription} />
+      <meta property="og:url" content={canonicalUrl} />
+      <meta property="og:type" content="website" />
+      <meta property="og:site_name" content="Vakil & Co. Legal Associates" />
+      <meta name="twitter:card" content="summary_large_image" />
+      <meta name="twitter:title" content={metaTitle} />
+      <meta name="twitter:description" content={metaDescription} />
+    </Helmet>
     <div className="w-full pb-24">
       {/* Category Header */}
       <div className="bg-primary pt-20 pb-24 relative overflow-hidden">
@@ -146,5 +166,6 @@ export default function ServiceCategory() {
         </div>
       </div>
     </div>
+    </>
   );
 }
