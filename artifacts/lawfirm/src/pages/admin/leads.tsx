@@ -14,7 +14,7 @@ import {
   Clock, CheckCircle2, Circle, Trash2, MessageSquare, Send, Paperclip, FileText as FileDoc,
   Activity, Phone, Mail, Building2, MapPin, Tag, Star,
   Calendar, Target, User, AlertCircle, Pencil, UserPlus,
-  FileText, Video, PhoneCall, RefreshCw, Users
+  FileText, Video, PhoneCall, RefreshCw, Users, MessageCircle as MessageCircleWa, ExternalLink,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -235,11 +235,16 @@ const TIMELINE_COLORS: Record<string, string> = {
 };
 
 function LeadDetailDrawer({ leadId, onClose, onUpdated }: { leadId: number; onClose: () => void; onUpdated: () => void }) {
-  const [tab, setTab] = useState<"info" | "notes" | "tasks" | "timeline" | "assign" | "portal-chat" | "portal-docs">("info");
+  const [tab, setTab] = useState<"info" | "notes" | "tasks" | "timeline" | "assign" | "portal-chat" | "portal-docs" | "whatsapp">("info");
   const [noteText, setNoteText] = useState("");
   const [taskForm, setTaskForm] = useState({ title: "", dueDate: "", priority: "medium" });
   const [editField, setEditField] = useState<string | null>(null);
   const [editVal, setEditVal] = useState("");
+  // WhatsApp tab state
+  const [waInput, setWaInput] = useState("");
+  const [waTemplateId, setWaTemplateId] = useState<number | null>(null);
+  const [waSending, setWaSending] = useState(false);
+  const waEndRef = useRef<HTMLDivElement>(null);
   // Portal chat state
   const [portalChatInput, setPortalChatInput] = useState("");
   const [portalChatSending, setPortalChatSending] = useState(false);
@@ -284,6 +289,22 @@ function LeadDetailDrawer({ leadId, onClose, onUpdated }: { leadId: number; onCl
     queryKey: ["portal-docs", leadId],
     queryFn: () => api(`/admin/leads/${leadId}/portal-documents`),
     enabled: tab === "portal-docs",
+  });
+
+  // WhatsApp messages for this lead
+  interface WaMsg { id: number; toNumber: string; message: string; templateName?: string; senderName?: string; senderType: string; status: string; createdAt: string; direction: string; }
+  const { data: waMsgs = [], refetch: refetchWa } = useQuery<WaMsg[]>({
+    queryKey: ["wa-messages-lead", leadId],
+    queryFn: () => api(`/admin/whatsapp/messages?leadId=${leadId}`),
+    enabled: tab === "whatsapp",
+  });
+
+  // WhatsApp templates (loaded lazily when tab opens)
+  interface WaTemplate { id: number; name: string; category: string; body: string; isActive?: boolean; }
+  const { data: waTemplates = [] } = useQuery<WaTemplate[]>({
+    queryKey: ["wa-templates"],
+    queryFn: () => api("/admin/whatsapp/templates"),
+    enabled: tab === "whatsapp",
   });
 
   // SSE for real-time portal chat on admin side
@@ -455,7 +476,7 @@ function LeadDetailDrawer({ leadId, onClose, onUpdated }: { leadId: number; onCl
 
         {/* Tabs */}
         <div className="flex border-b px-4 bg-white overflow-x-auto">
-          {(["info", "notes", "tasks", "timeline", "assign", "portal-chat", "portal-docs"] as const).map(t => (
+          {(["info", "notes", "tasks", "timeline", "assign", "portal-chat", "portal-docs", "whatsapp"] as const).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -464,7 +485,8 @@ function LeadDetailDrawer({ leadId, onClose, onUpdated }: { leadId: number; onCl
               {t === "assign" && <span className="flex items-center gap-1"><UserPlus size={11} />Assign</span>}
               {t === "portal-chat" && <span className="flex items-center gap-1"><MessageSquare size={11} />Portal Chat</span>}
               {t === "portal-docs" && <span className="flex items-center gap-1"><Paperclip size={11} />Portal Docs</span>}
-              {!["assign", "portal-chat", "portal-docs"].includes(t) && <span className="capitalize">{t}</span>}
+              {t === "whatsapp" && <span className="flex items-center gap-1"><MessageCircleWa size={11} />WhatsApp</span>}
+              {!["assign", "portal-chat", "portal-docs", "whatsapp"].includes(t) && <span className="capitalize">{t}</span>}
               {t === "notes" && lead?.notes?.length ? ` (${lead.notes.length})` : ""}
               {t === "tasks" && lead?.tasks?.length ? ` (${lead.tasks.length})` : ""}
             </button>
@@ -1013,6 +1035,119 @@ function LeadDetailDrawer({ leadId, onClose, onUpdated }: { leadId: number; onCl
                   )}
                 </div>
               )}
+
+              {/* WHATSAPP TAB */}
+              {tab === "whatsapp" && lead && (() => {
+                const waNumber = lead.whatsapp || lead.phone || "";
+                const cleanWaNum = waNumber.replace(/[\s\-().]/g, "").replace(/[^\d+]/g, "").replace(/^\+/, "");
+                const waWebUrl = cleanWaNum ? `https://wa.me/${cleanWaNum}` : null;
+
+                const handleWaSend = async () => {
+                  if (!waNumber) return;
+                  if (!waInput.trim() && !waTemplateId) return;
+                  setWaSending(true);
+                  try {
+                    const res = await api("/admin/whatsapp/send", {
+                      method: "POST",
+                      body: JSON.stringify({
+                        leadId,
+                        templateId: waTemplateId ?? undefined,
+                        message: !waTemplateId ? waInput.trim() : undefined,
+                        senderName: "Admin",
+                      }),
+                    });
+                    setWaInput("");
+                    setWaTemplateId(null);
+                    refetchWa();
+                    if (res.waUrl) window.open(res.waUrl, "_blank");
+                  } catch { /* noop */ }
+                  setWaSending(false);
+                };
+
+                return (
+                  <div className="flex flex-col h-full gap-4">
+                    {/* Header with number + open WA Web */}
+                    <div className="flex items-center gap-3 p-3 rounded-xl bg-green-50 border border-green-100">
+                      <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center shrink-0">
+                        <MessageCircleWa size={16} className="text-white" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-800">{lead.name}</p>
+                        <p className="text-xs text-gray-500">{waNumber || "No number on file"}</p>
+                      </div>
+                      {waWebUrl && (
+                        <a href={waWebUrl} target="_blank" rel="noreferrer"
+                          className="flex items-center gap-1 px-3 py-1.5 bg-green-500 text-white text-xs rounded-lg hover:bg-green-600 transition-colors font-medium shrink-0">
+                          <ExternalLink size={11} />Open Chat
+                        </a>
+                      )}
+                    </div>
+
+                    {!waNumber && (
+                      <div className="text-center py-4 text-sm text-amber-600 bg-amber-50 rounded-xl border border-amber-100">
+                        This lead has no WhatsApp or phone number. Edit the Info tab to add one.
+                      </div>
+                    )}
+
+                    {/* Message history */}
+                    <div className="flex-1 overflow-y-auto space-y-2 max-h-64 pr-1">
+                      {waMsgs.length === 0 ? (
+                        <div className="text-center py-8 text-gray-300 text-sm">No messages yet — send the first one below.</div>
+                      ) : (
+                        [...waMsgs].reverse().map(msg => (
+                          <div key={msg.id} className={`flex ${msg.direction === "outgoing" ? "justify-end" : "justify-start"}`}>
+                            <div className={`max-w-[80%] rounded-2xl px-3 py-2 text-xs shadow-sm ${msg.direction === "outgoing" ? "bg-[#0f2044] text-white rounded-br-sm" : "bg-gray-100 text-gray-800 rounded-bl-sm"}`}>
+                              <p className="leading-relaxed whitespace-pre-line">{msg.message}</p>
+                              <div className={`flex items-center gap-1 mt-1 ${msg.direction === "outgoing" ? "text-white/50 justify-end" : "text-gray-400"}`}>
+                                {msg.senderName && <span className="text-[9px]">{msg.senderName} ·</span>}
+                                <span className="text-[9px]">{new Date(msg.createdAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}</span>
+                                {msg.templateName && <span className="text-[9px] opacity-70">· {msg.templateName}</span>}
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                      <div ref={waEndRef} />
+                    </div>
+
+                    {/* Compose */}
+                    {waNumber && (
+                      <div className="space-y-2 border-t pt-3">
+                        <select value={waTemplateId ?? ""} onChange={e => { setWaTemplateId(e.target.value ? Number(e.target.value) : null); setWaInput(""); }}
+                          className="w-full h-8 border border-gray-200 rounded-lg px-3 text-xs focus:outline-none bg-white">
+                          <option value="">— Custom message (no template) —</option>
+                          {waTemplates.filter(t => t.isActive !== false).map(t => (
+                            <option key={t.id} value={t.id}>{t.name}</option>
+                          ))}
+                        </select>
+                        {!waTemplateId && (
+                          <textarea
+                            value={waInput}
+                            onChange={e => setWaInput(e.target.value)}
+                            rows={3}
+                            placeholder="Type a WhatsApp message…"
+                            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-400 resize-none"
+                          />
+                        )}
+                        {waTemplateId && (
+                          <div className="bg-gray-50 rounded-xl px-3 py-2 text-xs text-gray-500 font-mono">
+                            {waTemplates.find(t => t.id === waTemplateId)?.body ?? ""}
+                          </div>
+                        )}
+                        <button
+                          disabled={waSending || (!waInput.trim() && !waTemplateId)}
+                          onClick={handleWaSend}
+                          className="w-full flex items-center justify-center gap-2 py-2 bg-green-500 hover:bg-green-600 text-white text-sm rounded-xl transition-colors disabled:opacity-40 font-medium"
+                        >
+                          {waSending ? <RefreshCw size={13} className="animate-spin" /> : <Send size={13} />}
+                          {waSending ? "Opening WhatsApp…" : "Send via WhatsApp"}
+                        </button>
+                        <p className="text-[10px] text-gray-400 text-center">This will open WhatsApp Web and save the message to CRM history.</p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </>
           ) : null}
         </div>

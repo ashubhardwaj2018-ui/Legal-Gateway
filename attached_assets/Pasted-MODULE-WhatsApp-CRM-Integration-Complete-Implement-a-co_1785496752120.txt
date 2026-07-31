@@ -1,0 +1,143 @@
+MODULE – WhatsApp CRM Integration (Complete)
+Implement a complete WhatsApp integration throughout the CRM.
+This should not only open WhatsApp but also store communication history and integrate with leads.
+Lead WhatsApp Integration
+Every lead should have the following fields:
+•	Mobile Number 
+•	WhatsApp Number 
+•	Country Code 
+•	WhatsApp Verified Status 
+•	Last WhatsApp Message 
+•	Last Message Date 
+•	WhatsApp Status 
+If WhatsApp number is blank, use the Mobile Number automatically.
+________________________________________
+WhatsApp Button
+Every Lead page should display a prominent WhatsApp button.
+Clicking it should:
+•	Open the conversation with the lead. 
+•	If integrated with the WhatsApp Business API, send messages directly from the CRM. 
+•	If the API is not configured, open WhatsApp Web with the lead's number and a pre-filled message. 
+Store every outgoing message in the CRM history, including timestamp and sender.
+________________________________________
+Company WhatsApp Number
+Create a settings page:
+Settings → Company Information
+Admin should be able to configure:
+•	Company Name 
+•	Company Logo 
+•	Company Email 
+•	Company Mobile 
+•	Company WhatsApp Number 
+•	WhatsApp Business API credentials (optional) 
+•	Office Address 
+•	Website 
+•	GSTIN 
+•	CIN 
+•	PAN 
+Use the configured company WhatsApp number for all CRM messaging.
+________________________________________
+WhatsApp Templates
+Admin can create reusable templates.
+Examples:
+•	Welcome 
+•	Thank You 
+•	Lead Received 
+•	Quotation Sent 
+•	Invoice Sent 
+•	Payment Reminder 
+•	Document Request 
+•	Follow-up 
+•	Service Completed 
+•	Birthday Wishes 
+•	Festival Greetings 
+Support placeholders such as:
+{{ClientName}}
+{{CompanyName}}
+{{LeadID}}
+{{ServiceName}}
+{{QuotationNo}}
+{{InvoiceNo}}
+{{Amount}}
+{{AssignedEmployee}}
+{{DueDate}}
+{{Website}}
+{{CompanyWhatsApp}}
+{{SupportEmail}}
+________________________________________
+Automatic WhatsApp Triggers
+Automatically send WhatsApp messages when:
+•	A new lead is created. 
+•	A lead is assigned to an employee. 
+•	Lead status changes. 
+•	Quotation is generated. 
+•	Quotation is approved. 
+•	Invoice is generated. 
+•	Payment reminder is due. 
+•	Documents are requested. 
+•	Service is completed. 
+•	Customer account is created. 
+Admin should be able to enable or disable each automation.
+________________________________________
+WhatsApp Chat History
+Maintain a full conversation timeline.
+Display:
+•	Sent messages 
+•	Received messages (when API is connected) 
+•	Attachments 
+•	PDFs 
+•	Images 
+•	Voice notes 
+•	Documents 
+•	Timestamps 
+•	Employee who sent the message 
+________________________________________
+WhatsApp from Every Module
+Add WhatsApp actions in:
+•	Leads 
+•	Customers 
+•	Quotations 
+•	Invoices 
+•	Payments 
+•	Company Database 
+•	Employee Directory 
+________________________________________
+Employee Permissions
+Permissions should include:
+•	View WhatsApp 
+•	Send WhatsApp 
+•	View Templates 
+•	Manage Templates 
+•	Broadcast Messages 
+•	Configure WhatsApp Settings 
+
+Bulk WhatsApp
+Admin can send WhatsApp messages to:
+•	Selected Leads 
+•	All Leads 
+•	Leads by Status 
+•	Leads by Service 
+•	Leads by City 
+•	Leads by State 
+•	Customers 
+Include scheduling and delivery logs.
+________________________________________
+WhatsApp Dashboard
+Show:
+•	Messages Sent Today 
+•	Messages Delivered 
+•	Failed Messages 
+•	Pending Queue 
+•	Top Employees by WhatsApp Activity 
+•	Response Time 
+•	Conversation Statistics 
+________________________________________
+Future Ready
+Build the module with a provider abstraction so it can later support:
+•	WhatsApp Business Cloud API 
+•	Twilio 
+•	360dialog 
+•	Gupshup 
+•	Interakt 
+•	Other providers 
+The CRM should work initially with WhatsApp Web and be easy to switch to an API provider later without changing the rest of the application.

@@ -36,6 +36,7 @@ import AdminEmployees from "@/pages/admin/employees";
 import AdminRoles from "@/pages/admin/roles";
 import AdminLoginHistory from "@/pages/admin/login-history";
 import AdminActivityLog from "@/pages/admin/activity-log";
+import AdminWhatsApp from "@/pages/admin/whatsapp";
 import EmployeeDashboard from "@/pages/admin/employee-dashboard";
 import TeamPerformance from "@/pages/admin/team-performance";
 import PortalLogin from "@/pages/portal/login";
@@ -89,6 +90,7 @@ function Router() {
       <Route path="/admin/roles" component={AdminRoles} />
       <Route path="/admin/login-history" component={AdminLoginHistory} />
       <Route path="/admin/activity-log" component={AdminActivityLog} />
+      <Route path="/admin/whatsapp" component={AdminWhatsApp} />
       <Route path="/admin/my-dashboard" component={EmployeeDashboard} />
       <Route path="/admin/team-performance" component={TeamPerformance} />
 

@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, integer, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -27,6 +27,12 @@ export const consultationsTable = pgTable("consultations", {
   expectedClosingDate: text("expected_closing_date"),
   nextFollowUp: timestamp("next_follow_up", { withTimezone: true }),
   tags: text("tags"),
+  // WhatsApp CRM fields
+  countryCode: text("country_code").default("+91"),
+  whatsappVerified: boolean("whatsapp_verified").default(false),
+  lastWhatsappMessage: text("last_whatsapp_message"),
+  lastWhatsappDate: timestamp("last_whatsapp_date", { withTimezone: true }),
+  whatsappStatus: text("whatsapp_status").default("unknown"), // unknown | active | blocked | invalid
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

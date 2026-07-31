@@ -7,6 +7,7 @@ import {
   Settings, Building2, Mail, User, Scale, Menu, X, ChevronRight,
   Briefcase, ExternalLink, MapPin, BookOpen, UserCog, CheckSquare, TrendingUp,
   LogOut, ShieldCheck, Loader2, Layers, Shield, History, Activity, BarChart2, Upload,
+  MessageCircle,
 } from "lucide-react";
 
 interface NavItem {
@@ -31,6 +32,7 @@ const navItems: NavItem[] = [
   { href: "/admin/indian-companies",label: "Indian Companies DB", icon: Building2,                     module: "indian_companies" },
   { href: "/admin/tasks",           label: "Task Management",     icon: CheckSquare,                   module: "tasks" },
   { href: "/admin/invoices",        label: "Invoice & Finance",   icon: FileText,                      module: "invoices" },
+  { href: "/admin/whatsapp",        label: "WhatsApp CRM",        icon: MessageCircle,                 module: "whatsapp" },
   { href: "/admin/chat",            label: "Team Chat",           icon: MessageSquare,                 module: "chat" },
   { href: "/admin/email",           label: "Email",               icon: Mail,                          module: "email" },
   { href: "/admin/reports",         label: "Reports",             icon: TrendingUp,                    module: "reports" },
