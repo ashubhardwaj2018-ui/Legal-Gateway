@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, desc } from "drizzle-orm";
 import { db, quotationsTable } from "@workspace/db";
 import { requirePermission } from "./auth";
+import { fireWhatsAppTrigger } from "./whatsapp";
 import {
   CreateQuotationBody,
   UpdateQuotationBody,
@@ -128,6 +129,11 @@ router.post("/admin/quotations/:id/send", requirePermission("quotations", "send"
   if (!result) {
     res.status(404).json({ error: "Quotation not found" });
     return;
+  }
+  if ((result as Record<string, unknown>).leadId) {
+    fireWhatsAppTrigger("quotation_sent", (result as Record<string, unknown>).leadId as number, {
+      QuotationNo: (result as Record<string, unknown>).quotationNumber as string ?? "",
+    }).catch(() => {});
   }
   res.json(result);
 });

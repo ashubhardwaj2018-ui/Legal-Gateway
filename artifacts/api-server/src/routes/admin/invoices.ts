@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import { createNotification } from "./notifications";
+import { fireWhatsAppTrigger } from "./whatsapp";
 import type { AuthenticatedRequest } from "./auth";
 import { eq, ilike, and, desc, count, asc } from "drizzle-orm";
 import { db, invoicesTable, invoicePaymentsTable } from "@workspace/db";
@@ -161,6 +162,9 @@ router.patch("/admin/invoices/:id", async (req, res): Promise<void> => {
 
   const [inv] = await db.update(invoicesTable).set(updates).where(eq(invoicesTable.id, id)).returning();
   if (!inv) { res.status(404).json({ error: "Not found" }); return; }
+  if (updates.status === "sent" && inv.leadId) {
+    fireWhatsAppTrigger("invoice_sent", inv.leadId, { InvoiceNo: inv.number, Amount: String(inv.total) }).catch(() => {});
+  }
   res.json(inv);
 });
 

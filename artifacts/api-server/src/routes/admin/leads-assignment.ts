@@ -3,6 +3,7 @@ import { eq, and, desc, asc, count, sql } from "drizzle-orm";
 import { db, consultationsTable, leadAssignmentsTable, leadTimelineTable, teamMembersTable } from "@workspace/db";
 import type { AuthenticatedRequest } from "./auth";
 import { createNotification } from "./notifications";
+import { fireWhatsAppTrigger } from "./whatsapp";
 
 const router: IRouter = Router();
 
@@ -240,6 +241,7 @@ router.post("/admin/leads/:id/assign", async (req: AuthenticatedRequest, res): P
     });
   }
 
+  fireWhatsAppTrigger("lead_assigned", id, { AssignedEmployee: newAssignees[0]?.name ?? "" }).catch(() => {});
   res.status(201).json({ assigned: inserted, count: inserted.length });
 });
 

@@ -12,7 +12,19 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Trash2, Send, Eye, FileText, PlusCircle, Printer } from "lucide-react";
+import { Plus, Trash2, Send, Eye, FileText, PlusCircle, Printer, MessageCircle } from "lucide-react";
+
+/** Call /admin/whatsapp/send, store the message, then open WhatsApp Web. */
+async function sendWaFromQuotation(toNumber: string, message: string) {
+  try {
+    const r = await fetch("/api/admin/whatsapp/send", {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ toNumber, message, senderName: "Admin" }),
+    });
+    if (r.ok) { const d = await r.json(); if (d.waUrl) window.open(d.waUrl, "_blank"); }
+  } catch { /* noop */ }
+}
 
 type QuotationItem = { serviceName: string; description: string; quantity: number; unitPrice: number; total: number };
 
@@ -402,6 +414,16 @@ export default function AdminQuotations() {
                       {q.status === "draft" && (
                         <Button size="sm" variant="ghost" onClick={() => handleSend(q.id)} className="h-7 px-2 text-xs gap-1 text-blue-600">
                           <Send size={12} /> Send
+                        </Button>
+                      )}
+                      {q.clientPhone && (
+                        <Button size="sm" variant="ghost"
+                          onClick={() => {
+                            const num = q.clientPhone!.replace(/[\s\-().]/g, "").replace(/[^\d+]/g, "");
+                            sendWaFromQuotation(num, `Dear ${q.clientName}, your quotation ${q.quotationNumber} for ₹${Number(q.total).toLocaleString("en-IN")} is ready for your review. Please let us know if you have any questions. — Vakil & Co.`);
+                          }}
+                          className="h-7 px-2 text-xs gap-1 text-green-600 hover:text-green-700 hover:bg-green-50">
+                          <MessageCircle size={12} /> WA
                         </Button>
                       )}
                     </div>

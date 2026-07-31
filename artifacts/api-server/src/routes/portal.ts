@@ -10,6 +10,7 @@ import {
   quotationsTable, invoicePaymentsTable,
   portalDocumentsTable, portalChatMessagesTable,
   leadAssignmentsTable, leadTimelineTable, leadActivitiesTable,
+  adminUsersTable,
 } from "@workspace/db";
 import { createNotification } from "./admin/notifications";
 
@@ -47,14 +48,28 @@ async function portalAuth(req: Request, res: Response, next: NextFunction): Prom
   next();
 }
 
-/** Notify all employees assigned to a lead */
+/** Notify all employees assigned to a lead.
+ *  Falls back to all active admins when the lead has no specific assignees,
+ *  so client actions are never silently dropped on unassigned cases. */
 async function notifyAssignees(leadId: number, type: string, title: string, body: string, link: string) {
   try {
     const assignments = await db.select()
       .from(leadAssignmentsTable)
       .where(and(eq(leadAssignmentsTable.leadId, leadId), eq(leadAssignmentsTable.status, "active")));
-    for (const a of assignments) {
-      await createNotification({ recipientId: a.assignedToId, recipientType: "employee", type, title, body, entityType: "lead", entityId: leadId, link });
+
+    if (assignments.length > 0) {
+      for (const a of assignments) {
+        await createNotification({ recipientId: a.assignedToId, recipientType: "employee", type, title, body, entityType: "lead", entityId: leadId, link });
+      }
+    } else {
+      // No assignees — fall back to all active admins so the action is not lost
+      const admins = await db.select({ id: adminUsersTable.id }).from(adminUsersTable);
+      for (const admin of admins) {
+        await createNotification({
+          recipientId: admin.id, recipientType: "admin",
+          type, title: `[Unassigned] ${title}`, body, entityType: "lead", entityId: leadId, link,
+        });
+      }
     }
   } catch { /* non-fatal */ }
 }

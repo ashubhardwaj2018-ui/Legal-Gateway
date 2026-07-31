@@ -12,6 +12,7 @@ import {
 } from "@workspace/db";
 import type { AuthenticatedRequest } from "./auth";
 import { createNotification } from "./notifications";
+import { fireWhatsAppTrigger } from "./whatsapp";
 
 const router: IRouter = Router();
 
@@ -255,6 +256,7 @@ router.post("/admin/leads", async (req: AuthenticatedRequest, res): Promise<void
 
   await logActivity(lead.id, "created", `Lead created manually`);
   await logTimeline(lead.id, "created", `Lead created for ${body.name}`, req);
+  fireWhatsAppTrigger("lead_created", lead.id).catch(() => {});
   req.log.info({ id: lead.id }, "Lead created");
   res.status(201).json(lead);
 });
@@ -309,6 +311,7 @@ router.patch("/admin/leads/:id", async (req: AuthenticatedRequest, res): Promise
   if (body.status && body.status !== before.status) {
     await logActivity(id, "status_change", `Status changed from "${before.status}" to "${body.status}"`);
     await logTimeline(id, "status_changed", `Status changed from "${before.status}" to "${body.status}"`, req as AuthenticatedRequest);
+    fireWhatsAppTrigger("status_changed", id, { NewStatus: String(body.status) }).catch(() => {});
 
     // Notify all active assignees of the status change
     const assignees = await db.select()

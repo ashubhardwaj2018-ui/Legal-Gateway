@@ -6,8 +6,19 @@ import {
   Plus, Search, Printer, Trash2, X, IndianRupee, CreditCard,
   ChevronRight, Eye, Send, CheckCircle2, Clock, AlertCircle,
   FileText, ReceiptText, ShoppingCart, Download, Pencil,
-  PlusCircle, Minus,
+  PlusCircle, Minus, MessageCircle,
 } from "lucide-react";
+
+async function sendWaFromInvoice(toNumber: string, message: string) {
+  try {
+    const r = await fetch("/api/admin/whatsapp/send", {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ toNumber, message, senderName: "Admin" }),
+    });
+    if (r.ok) { const d = await r.json(); if (d.waUrl) window.open(d.waUrl, "_blank"); }
+  } catch { /* noop */ }
+}
 
 interface InvoiceItem {
   _id: string;
@@ -482,6 +493,16 @@ export default function AdminInvoices() {
                         <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
                           <button onClick={() => openInvoice(inv)} className="p-1.5 text-gray-400 hover:text-[#0f2044] hover:bg-gray-100 rounded-lg transition-colors"><Eye size={13} /></button>
                           <button onClick={() => printInvoice(inv)} className="p-1.5 text-gray-400 hover:text-[#0f2044] hover:bg-gray-100 rounded-lg transition-colors"><Printer size={13} /></button>
+                          {inv.clientPhone && (
+                            <button
+                              onClick={() => {
+                                const num = inv.clientPhone!.replace(/[\s\-().]/g, "").replace(/[^\d+]/g, "");
+                                sendWaFromInvoice(num, `Dear ${inv.clientName}, your ${inv.type} ${inv.number} for ₹${Number(inv.total).toLocaleString("en-IN")} is ready. Balance due: ₹${(Number(inv.total) - Number(inv.paidAmount ?? 0)).toLocaleString("en-IN")}. Please contact us for any queries. — Vakil & Co.`);
+                              }}
+                              className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                              title="Send WhatsApp"
+                            ><MessageCircle size={13} /></button>
+                          )}
                           <button onClick={() => openCreate(inv)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Pencil size={13} /></button>
                           <button onClick={() => deleteInvoice(inv.id)} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={13} /></button>
                         </div>

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Save, Building2, Phone, Clock, Share2, Briefcase } from "lucide-react";
+import { Save, Building2, Phone, Clock, Share2, Briefcase, MessageCircle } from "lucide-react";
 
 const SETTING_GROUPS = [
   {
@@ -34,9 +34,15 @@ const SETTING_GROUPS = [
     icon: Share2,
     keys: ["linkedin_url", "twitter_url", "facebook_url", "instagram_url"],
   },
+  {
+    id: "whatsapp",
+    label: "WhatsApp Settings",
+    icon: MessageCircle,
+    keys: ["company_whatsapp", "whatsapp_provider", "whatsapp_api_key", "whatsapp_phone_number_id", "whatsapp_business_account_id"],
+  },
 ];
 
-const KEY_LABELS: Record<string, { label: string; placeholder: string; multiline?: boolean }> = {
+const KEY_LABELS: Record<string, { label: string; placeholder: string; multiline?: boolean; type?: "select"; options?: string[] }> = {
   site_name: { label: "Firm Name", placeholder: "Vakil & Co. Legal Associates" },
   site_tagline: { label: "Tagline", placeholder: "India's Premium Legal Network" },
   gst_number: { label: "GST Number", placeholder: "27AABCV1234F1Z5" },
@@ -52,6 +58,12 @@ const KEY_LABELS: Record<string, { label: string; placeholder: string; multiline
   twitter_url: { label: "Twitter/X URL", placeholder: "https://twitter.com/vakilco" },
   facebook_url: { label: "Facebook URL", placeholder: "https://facebook.com/vakilco" },
   instagram_url: { label: "Instagram URL", placeholder: "https://instagram.com/vakilco" },
+  // WhatsApp
+  company_whatsapp:            { label: "Company WhatsApp Number", placeholder: "+91 98765 43210" },
+  whatsapp_provider:           { label: "Provider", placeholder: "web", type: "select" as const, options: ["web", "waba", "twilio", "360dialog", "gupshup", "interakt"] },
+  whatsapp_api_key:            { label: "API Key / Token", placeholder: "Leave blank if using WhatsApp Web" },
+  whatsapp_phone_number_id:    { label: "Phone Number ID (WABA)", placeholder: "Meta phone_number_id" },
+  whatsapp_business_account_id:{ label: "Business Account ID (WABA)", placeholder: "Meta waba_id" },
 };
 
 export default function AdminSettings() {
@@ -140,7 +152,17 @@ export default function AdminSettings() {
                 return (
                   <div key={key}>
                     <Label className="text-xs text-gray-700">{meta.label}</Label>
-                    {meta.multiline ? (
+                    {meta.type === "select" ? (
+                      <select
+                        className="mt-1 h-9 w-full border border-input rounded-md px-3 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                        value={values[key] ?? ""}
+                        onChange={e => setValue(key, e.target.value)}
+                      >
+                        {(meta.options ?? []).map(opt => (
+                          <option key={opt} value={opt}>{opt}</option>
+                        ))}
+                      </select>
+                    ) : meta.multiline ? (
                       <Textarea
                         className="mt-1 text-sm resize-none"
                         rows={3}
