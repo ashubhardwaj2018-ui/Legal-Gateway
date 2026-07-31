@@ -782,11 +782,171 @@ function EmailTab() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// FOLLOW-UPS TAB
+// ═══════════════════════════════════════════════════════════════════════════════
+
+interface FollowUpLead {
+  id: number; name: string; phone: string; serviceInterest: string;
+  status: string; nextFollowUp: string | null; isOverdue: boolean;
+  priority: string | null; assignedTo: string | null;
+}
+
+function FollowUpsTab() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [newDate, setNewDate] = useState("");
+
+  const { data: followUps = [], isLoading } = useQuery<FollowUpLead[]>({
+    queryKey: ["follow-ups"],
+    queryFn: () => api("/admin/leads/follow-ups"),
+    refetchInterval: 5 * 60 * 1000, // refresh every 5 min
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, nextFollowUp }: { id: number; nextFollowUp: string | null }) =>
+      api(`/admin/leads/${id}`, { method: "PATCH", body: JSON.stringify({ nextFollowUp }), headers: { "Content-Type": "application/json" } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["follow-ups"] });
+      setEditingId(null);
+      setNewDate("");
+      toast({ title: "Follow-up reminder updated" });
+    },
+  });
+
+  const overdue = followUps.filter(f => f.isOverdue);
+  const upcoming = followUps.filter(f => !f.isOverdue);
+
+  const fmtDate = (d: string | null) => {
+    if (!d) return "—";
+    const date = new Date(d);
+    return date.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) +
+      " " + date.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+  };
+
+  function LeadCard({ lead }: { lead: FollowUpLead }) {
+    const isEditing = editingId === lead.id;
+    return (
+      <div className={`bg-white rounded-xl border p-4 ${lead.isOverdue ? "border-red-200 bg-red-50/30" : "border-gray-100"}`}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 mb-1">
+              <p className="font-semibold text-[#0f2044] text-sm truncate">{lead.name}</p>
+              {lead.priority && lead.priority !== "medium" && (
+                <span className={`text-[9px] px-1.5 py-0.5 rounded capitalize shrink-0 ${lead.priority === "urgent" ? "bg-red-100 text-red-700" : lead.priority === "high" ? "bg-orange-100 text-orange-700" : "bg-gray-100 text-gray-600"}`}>{lead.priority}</span>
+              )}
+            </div>
+            <p className="text-xs text-gray-500 mb-1.5 truncate">{lead.serviceInterest}</p>
+            <div className="flex items-center gap-2">
+              <span className={`flex items-center gap-1 text-xs font-medium ${lead.isOverdue ? "text-red-600" : "text-amber-600"}`}>
+                <Clock size={11} /> {lead.isOverdue ? "Overdue: " : "Due: "}{fmtDate(lead.nextFollowUp)}
+              </span>
+            </div>
+          </div>
+          <div className="flex flex-col gap-1.5 shrink-0">
+            {!isEditing ? (
+              <button
+                onClick={() => { setEditingId(lead.id); setNewDate(lead.nextFollowUp ? lead.nextFollowUp.slice(0, 16) : ""); }}
+                className="text-[10px] px-2.5 py-1 rounded-lg bg-[#0f2044] text-white hover:bg-[#1a3060] transition-colors"
+              >
+                Reschedule
+              </button>
+            ) : null}
+            <button
+              onClick={() => updateMutation.mutate({ id: lead.id, nextFollowUp: null })}
+              className="text-[10px] px-2.5 py-1 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+        {isEditing && (
+          <div className="mt-3 flex gap-2">
+            <input
+              type="datetime-local"
+              value={newDate}
+              onChange={e => setNewDate(e.target.value)}
+              className="flex-1 text-xs h-8 border border-gray-200 rounded-lg px-2 focus:outline-none focus:border-[#c9a227]"
+            />
+            <button
+              onClick={() => updateMutation.mutate({ id: lead.id, nextFollowUp: newDate || null })}
+              disabled={updateMutation.isPending}
+              className="text-[10px] px-3 py-1 rounded-lg bg-[#c9a227] text-white hover:bg-[#c9a227]/90 font-medium disabled:opacity-50"
+            >
+              {updateMutation.isPending ? "Saving…" : "Save"}
+            </button>
+            <button onClick={() => setEditingId(null)} className="text-[10px] px-2 py-1 rounded-lg bg-gray-100 text-gray-600">Cancel</button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-48">
+        <Loader2 size={24} className="animate-spin text-[#c9a227]" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Set new follow-up */}
+      <div className="bg-gradient-to-r from-[#0f2044] to-[#1a3060] rounded-2xl p-5 text-white">
+        <div className="flex items-center gap-2 mb-1">
+          <RefreshCw size={16} className="text-[#c9a227]" />
+          <h3 className="font-semibold text-sm">Follow-up Reminders</h3>
+        </div>
+        <p className="text-white/60 text-xs">
+          {followUps.length === 0
+            ? "No follow-ups scheduled in the next 48 hours."
+            : `${overdue.length} overdue · ${upcoming.length} upcoming`}
+        </p>
+      </div>
+
+      {overdue.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <AlertCircle size={14} className="text-red-500" />
+            <h4 className="text-sm font-semibold text-red-600">Overdue ({overdue.length})</h4>
+          </div>
+          <div className="space-y-3">
+            {overdue.map(f => <LeadCard key={f.id} lead={f} />)}
+          </div>
+        </div>
+      )}
+
+      {upcoming.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <Clock size={14} className="text-amber-500" />
+            <h4 className="text-sm font-semibold text-[#0f2044]">Upcoming — Next 48 Hours ({upcoming.length})</h4>
+          </div>
+          <div className="space-y-3">
+            {upcoming.map(f => <LeadCard key={f.id} lead={f} />)}
+          </div>
+        </div>
+      )}
+
+      {followUps.length === 0 && (
+        <div className="text-center py-12 text-gray-400">
+          <CheckCircle2 size={36} className="mx-auto mb-3 opacity-30" />
+          <p className="text-sm font-medium">All caught up!</p>
+          <p className="text-xs mt-1">No follow-ups due in the next 48 hours.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
 const TABS = [
   { key: "overview", label: "Overview", icon: TrendingUp },
   { key: "leads", label: "My Leads", icon: Users },
+  { key: "followups", label: "Follow-ups", icon: RefreshCw },
   { key: "chat", label: "Chat", icon: MessageSquare },
   { key: "email", label: "Email", icon: Mail },
 ] as const;
@@ -818,6 +978,11 @@ export default function EmployeeDashboard() {
                 {kpi.pendingTasks}
               </span>
             )}
+            {key === "followups" && kpi && kpi.todayFollowUps > 0 && (
+              <span className="bg-red-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none ml-1">
+                {kpi.todayFollowUps}
+              </span>
+            )}
             {key === "chat" && kpi && kpi.newMessages > 0 && (
               <span className="bg-[#c9a227] text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none ml-1">
                 {kpi.newMessages}
@@ -829,6 +994,7 @@ export default function EmployeeDashboard() {
 
       {activeTab === "overview" && <OverviewTab />}
       {activeTab === "leads" && <LeadsTab />}
+      {activeTab === "followups" && <FollowUpsTab />}
       {activeTab === "chat" && <ChatTab />}
       {activeTab === "email" && <EmailTab />}
     </AdminLayout>

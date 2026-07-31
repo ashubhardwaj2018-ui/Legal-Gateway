@@ -153,7 +153,7 @@ router.get("/portal/cases", portalAuth, async (req, res): Promise<void> => {
   res.json(cases.map(c => ({
     id: c.id, service: c.serviceInterest, status: c.status,
     priority: c.priority, assignedTo: c.assignedTo,
-    nextFollowUp: c.nextFollowUp, lastContact: c.lastContact,
+    nextFollowUp: c.nextFollowUp,
     notes: c.notes, createdAt: c.createdAt,
     message: c.message,
   })));

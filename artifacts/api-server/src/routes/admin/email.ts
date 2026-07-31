@@ -316,7 +316,7 @@ router.post("/admin/email/send", requirePermission("email", "send"), async (req,
 });
 
 router.post("/admin/email/send-invoice/:id", requirePermission("email", "send"), async (req, res): Promise<void> => {
-  const invoiceId = parseInt(req.params.id, 10);
+  const invoiceId = parseInt(String(req.params.id ?? ""), 10);
   const [inv] = await db.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
   if (!inv || !inv.clientEmail) { res.status(400).json({ error: "Invoice not found or no client email" }); return; }
 
@@ -351,7 +351,7 @@ router.get("/admin/email/logs", async (req, res): Promise<void> => {
 });
 
 router.get("/admin/email/logs/:id/track", async (req: Request, res: Response): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id ?? ""), 10);
   const [log] = await db.select().from(emailLogsTable).where(eq(emailLogsTable.id, id));
   if (log && !log.openedAt) {
     await db.update(emailLogsTable).set({ openedAt: new Date() }).where(eq(emailLogsTable.id, id));

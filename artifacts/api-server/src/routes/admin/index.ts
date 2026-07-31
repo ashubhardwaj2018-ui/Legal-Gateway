@@ -24,7 +24,7 @@ import rolesRouter from "./roles";
 import loginHistoryRouter from "./login-history";
 import activityLogsRouter from "./activity-logs";
 import performanceRouter from "./performance";
-import notificationsRouter from "./notifications";
+import notificationsRouter, { startFollowUpScheduler } from "./notifications";
 
 const router: IRouter = Router();
 
@@ -32,6 +32,9 @@ const router: IRouter = Router();
 seedDefaultAdmin().catch(() => {});
 seedDefaultRoles().catch(() => {});
 seedDefaultRolePermissions().catch(() => {});
+
+// Follow-up reminder scheduler
+startFollowUpScheduler();
 
 // Public auth routes (no auth required)
 router.use(authRouter);

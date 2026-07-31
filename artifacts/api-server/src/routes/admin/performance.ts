@@ -350,4 +350,45 @@ router.get("/admin/performance/chart/:employeeId", async (req: AuthenticatedRequ
   res.json({ chart });
 });
 
+// ── GET /admin/performance/workload — per-employee lead counts ────────────────
+// Used by the admin workload/reassignment dashboard.
+router.get("/admin/performance/workload", async (req: AuthenticatedRequest, res): Promise<void> => {
+  const perms = (req as { permissions?: { all: boolean; map: Record<string, Record<string, boolean>> } }).permissions;
+  const isEmployee = req.adminUser?.userType === "employee";
+  const canView = !isEmployee || perms?.all || perms?.map["team"]?.["view"] || perms?.map["team"]?.["manage"] || perms?.map["leads"]?.["manage"];
+  if (!canView) { res.status(403).json({ error: "Insufficient permissions" }); return; }
+
+  const members = await db.select({ id: teamMembersTable.id, name: teamMembersTable.name, designation: teamMembersTable.designation, department: teamMembersTable.department })
+    .from(teamMembersTable)
+    .where(eq(teamMembersTable.status, "active"));
+
+  const allAssignments = await db.select({ leadId: leadAssignmentsTable.leadId, assignedToId: leadAssignmentsTable.assignedToId })
+    .from(leadAssignmentsTable)
+    .where(eq(leadAssignmentsTable.status, "active"));
+
+  const allLeadIds = [...new Set(allAssignments.map(a => a.leadId))];
+  const allLeads = allLeadIds.length
+    ? await db.select({ id: consultationsTable.id, name: consultationsTable.name, status: consultationsTable.status, priority: consultationsTable.priority, serviceInterest: consultationsTable.serviceInterest })
+        .from(consultationsTable)
+        .where(inArray(consultationsTable.id, allLeadIds))
+    : [];
+
+  const result = members.map(m => {
+    const myAssignmentLeadIds = allAssignments.filter(a => a.assignedToId === m.id).map(a => a.leadId);
+    const myLeads = allLeads.filter(l => myAssignmentLeadIds.includes(l.id));
+    return {
+      id: m.id,
+      name: m.name,
+      designation: m.designation ?? "",
+      department: m.department ?? "",
+      totalLeads: myLeads.length,
+      activeLeads: myLeads.filter(l => !["won", "lost"].includes(l.status)).length,
+      wonLeads: myLeads.filter(l => l.status === "won").length,
+      leads: myLeads,
+    };
+  });
+
+  res.json(result.sort((a, b) => b.activeLeads - a.activeLeads));
+});
+
 export default router;

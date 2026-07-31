@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, and, ilike, or, inArray } from "drizzle-orm";
+import { eq, desc, asc, and, ilike, or, inArray, isNotNull, lte } from "drizzle-orm";
 import {
   db,
   consultationsTable,
@@ -83,6 +83,34 @@ async function requireLeadAccess(req: AuthenticatedRequest, leadId: number): Pro
   }
   return false;
 }
+
+// ── GET /admin/leads/follow-ups — upcoming & overdue follow-ups ───────────────
+// Must be registered BEFORE /:id to avoid "follow-ups" being parsed as an ID.
+router.get("/admin/leads/follow-ups", async (req: AuthenticatedRequest, res): Promise<void> => {
+  const userId = typeof req.adminUser?.userId === "number" ? req.adminUser.userId : null;
+  const isEmployee = req.adminUser?.userType === "employee";
+  const now = new Date();
+  const in48h = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+
+  if (isEmployee && userId) {
+    const assignments = await db.select({ leadId: leadAssignmentsTable.leadId })
+      .from(leadAssignmentsTable)
+      .where(and(eq(leadAssignmentsTable.assignedToId, userId), eq(leadAssignmentsTable.status, "active")));
+    const leadIds = [...new Set(assignments.map(a => a.leadId))];
+    if (!leadIds.length) { res.json([]); return; }
+
+    const rows = await db.select().from(consultationsTable)
+      .where(and(inArray(consultationsTable.id, leadIds), isNotNull(consultationsTable.nextFollowUp), lte(consultationsTable.nextFollowUp, in48h)))
+      .orderBy(asc(consultationsTable.nextFollowUp));
+    res.json(rows.map(l => ({ ...l, isOverdue: l.nextFollowUp ? l.nextFollowUp < now : false })));
+  } else {
+    // Admin: all follow-ups due within 48 hours
+    const rows = await db.select().from(consultationsTable)
+      .where(and(isNotNull(consultationsTable.nextFollowUp), lte(consultationsTable.nextFollowUp, in48h)))
+      .orderBy(asc(consultationsTable.nextFollowUp));
+    res.json(rows.map(l => ({ ...l, isOverdue: l.nextFollowUp ? l.nextFollowUp < now : false })));
+  }
+});
 
 // ── GET /admin/leads ──────────────────────────────────────────────────────────
 router.get("/admin/leads", async (req: AuthenticatedRequest, res): Promise<void> => {

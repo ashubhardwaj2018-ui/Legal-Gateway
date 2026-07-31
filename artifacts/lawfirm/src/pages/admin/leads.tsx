@@ -862,7 +862,11 @@ function LeadDetailDrawer({ leadId, onClose, onUpdated }: { leadId: number; onCl
 
 // ── Kanban Card ────────────────────────────────────────────────────────────────
 
-function KanbanCard({ lead, onClick }: { lead: Lead; onClick: () => void }) {
+function KanbanCard({ lead, onClick, onStatusChange }: {
+  lead: Lead;
+  onClick: () => void;
+  onStatusChange?: (status: string) => void;
+}) {
   return (
     <div
       onClick={onClick}
@@ -875,7 +879,7 @@ function KanbanCard({ lead, onClick }: { lead: Lead; onClick: () => void }) {
         )}
       </div>
       {lead.company && <p className="text-xs text-gray-500 mb-1.5 flex items-center gap-1"><Building2 size={10} />{lead.company}</p>}
-      <p className="text-[11px] text-gray-500 mb-2 truncate">{lead.serviceInterest}</p>
+      <p className="text-[11px] text-gray-500 mb-2 truncate">{lead.serviceInterest ?? "—"}</p>
       <div className="flex justify-between items-center">
         {lead.expectedRevenue ? (
           <span className="text-xs font-semibold text-[#0f2044]">₹ {lead.expectedRevenue}</span>
@@ -889,6 +893,21 @@ function KanbanCard({ lead, onClick }: { lead: Lead; onClick: () => void }) {
           {lead.tags.split(",").slice(0, 2).map(t => t.trim()).filter(Boolean).map(t => (
             <span key={t} className="text-[9px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">{t}</span>
           ))}
+        </div>
+      )}
+      {/* Inline stage mover — stops propagation so clicking here won't open the detail drawer */}
+      {onStatusChange && (
+        <div onClick={e => e.stopPropagation()} className="mt-2 pt-2 border-t border-gray-100">
+          <select
+            value={lead.status}
+            onChange={e => { e.stopPropagation(); onStatusChange(e.target.value); }}
+            onClick={e => e.stopPropagation()}
+            className="w-full text-[10px] border border-gray-200 rounded px-1.5 py-0.5 bg-gray-50 text-gray-600 focus:outline-none focus:border-[#c9a227] cursor-pointer"
+          >
+            {KANBAN_COLS.map(s => (
+              <option key={s.value} value={s.value}>{s.label}</option>
+            ))}
+          </select>
         </div>
       )}
     </div>
@@ -946,6 +965,13 @@ export default function AdminLeads() {
     ...col,
     leads: leads.filter(l => l.status === col.value),
   }));
+
+  // Inline Kanban status change
+  const patchStatus = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: string }) =>
+      api(`/admin/leads/${id}`, { method: "PATCH", body: JSON.stringify({ status }) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["leads"] }),
+  });
 
   // Stats
   const total = leads.length;
@@ -1055,7 +1081,7 @@ export default function AdminLeads() {
                   {col.leads.length === 0 ? (
                     <div className="text-center py-4 text-xs text-gray-400">No leads</div>
                   ) : col.leads.map(lead => (
-                    <KanbanCard key={lead.id} lead={lead} onClick={() => setSelectedId(lead.id)} />
+                    <KanbanCard key={lead.id} lead={lead} onClick={() => setSelectedId(lead.id)} onStatusChange={status => patchStatus.mutate({ id: lead.id, status })} />
                   ))}
                 </div>
               </div>
