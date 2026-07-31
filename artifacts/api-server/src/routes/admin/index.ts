@@ -25,6 +25,7 @@ import loginHistoryRouter from "./login-history";
 import activityLogsRouter from "./activity-logs";
 import performanceRouter from "./performance";
 import notificationsRouter, { startFollowUpScheduler } from "./notifications";
+import portalAdminRouter from "./portal-admin";
 
 const router: IRouter = Router();
 
@@ -103,5 +104,6 @@ router.use(activityLogsRouter);
 router.use(adminBlogsRouter);
 router.use(performanceRouter);
 router.use(notificationsRouter);
+router.use(portalAdminRouter);
 
 export default router;

@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AdminLayout } from "./AdminLayout";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import {
   Search, Download, Plus, X, ChevronRight, LayoutGrid, List,
-  Clock, CheckCircle2, Circle, Trash2, MessageSquare,
+  Clock, CheckCircle2, Circle, Trash2, MessageSquare, Send, Paperclip, FileText as FileDoc,
   Activity, Phone, Mail, Building2, MapPin, Tag, Star,
   Calendar, Target, User, AlertCircle, Pencil, UserPlus,
   FileText, Video, PhoneCall, RefreshCw, Users
@@ -235,11 +235,17 @@ const TIMELINE_COLORS: Record<string, string> = {
 };
 
 function LeadDetailDrawer({ leadId, onClose, onUpdated }: { leadId: number; onClose: () => void; onUpdated: () => void }) {
-  const [tab, setTab] = useState<"info" | "notes" | "tasks" | "timeline" | "assign">("info");
+  const [tab, setTab] = useState<"info" | "notes" | "tasks" | "timeline" | "assign" | "portal-chat" | "portal-docs">("info");
   const [noteText, setNoteText] = useState("");
   const [taskForm, setTaskForm] = useState({ title: "", dueDate: "", priority: "medium" });
   const [editField, setEditField] = useState<string | null>(null);
   const [editVal, setEditVal] = useState("");
+  // Portal chat state
+  const [portalChatInput, setPortalChatInput] = useState("");
+  const [portalChatSending, setPortalChatSending] = useState(false);
+  const [portalChatSenderName, setPortalChatSenderName] = useState("");
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatSseRef = useRef<EventSource | null>(null);
   // Assignment state
   const [assignMethod, setAssignMethod] = useState("individual");
   const [assignDept, setAssignDept] = useState("");
@@ -263,6 +269,39 @@ function LeadDetailDrawer({ leadId, onClose, onUpdated }: { leadId: number; onCl
     queryFn: () => api(`/admin/leads/${leadId}/timeline`),
     enabled: tab === "timeline",
   });
+
+  // Portal chat messages
+  interface PortalChatMsg { id: number; leadId: number; clientEmail: string; senderType: string; senderName: string; message: string; createdAt: string; }
+  const { data: portalChatMsgs = [], refetch: refetchPortalChat } = useQuery<PortalChatMsg[]>({
+    queryKey: ["portal-chat", leadId],
+    queryFn: () => api(`/admin/leads/${leadId}/portal-chat`),
+    enabled: tab === "portal-chat",
+  });
+
+  // Portal documents
+  interface PortalDoc { id: number; fileName: string; fileUrl: string; fileSize: number; mimeType: string; uploadedAt: string; clientEmail: string; }
+  const { data: portalDocs = [] } = useQuery<PortalDoc[]>({
+    queryKey: ["portal-docs", leadId],
+    queryFn: () => api(`/admin/leads/${leadId}/portal-documents`),
+    enabled: tab === "portal-docs",
+  });
+
+  // SSE for real-time portal chat on admin side
+  useEffect(() => {
+    if (tab !== "portal-chat") { chatSseRef.current?.close(); chatSseRef.current = null; return; }
+    const apiBase = (window as Window & { __API_BASE__?: string }).__API_BASE__ ?? "/api";
+    const es = new EventSource(`${apiBase}/admin/leads/${leadId}/portal-chat/sse`);
+    es.onmessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg.type === "message") refetchPortalChat();
+      } catch { /* ignore */ }
+    };
+    chatSseRef.current = es;
+    return () => { es.close(); chatSseRef.current = null; };
+  }, [tab, leadId]);
+
+  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [portalChatMsgs]);
 
   const { data: assignments = [] } = useQuery<LeadAssignment[]>({
     queryKey: ["lead-assignments", leadId],
@@ -416,13 +455,16 @@ function LeadDetailDrawer({ leadId, onClose, onUpdated }: { leadId: number; onCl
 
         {/* Tabs */}
         <div className="flex border-b px-4 bg-white overflow-x-auto">
-          {(["info", "notes", "tasks", "timeline", "assign"] as const).map(t => (
+          {(["info", "notes", "tasks", "timeline", "assign", "portal-chat", "portal-docs"] as const).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`px-3 py-2.5 text-xs font-medium capitalize whitespace-nowrap border-b-2 transition-colors ${tab === t ? "border-[#c9a227] text-[#0f2044]" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+              className={`px-3 py-2.5 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${tab === t ? "border-[#c9a227] text-[#0f2044]" : "border-transparent text-gray-500 hover:text-gray-700"}`}
             >
-              {t === "assign" ? <span className="flex items-center gap-1"><UserPlus size={11} />Assign</span> : t}
+              {t === "assign" && <span className="flex items-center gap-1"><UserPlus size={11} />Assign</span>}
+              {t === "portal-chat" && <span className="flex items-center gap-1"><MessageSquare size={11} />Portal Chat</span>}
+              {t === "portal-docs" && <span className="flex items-center gap-1"><Paperclip size={11} />Portal Docs</span>}
+              {!["assign", "portal-chat", "portal-docs"].includes(t) && <span className="capitalize">{t}</span>}
               {t === "notes" && lead?.notes?.length ? ` (${lead.notes.length})` : ""}
               {t === "tasks" && lead?.tasks?.length ? ` (${lead.tasks.length})` : ""}
             </button>
@@ -850,6 +892,125 @@ function LeadDetailDrawer({ leadId, onClose, onUpdated }: { leadId: number; onCl
                       )}
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* PORTAL CHAT TAB */}
+              {tab === "portal-chat" && (
+                <div className="flex flex-col" style={{ height: "480px" }}>
+                  <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+                    {portalChatMsgs.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                        <MessageSquare size={28} className="mb-2 opacity-30" />
+                        <p className="text-sm">No portal chat messages yet</p>
+                      </div>
+                    ) : portalChatMsgs.map(msg => {
+                      const isEmployee = msg.senderType === "employee";
+                      return (
+                        <div key={msg.id} className={`flex gap-2 ${isEmployee ? "flex-row-reverse" : "flex-row"}`}>
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${isEmployee ? "bg-[#c9a227] text-[#0f2044]" : "bg-[#0f2044] text-white"}`}>
+                            {msg.senderName.charAt(0).toUpperCase()}
+                          </div>
+                          <div className={`max-w-[75%] ${isEmployee ? "items-end" : "items-start"} flex flex-col gap-0.5`}>
+                            <div className={`text-[10px] font-semibold ${isEmployee ? "text-right text-[#0f2044]/60" : "text-gray-400"}`}>{msg.senderName}</div>
+                            <div className={`px-3 py-2 rounded-xl text-sm ${isEmployee ? "bg-[#0f2044] text-white rounded-tr-sm" : "bg-gray-100 text-gray-800 rounded-tl-sm"}`}>
+                              {msg.message}
+                            </div>
+                            <div className="text-[10px] text-gray-400 px-1">{new Date(msg.createdAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div ref={chatEndRef} />
+                  </div>
+                  <div className="border-t pt-3 mt-3 space-y-2">
+                    <input
+                      value={portalChatSenderName}
+                      onChange={e => setPortalChatSenderName(e.target.value)}
+                      placeholder="Your name (shown to client)"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-[#c9a227]"
+                    />
+                    <div className="flex gap-2">
+                      <input
+                        value={portalChatInput}
+                        onChange={e => setPortalChatInput(e.target.value)}
+                        onKeyDown={async e => {
+                          if (e.key === "Enter" && portalChatInput.trim()) {
+                            e.preventDefault();
+                            setPortalChatSending(true);
+                            await api(`/admin/leads/${leadId}/portal-chat/reply`, {
+                              method: "POST",
+                              body: JSON.stringify({ message: portalChatInput.trim(), senderName: portalChatSenderName || "Support Team" }),
+                            });
+                            setPortalChatInput("");
+                            refetchPortalChat();
+                            setPortalChatSending(false);
+                          }
+                        }}
+                        placeholder="Reply to client…"
+                        className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#c9a227]"
+                      />
+                      <button
+                        disabled={!portalChatInput.trim() || portalChatSending}
+                        onClick={async () => {
+                          if (!portalChatInput.trim()) return;
+                          setPortalChatSending(true);
+                          await api(`/admin/leads/${leadId}/portal-chat/reply`, {
+                            method: "POST",
+                            body: JSON.stringify({ message: portalChatInput.trim(), senderName: portalChatSenderName || "Support Team" }),
+                          });
+                          setPortalChatInput("");
+                          refetchPortalChat();
+                          setPortalChatSending(false);
+                        }}
+                        className="w-9 h-9 bg-[#0f2044] rounded-lg flex items-center justify-center text-white hover:bg-[#1a3060] transition-all disabled:opacity-40"
+                      >
+                        <Send size={14} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* PORTAL DOCS TAB */}
+              {tab === "portal-docs" && (
+                <div className="space-y-3">
+                  {portalDocs.length === 0 ? (
+                    <div className="flex flex-col items-center py-12 text-gray-400">
+                      <Paperclip size={28} className="mb-2 opacity-30" />
+                      <p className="text-sm">Client has not uploaded any documents</p>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-gray-100 divide-y">
+                      {portalDocs.map(doc => {
+                        const filename = doc.fileUrl.split("/").pop() ?? "";
+                        return (
+                          <div key={doc.id} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50">
+                            <div className="w-8 h-8 bg-[#0f2044]/10 rounded-lg flex items-center justify-center shrink-0">
+                              <FileDoc size={14} className="text-[#0f2044]" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm text-[#0f2044] truncate">{doc.fileName}</p>
+                              <p className="text-[10px] text-gray-400">
+                                {doc.fileSize < 1024 ? `${doc.fileSize} B` : doc.fileSize < 1024 * 1024 ? `${(doc.fileSize / 1024).toFixed(1)} KB` : `${(doc.fileSize / (1024 * 1024)).toFixed(1)} MB`}
+                                {" · "}{new Date(doc.uploadedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                              </p>
+                              <p className="text-[10px] text-gray-300">{doc.clientEmail}</p>
+                            </div>
+                            <a
+                              href={`/api/admin/portal/files/${filename}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              download={doc.fileName}
+                              className="flex items-center gap-1 px-2.5 py-1.5 border border-gray-200 rounded-lg text-[11px] text-gray-600 hover:bg-[#0f2044] hover:text-white hover:border-[#0f2044] transition-all"
+                            >
+                              <Download size={11} />Download
+                            </a>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
             </>

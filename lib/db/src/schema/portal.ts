@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp, index } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, timestamp, index, integer } from "drizzle-orm/pg-core";
 
 export const portalTokensTable = pgTable("portal_tokens", {
   id: serial("id").primaryKey(),
@@ -24,5 +24,35 @@ export const portalMessagesTable = pgTable("portal_messages", {
   emailIdx: index("portal_messages_email_idx").on(t.clientEmail),
 }));
 
+// Documents uploaded by clients through the portal
+export const portalDocumentsTable = pgTable("portal_documents", {
+  id: serial("id").primaryKey(),
+  leadId: integer("lead_id").notNull(),
+  clientEmail: text("client_email").notNull(),
+  fileName: text("file_name").notNull(),
+  fileUrl: text("file_url").notNull(),
+  fileSize: integer("file_size").notNull().default(0),
+  mimeType: text("mime_type").notNull().default("application/octet-stream"),
+  uploadedAt: timestamp("uploaded_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  leadIdx: index("portal_documents_lead_idx").on(t.leadId),
+  emailIdx: index("portal_documents_email_idx").on(t.clientEmail),
+}));
+
+// Real-time chat between client and assigned executive
+export const portalChatMessagesTable = pgTable("portal_chat_messages", {
+  id: serial("id").primaryKey(),
+  leadId: integer("lead_id").notNull(),
+  clientEmail: text("client_email").notNull(),
+  senderType: text("sender_type").notNull().default("client"), // "client" | "employee"
+  senderName: text("sender_name").notNull(),
+  message: text("message").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  leadIdx: index("portal_chat_lead_idx").on(t.leadId),
+}));
+
 export type PortalToken = typeof portalTokensTable.$inferSelect;
 export type PortalMessage = typeof portalMessagesTable.$inferSelect;
+export type PortalDocument = typeof portalDocumentsTable.$inferSelect;
+export type PortalChatMessage = typeof portalChatMessagesTable.$inferSelect;

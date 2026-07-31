@@ -44,7 +44,7 @@ export default function IndianCompanies() {
   const [page, setPage] = useState(1);
   const [data, setData] = useState<{ data: Company[]; total: number; pages: number } | null>(null);
   const [loading, setLoading] = useState(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     clearTimeout(debounceRef.current);

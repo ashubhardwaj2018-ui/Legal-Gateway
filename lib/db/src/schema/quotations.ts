@@ -18,6 +18,9 @@ export const quotationsTable = pgTable("quotations", {
   validityDays: integer("validity_days").notNull().default(30),
   status: text("status").notNull().default("draft"),
   sentAt: timestamp("sent_at", { withTimezone: true }),
+  acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+  rejectedAt: timestamp("rejected_at", { withTimezone: true }),
+  rejectedReason: text("rejected_reason"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

@@ -211,7 +211,7 @@ export default function Home() {
                   <CheckCircle2 size={48} className="text-green-500 mx-auto mb-4" />
                   <h3 className="font-bold text-primary text-lg mb-1">Request Received!</h3>
                   <p className="text-gray-500 text-sm">Our team will call you within 2 business hours.</p>
-                  <button onClick={() => { setConsultStatus("idle"); setForm({ name: "", phone: "", service: "", message: "" }); }} className="mt-5 text-sm text-secondary hover:underline">
+                  <button onClick={() => { setConsultStatus("idle"); setForm({ name: "", email: "", phone: "", serviceCategory: "", message: "" }); }} className="mt-5 text-sm text-secondary hover:underline">
                     Submit another request
                   </button>
                 </div>
