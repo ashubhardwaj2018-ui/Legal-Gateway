@@ -197,11 +197,21 @@ router.post("/admin/whatsapp/send", async (req, res): Promise<void> => {
   const settings = await getSettings();
   const ctx = await buildContext(resolvedLeadId ?? null, settings);
 
-  // Build final message text
+  // Build final message text.
+  // If message is already pre-resolved client-side (non-empty), use it as-is.
+  // Only resolve from template body when no message string was provided.
   let finalMessage = message ?? "";
+  let resolvedTemplateName = templateName;
   if (templateId) {
     const [tmpl] = await db.select().from(whatsappTemplatesTable).where(eq(whatsappTemplatesTable.id, templateId)).limit(1);
-    if (tmpl) finalMessage = resolvePlaceholders(tmpl.body, { ...ctx, ...(extra ?? {}) });
+    if (tmpl) {
+      resolvedTemplateName = tmpl.name;
+      if (!finalMessage.trim()) {
+        // No pre-resolved message supplied — resolve the template ourselves with available context
+        finalMessage = resolvePlaceholders(tmpl.body, { ...ctx, ...(extra ?? {}) });
+      }
+      // else: keep the client-supplied pre-resolved message; still record the templateId/name below
+    }
   }
   if (!finalMessage.trim()) { res.status(400).json({ error: "message is required" }); return; }
 
@@ -211,7 +221,7 @@ router.post("/admin/whatsapp/send", async (req, res): Promise<void> => {
   // Store the message
   const msg = await storeMessage({
     leadId: resolvedLeadId, toNumber: destination, fromNumber,
-    message: finalMessage, templateId, templateName,
+    message: finalMessage, templateId, templateName: resolvedTemplateName,
     senderType: "employee", senderName, senderId,
     status: provider === "web" ? "sent" : "pending",
     provider,

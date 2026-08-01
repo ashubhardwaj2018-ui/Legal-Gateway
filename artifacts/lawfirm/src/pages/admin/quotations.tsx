@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   useListQuotations, useCreateQuotation, useUpdateQuotation, useSendQuotation,
   getListQuotationsQueryKey, useGetQuotation, type Quotation
@@ -153,6 +153,106 @@ async function sendWaFromQuotation(toNumber: string, message: string) {
     });
     if (r.ok) { const d = await r.json(); if (d.waUrl) window.open(d.waUrl, "_blank"); }
   } catch { /* noop */ }
+}
+
+// ─── WhatsApp quick-send with template support ────────────────────────────────
+
+interface WaTemplate { id: number; name: string; body: string; category: string; isActive: boolean }
+
+function resolvePlaceholders(body: string, ctx: Record<string, string>): string {
+  return body.replace(/\{\{(\w+)\}\}/g, (_, k) => ctx[k] ?? `{{${k}}}`);
+}
+
+/**
+ * ctx — document-specific placeholder values, e.g.:
+ *   { ClientName, QuotationNo, Amount, ValidityDays, CompanyName }
+ * These are resolved into the template body client-side before sending,
+ * so the stored message and the WhatsApp text are always fully resolved.
+ */
+function WaSendButton({
+  phone, defaultMessage, categoryHint, ctx,
+}: {
+  phone: string; defaultMessage: string; categoryHint: string;
+  ctx: Record<string, string>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [message, setMessage] = useState(defaultMessage);
+  const [templateId, setTemplateId] = useState<number | undefined>(undefined);
+  const [templateName, setTemplateName] = useState<string | undefined>(undefined);
+  const [sending, setSending] = useState(false);
+  const [templatesLoaded, setTemplatesLoaded] = useState(false);
+
+  // Keep a ref so the fetch callback always sees the latest ctx without
+  // causing the effect to re-fire on every render.
+  const ctxRef = useRef(ctx);
+  ctxRef.current = ctx;
+
+  useEffect(() => {
+    if (!open || templatesLoaded) return;
+    fetch("/api/admin/whatsapp/templates", { credentials: "include" })
+      .then(r => r.json())
+      .then((ts: WaTemplate[]) => {
+        const match = ts.find(t => t.isActive && t.category.toLowerCase().includes(categoryHint));
+        if (match) {
+          // Resolve all {{Placeholder}} tokens with document-specific context
+          setMessage(resolvePlaceholders(match.body, ctxRef.current));
+          setTemplateId(match.id);
+          setTemplateName(match.name);
+        }
+        setTemplatesLoaded(true);
+      })
+      .catch(() => { setTemplatesLoaded(true); });
+  }, [open, templatesLoaded, categoryHint]);
+
+  const send = async () => {
+    if (!message.trim()) return;
+    setSending(true);
+    try {
+      const r = await fetch("/api/admin/whatsapp/send", {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        // Pass the pre-resolved message + templateId for storage.
+        // The backend skips re-resolution when message is non-empty.
+        body: JSON.stringify({ toNumber: phone, message, templateId, templateName, senderName: "Admin" }),
+      });
+      if (r.ok) { const d = await r.json(); if (d.waUrl) window.open(d.waUrl, "_blank"); }
+      setOpen(false);
+    } catch { /* noop */ }
+    finally { setSending(false); }
+  };
+
+  if (!phone) return null;
+  return (
+    <div className="w-full">
+      {!open ? (
+        <Button variant="outline" onClick={() => setOpen(true)}
+          className="w-full gap-2 text-green-700 border-green-300 hover:bg-green-50 hover:border-green-400">
+          <MessageCircle size={14} /> Send WhatsApp
+        </Button>
+      ) : (
+        <div className="bg-green-50 border border-green-200 rounded-xl p-3 space-y-2">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs font-semibold text-green-800 flex items-center gap-1.5">
+              <MessageCircle size={12} /> Sending to {phone}
+              {templateName && <span className="ml-1 text-green-600 font-normal">· template: {templateName}</span>}
+            </span>
+            <button onClick={() => setOpen(false)} className="text-green-600 hover:text-green-900 p-0.5">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <textarea
+            value={message} onChange={e => setMessage(e.target.value)} rows={4}
+            placeholder="Type your message…"
+            className="w-full text-xs border border-green-200 rounded-lg px-3 py-2 focus:outline-none focus:border-green-400 bg-white resize-none"
+          />
+          <Button onClick={send} disabled={sending || !message.trim()}
+            className="w-full bg-green-600 hover:bg-green-700 text-white gap-2 h-8 text-xs">
+            {sending ? "Opening WhatsApp…" : "Send & Open WhatsApp ↗"}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 type QuotationItem = { serviceName: string; description: string; quantity: number; unitPrice: number; total: number };
@@ -419,19 +519,36 @@ function QuotationDetail({ quotation, onClose, onSend }: { quotation: Quotation;
             </div>
           )}
 
-          <div className="flex gap-3 flex-wrap">
-            {quotation.status === "draft" && (
-              <Button onClick={onSend} className="flex-1 bg-[#0f2044] hover:bg-[#0f2044]/90 text-white gap-2">
-                <Send size={14} /> Mark as Sent
+          <div className="space-y-3">
+            <div className="flex gap-3 flex-wrap">
+              {quotation.status === "draft" && (
+                <Button onClick={onSend} className="flex-1 bg-[#0f2044] hover:bg-[#0f2044]/90 text-white gap-2">
+                  <Send size={14} /> Mark as Sent
+                </Button>
+              )}
+              <Button variant="outline" onClick={() => printQuotation(quotation)} className="gap-2">
+                <Printer size={14} /> Print
               </Button>
+              <Button variant="outline" onClick={() => printQuotation(quotation)} className="gap-2 bg-[#0f2044] text-white hover:bg-[#c9a227] hover:text-[#0f2044] border-0">
+                <Download size={14} /> Download PDF
+              </Button>
+              <Button variant="outline" onClick={onClose}>Close</Button>
+            </div>
+            {quotation.clientPhone && (
+              <WaSendButton
+                phone={quotation.clientPhone}
+                defaultMessage={`Dear ${quotation.clientName}, your quotation ${quotation.quotationNumber} for ₹${(quotation.total ?? 0).toLocaleString("en-IN")} is ready for your review. Valid for ${quotation.validityDays} days. Please contact us for any queries. — Vakil & Co.`}
+                categoryHint="quotation"
+                ctx={{
+                  ClientName: quotation.clientName,
+                  QuotationNo: quotation.quotationNumber,
+                  Amount: `₹${(quotation.total ?? 0).toLocaleString("en-IN")}`,
+                  ValidityDays: String(quotation.validityDays),
+                  CompanyName: "Vakil & Co.",
+                  SupportEmail: "info@vakilco.in",
+                }}
+              />
             )}
-            <Button variant="outline" onClick={() => printQuotation(quotation)} className="gap-2">
-              <Printer size={14} /> Print
-            </Button>
-            <Button variant="outline" onClick={() => printQuotation(quotation)} className="gap-2 bg-[#0f2044] text-white hover:bg-[#c9a227] hover:text-[#0f2044] border-0">
-              <Download size={14} /> Download PDF
-            </Button>
-            <Button variant="outline" onClick={onClose}>Close</Button>
           </div>
         </div>
       </DialogContent>

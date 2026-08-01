@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { AdminLayout } from "./AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,110 @@ async function sendWaFromInvoice(toNumber: string, message: string) {
     });
     if (r.ok) { const d = await r.json(); if (d.waUrl) window.open(d.waUrl, "_blank"); }
   } catch { /* noop */ }
+}
+
+// ─── WhatsApp quick-send with template support ────────────────────────────────
+
+interface WaTemplate { id: number; name: string; body: string; category: string; isActive: boolean }
+
+function resolvePlaceholders(body: string, ctx: Record<string, string>): string {
+  return body.replace(/\{\{(\w+)\}\}/g, (_, k) => ctx[k] ?? `{{${k}}}`);
+}
+
+/**
+ * ctx — document-specific placeholder values, e.g.:
+ *   { ClientName, InvoiceNo, Amount, Balance, Type, CompanyName }
+ * These are resolved into the template body client-side before sending,
+ * so the stored message and the WhatsApp text are always fully resolved.
+ */
+function WaSendButton({
+  phone, defaultMessage, categoryHint, ctx,
+}: {
+  phone: string; defaultMessage: string; categoryHint: string;
+  ctx: Record<string, string>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [message, setMessage] = useState(defaultMessage);
+  const [templateId, setTemplateId] = useState<number | undefined>(undefined);
+  const [templateName, setTemplateName] = useState<string | undefined>(undefined);
+  const [sending, setSending] = useState(false);
+  const [templatesLoaded, setTemplatesLoaded] = useState(false);
+
+  // Keep a ref so the fetch callback always sees the latest ctx without
+  // causing the effect to re-fire on every render.
+  const ctxRef = useRef(ctx);
+  ctxRef.current = ctx;
+
+  useEffect(() => {
+    if (!open || templatesLoaded) return;
+    fetch("/api/admin/whatsapp/templates", { credentials: "include" })
+      .then(r => r.json())
+      .then((ts: WaTemplate[]) => {
+        const match = ts.find(t => t.isActive && t.category.toLowerCase().includes(categoryHint));
+        if (match) {
+          // Resolve all {{Placeholder}} tokens with document-specific context
+          setMessage(resolvePlaceholders(match.body, ctxRef.current));
+          setTemplateId(match.id);
+          setTemplateName(match.name);
+        }
+        setTemplatesLoaded(true);
+      })
+      .catch(() => { setTemplatesLoaded(true); });
+  }, [open, templatesLoaded, categoryHint]);
+
+  const send = async () => {
+    if (!message.trim()) return;
+    setSending(true);
+    try {
+      const r = await fetch("/api/admin/whatsapp/send", {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        // Pass the pre-resolved message + templateId for storage.
+        // The backend skips re-resolution when message is non-empty.
+        body: JSON.stringify({ toNumber: phone, message, templateId, templateName, senderName: "Admin" }),
+      });
+      if (r.ok) { const d = await r.json(); if (d.waUrl) window.open(d.waUrl, "_blank"); }
+      setOpen(false);
+    } catch { /* noop */ }
+    finally { setSending(false); }
+  };
+
+  if (!phone) return null;
+  return (
+    <div className="w-full">
+      {!open ? (
+        <button
+          onClick={() => setOpen(true)}
+          className="w-full flex items-center justify-center gap-2 text-xs font-medium text-green-700 border border-green-300 hover:bg-green-50 hover:border-green-400 rounded-lg px-3 py-2 transition-colors"
+        >
+          <MessageCircle size={13} /> Send WhatsApp
+        </button>
+      ) : (
+        <div className="bg-green-50 border border-green-200 rounded-xl p-3 space-y-2">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs font-semibold text-green-800 flex items-center gap-1.5">
+              <MessageCircle size={12} /> Sending to {phone}
+              {templateName && <span className="ml-1 text-green-600 font-normal">· {templateName}</span>}
+            </span>
+            <button onClick={() => setOpen(false)} className="text-green-600 hover:text-green-900 p-0.5">
+              <X size={12} />
+            </button>
+          </div>
+          <textarea
+            value={message} onChange={e => setMessage(e.target.value)} rows={4}
+            placeholder="Type your message…"
+            className="w-full text-xs border border-green-200 rounded-lg px-3 py-2 focus:outline-none focus:border-green-400 bg-white resize-none"
+          />
+          <button
+            onClick={send} disabled={sending || !message.trim()}
+            className="w-full flex items-center justify-center gap-2 text-xs font-semibold text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 rounded-lg px-3 py-2 transition-colors"
+          >
+            {sending ? "Opening WhatsApp…" : "Send & Open WhatsApp ↗"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 interface InvoiceItem {
@@ -541,16 +645,34 @@ export default function AdminInvoices() {
 
             <div className="flex-1 overflow-y-auto p-5 space-y-5">
               {/* Status + Actions */}
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <span className={`text-sm px-3 py-1 rounded-full font-semibold ${STATUS_COLORS[selected.status] ?? STATUS_COLORS.draft}`}>
-                  {selected.status.charAt(0).toUpperCase() + selected.status.slice(1)}
-                </span>
-                <div className="flex gap-1.5 flex-wrap">
-                  {selected.status === "draft" && <button onClick={() => markStatus(selected.id, "sent")} className="text-xs px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 font-medium flex items-center gap-1"><Send size={11} />Mark Sent</button>}
-                  {(selected.status === "sent" || selected.status === "partial" || selected.status === "overdue") && <button onClick={() => { setShowPayment(true); setPayForm(f => ({ ...f, amount: String(Math.max(0, selBalance).toFixed(2)) })); }} className="text-xs px-3 py-1.5 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 font-medium flex items-center gap-1"><CreditCard size={11} />Add Payment</button>}
-                  {selected.status !== "cancelled" && selected.status !== "paid" && <button onClick={() => markStatus(selected.id, "cancelled")} className="text-xs px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 font-medium">Cancel</button>}
-                  <button onClick={() => printInvoice(selected)} className="text-xs px-3 py-1.5 bg-[#0f2044] text-white rounded-lg hover:bg-[#c9a227] hover:text-[#0f2044] font-medium flex items-center gap-1 transition-colors"><Download size={11} />Download PDF</button>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <span className={`text-sm px-3 py-1 rounded-full font-semibold ${STATUS_COLORS[selected.status] ?? STATUS_COLORS.draft}`}>
+                    {selected.status.charAt(0).toUpperCase() + selected.status.slice(1)}
+                  </span>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {selected.status === "draft" && <button onClick={() => markStatus(selected.id, "sent")} className="text-xs px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 font-medium flex items-center gap-1"><Send size={11} />Mark Sent</button>}
+                    {(selected.status === "sent" || selected.status === "partial" || selected.status === "overdue") && <button onClick={() => { setShowPayment(true); setPayForm(f => ({ ...f, amount: String(Math.max(0, selBalance).toFixed(2)) })); }} className="text-xs px-3 py-1.5 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 font-medium flex items-center gap-1"><CreditCard size={11} />Add Payment</button>}
+                    {selected.status !== "cancelled" && selected.status !== "paid" && <button onClick={() => markStatus(selected.id, "cancelled")} className="text-xs px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 font-medium">Cancel</button>}
+                    <button onClick={() => printInvoice(selected)} className="text-xs px-3 py-1.5 bg-[#0f2044] text-white rounded-lg hover:bg-[#c9a227] hover:text-[#0f2044] font-medium flex items-center gap-1 transition-colors"><Download size={11} />Download PDF</button>
+                  </div>
                 </div>
+                {selected.clientPhone && (
+                  <WaSendButton
+                    phone={selected.clientPhone.replace(/[\s\-().]/g, "").replace(/[^\d+]/g, "")}
+                    defaultMessage={`Dear ${selected.clientName}, your ${TYPE_LABELS[selected.type] ?? selected.type} ${selected.number} for ₹${fmt(selected.total)} has been shared. ${selBalance > 0.01 ? `Balance due: ₹${fmt(String(selBalance))}. ` : ""}Please contact us for any queries. — Vakil & Co.`}
+                    categoryHint="invoice"
+                    ctx={{
+                      ClientName: selected.clientName,
+                      InvoiceNo: selected.number,
+                      Amount: `₹${fmt(selected.total)}`,
+                      Balance: selBalance > 0.01 ? `₹${fmt(String(selBalance))}` : "Nil",
+                      Type: TYPE_LABELS[selected.type] ?? selected.type,
+                      CompanyName: "Vakil & Co.",
+                      SupportEmail: "info@vakilco.in",
+                    }}
+                  />
+                )}
               </div>
 
               {/* Amounts */}
