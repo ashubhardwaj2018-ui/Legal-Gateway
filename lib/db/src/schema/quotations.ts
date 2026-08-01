@@ -1,10 +1,11 @@
-import { pgTable, text, serial, integer, jsonb, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, jsonb, timestamp, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
 export const quotationsTable = pgTable("quotations", {
   id: serial("id").primaryKey(),
   quotationNumber: text("quotation_number").notNull().unique(),
+  leadId: integer("lead_id"),           // nullable FK → consultations.id
   clientName: text("client_name").notNull(),
   clientEmail: text("client_email").notNull(),
   clientPhone: text("client_phone"),
@@ -23,7 +24,10 @@ export const quotationsTable = pgTable("quotations", {
   rejectedReason: text("rejected_reason"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
-});
+}, (table) => ({
+  leadIdIdx: index("quotations_lead_id_idx").on(table.leadId),
+  statusIdx: index("quotations_status_idx").on(table.status),
+}));
 
 export const insertQuotationSchema = createInsertSchema(quotationsTable).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertQuotation = z.infer<typeof insertQuotationSchema>;

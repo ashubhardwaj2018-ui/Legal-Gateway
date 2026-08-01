@@ -1,0 +1,893 @@
+MASTER FINAL QA, TESTING & BUG FIX PROMPT
+Objective
+
+You are a Senior Software Architect, QA Engineer, Security Engineer, DevOps Engineer, Database Administrator, SEO Expert, and Performance Engineer.
+
+Your task is NOT to develop new features.
+
+Your task is to perform a complete audit, testing, debugging, optimization, and production-readiness review of my existing Website + CRM + ERP.
+
+Do not skip any module.
+
+Do not assume anything works.
+
+Verify every feature.
+
+If any issue exists, automatically fix it.
+
+Continue until the system is production-ready.
+
+STEP 1 – Project Audit
+
+Analyze the complete project.
+
+Review:
+
+Folder structure
+PHP files
+APIs
+MySQL database
+AJAX calls
+JavaScript
+Bootstrap UI
+Authentication
+Routes
+Permissions
+Cron Jobs
+Background Jobs
+Upload folders
+Logs
+Configuration
+
+Prepare an internal dependency map before testing.
+
+STEP 2 – Database Audit
+
+Check every database table.
+
+Verify:
+
+Foreign Keys
+Primary Keys
+Indexes
+Relationships
+Constraints
+Duplicate Data
+Null Values
+Orphan Records
+
+Check:
+
+Leads
+Customers
+Employees
+Users
+Services
+Locations
+Company Database
+Blogs
+Quotations
+Invoices
+Payments
+Chat
+Notifications
+Documents
+Tasks
+Attendance
+Finance
+Audit Logs
+
+Optimize SQL.
+
+Create missing indexes.
+
+Repair broken relationships.
+
+STEP 3 – Authentication
+
+Test:
+
+Super Admin
+
+Admin
+
+Sales
+
+SEO
+
+HR
+
+Finance
+
+Developer
+
+Support
+
+Customer
+
+Every role.
+
+Verify:
+
+Login
+
+Logout
+
+Forgot Password
+
+Reset Password
+
+Session Timeout
+
+Remember Me
+
+Password Encryption
+
+Permission Middleware
+
+Route Protection
+
+API Protection
+
+Inactive User
+
+Deleted User
+
+Wrong Password
+
+SQL Injection
+
+Brute Force Protection
+
+STEP 4 – Employee Dashboard
+
+Login as every employee.
+
+Verify:
+
+Dashboard loads
+
+Assigned Leads
+
+Tasks
+
+Notifications
+
+Chat
+
+Calendar
+
+Files
+
+Performance
+
+Profile
+
+Attendance
+
+Reports
+
+Settings
+
+Nothing should generate errors.
+
+STEP 5 – Lead Module
+
+Test:
+
+Create Lead
+
+Edit Lead
+
+Delete Lead
+
+Open Lead
+
+Assign Lead
+
+Transfer Lead
+
+Follow-up
+
+Reminder
+
+Status Change
+
+Priority
+
+Documents
+
+Timeline
+
+Quotation
+
+Invoice
+
+Payment
+
+Search
+
+Filter
+
+Export
+
+Import
+
+Bulk Update
+
+Employee Assignment
+
+Verify permissions.
+
+STEP 6 – Team Chat
+
+Test:
+
+Employee to Employee
+
+Department Chat
+
+File Sharing
+
+Image Sharing
+
+PDF
+
+Excel
+
+Word
+
+Typing Indicator
+
+Read Receipt
+
+Online Status
+
+Notification
+
+Message History
+
+Search
+
+Large Files
+
+Performance
+
+STEP 7 – Customer Module
+
+Verify:
+
+Create
+
+Edit
+
+Delete
+
+Documents
+
+Invoices
+
+Payments
+
+History
+
+Timeline
+
+Search
+
+Export
+
+Portal Login
+
+STEP 8 – Service Module
+
+Verify:
+
+Create
+
+Edit
+
+Delete
+
+Price
+
+GST
+
+FAQs
+
+SEO
+
+Categories
+
+Visibility
+
+Featured
+
+STEP 9 – Programmatic SEO
+
+This is a critical module.
+
+Verify:
+
+Location Upload
+
+Service Upload
+
+Relationship Table
+
+Every Service × Every Location
+
+Dynamic URLs
+
+Meta Title
+
+Meta Description
+
+Keywords
+
+Canonical
+
+Schema
+
+Breadcrumb
+
+Internal Links
+
+Nearby Cities
+
+Related Services
+
+Related Blogs
+
+No duplicate URLs.
+
+No broken links.
+
+STEP 10 – Company Database
+
+Verify:
+
+Excel Upload
+
+Duplicate Detection
+
+Search
+
+Filters
+
+Company Page
+
+SEO
+
+Slug
+
+Directors
+
+Industry
+
+GST
+
+CIN
+
+Export
+
+Update
+
+Delete
+
+Performance
+
+STEP 11 – Blog Module
+
+Verify:
+
+Manual Blog
+
+AI Blog
+
+Edit
+
+Delete
+
+Slug
+
+SEO
+
+FAQ
+
+Schema
+
+Internal Links
+
+Image Prompt
+
+Categories
+
+Tags
+
+Search
+
+Sitemap
+
+STEP 12 – Invoice Module
+
+Test:
+
+Quotation
+
+Invoice
+
+GST
+
+PDF
+
+Print
+
+WhatsApp
+
+Email
+
+Partial Payment
+
+Reminder
+
+Outstanding
+
+Credit Note
+
+Debit Note
+
+Recurring Invoice
+
+STEP 13 – Finance
+
+Verify:
+
+Income
+
+Expense
+
+Ledger
+
+Journal
+
+Bank
+
+Cash
+
+Profit & Loss
+
+Balance Sheet
+
+Trial Balance
+
+GST
+
+TDS
+
+Reports
+
+STEP 14 – WhatsApp
+
+Test complete WhatsApp workflow.
+
+Verify:
+
+Company WhatsApp Settings
+
+Lead WhatsApp
+
+Customer WhatsApp
+
+Quotation
+
+Invoice
+
+Reminder
+
+Templates
+
+Bulk WhatsApp
+
+History
+
+Logs
+
+Permission
+
+Fallback to WhatsApp Web if API unavailable.
+
+STEP 15 – Email
+
+Verify:
+
+SMTP
+
+Templates
+
+Quotation
+
+Invoice
+
+Reminder
+
+Attachments
+
+History
+
+Tracking
+
+Reply
+
+STEP 16 – File Upload
+
+Verify:
+
+Images
+
+PDF
+
+Excel
+
+Word
+
+ZIP
+
+CSV
+
+Large Files
+
+Validation
+
+Security
+
+Virus-safe handling
+
+STEP 17 – Search
+
+Verify global search.
+
+Search:
+
+Lead
+
+Company
+
+Customer
+
+Invoice
+
+Employee
+
+Blog
+
+Service
+
+Company Database
+
+Location
+
+Document
+
+Task
+
+STEP 18 – Reports
+
+Verify:
+
+Revenue
+
+Lead
+
+Conversion
+
+Employee
+
+Finance
+
+Services
+
+SEO
+
+Export
+
+Charts
+
+Filters
+
+STEP 19 – Notifications
+
+Verify:
+
+Browser
+
+In-App
+
+Email
+
+WhatsApp
+
+Real-time
+
+Unread Count
+
+Mark Read
+
+STEP 20 – Performance
+
+Test:
+
+1 User
+
+10 Users
+
+100 Users
+
+500 Users
+
+1000 Users
+
+Check:
+
+Memory
+
+CPU
+
+SQL
+
+AJAX
+
+API
+
+Caching
+
+Response Time
+
+STEP 21 – Security Audit
+
+Check:
+
+SQL Injection
+
+XSS
+
+CSRF
+
+Broken Authentication
+
+File Upload Exploits
+
+Directory Traversal
+
+Privilege Escalation
+
+Broken Permissions
+
+Session Hijacking
+
+Sensitive Data Exposure
+
+Weak Password Storage
+
+Missing Validation
+
+Fix every issue found.
+
+STEP 22 – SEO Audit
+
+Verify:
+
+Title
+
+Description
+
+Keywords
+
+Canonical
+
+Schema
+
+Breadcrumb
+
+Robots
+
+Internal Links
+
+Open Graph
+
+Twitter Cards
+
+404 Pages
+
+Redirects
+
+Lazy Loading
+
+Image ALT Tags
+
+XML Sitemap
+
+HTML Sitemap
+
+Programmatic SEO Pages
+
+Company Pages
+
+Blogs
+
+Services
+
+Locations
+
+STEP 23 – Sitemap
+
+Regenerate sitemap.
+
+Include:
+
+Homepage
+
+Services
+
+Blogs
+
+Companies
+
+Service × Location Pages
+
+Categories
+
+Static Pages
+
+Split into multiple sitemap files if over 50,000 URLs.
+
+Create sitemap index.
+
+Validate XML.
+
+STEP 24 – Mobile Testing
+
+Test:
+
+Desktop
+
+Laptop
+
+Tablet
+
+Android
+
+iPhone
+
+Responsive UI
+
+Buttons
+
+Tables
+
+Forms
+
+Menus
+
+Chat
+
+Dashboard
+
+STEP 25 – Browser Testing
+
+Chrome
+
+Edge
+
+Firefox
+
+Safari
+
+Opera
+
+STEP 26 – Logging
+
+Verify:
+
+Activity Logs
+
+Audit Logs
+
+Error Logs
+
+Login Logs
+
+API Logs
+
+STEP 27 – Code Review
+
+Remove:
+
+Unused files
+
+Unused JS
+
+Unused CSS
+
+Duplicate Code
+
+Dead APIs
+
+Unused Database Columns
+
+Optimize code quality.
+
+STEP 28 – Final Production Checklist
+
+Before marking complete:
+
+✓ No PHP warnings
+
+✓ No JavaScript errors
+
+✓ No SQL errors
+
+✓ No broken links
+
+✓ No permission issues
+
+✓ No missing routes
+
+✓ No missing APIs
+
+✓ No console errors
+
+✓ No missing images
+
+✓ No missing CSS
+
+✓ No duplicate URLs
+
+✓ No duplicate metadata
+
+✓ No orphan database records
+
+✓ No broken uploads
+
+✓ No broken downloads
+
+✓ No broken exports
+
+✓ No missing indexes
+
+✓ No failed AJAX calls
+
+✓ No failing forms
+
+✓ No broken search
+
+✓ No missing notifications
+
+✓ No security vulnerabilities
+
+✓ All dynamic pages indexed
+
+✓ XML sitemap valid
+
+✓ Robots.txt valid
+
+✓ Website passes production standards
+
+Final Deliverables
+
+Do not simply state that testing is complete.
+
+Provide:
+
+A list of every bug found.
+The exact files modified.
+Database tables changed.
+SQL migrations executed.
+APIs fixed.
+Security issues resolved.
+Performance improvements.
+SEO improvements.
+Permission issues corrected.
+Remaining recommendations (if any).
+
+Do not stop until every critical and major issue has been fixed. The application should be production-ready, secure, scalable, and fully functional for real custom

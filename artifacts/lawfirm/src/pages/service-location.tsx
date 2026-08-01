@@ -354,7 +354,7 @@ export default function ServiceLocation() {
                 <h2 className="text-2xl font-serif font-bold text-[#0f2044] mb-2">
                   {service.name} in Nearby Areas
                 </h2>
-                <p className="text-sm text-gray-500 mb-5">We serve clients across {loc.state} — click any city for details.</p>
+                <p className="text-sm text-gray-500 mb-4">We serve clients across {loc.state} — click any city for details.</p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
                   {nearby.map((n) => {
                     const nCity = primaryPlace(n);
@@ -368,6 +368,16 @@ export default function ServiceLocation() {
                       </Link>
                     );
                   })}
+                </div>
+                {/* State hub link */}
+                <div className="mt-4">
+                  <Link
+                    href={`/state/${loc.state.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
+                    className="inline-flex items-center gap-1.5 text-sm text-[#c9a227] font-medium hover:underline"
+                  >
+                    <MapPin size={14} />
+                    View all cities in {loc.state} →
+                  </Link>
                 </div>
               </section>
             )}
