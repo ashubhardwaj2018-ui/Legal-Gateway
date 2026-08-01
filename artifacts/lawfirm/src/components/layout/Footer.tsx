@@ -76,6 +76,7 @@ export function Footer() {
               <li><Link href="/indian-companies" className="text-primary-foreground/70 hover:text-secondary transition-colors text-sm">Indian Companies DB</Link></li>
               <li><Link href="/privacy-policy" className="text-primary-foreground/70 hover:text-secondary transition-colors text-sm">Privacy Policy</Link></li>
               <li><Link href="/terms-of-use" className="text-primary-foreground/70 hover:text-secondary transition-colors text-sm">Terms of Use</Link></li>
+              <li><Link href="/sitemap" className="text-primary-foreground/70 hover:text-secondary transition-colors text-sm">Sitemap</Link></li>
             </ul>
           </div>
 

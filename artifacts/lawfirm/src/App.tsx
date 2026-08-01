@@ -54,6 +54,7 @@ import Careers from "@/pages/careers";
 import PrivacyPolicy from "@/pages/privacy";
 import TermsOfUse from "@/pages/terms";
 import OurLawyers from "@/pages/our-lawyers";
+import Sitemap from "@/pages/sitemap";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -119,6 +120,7 @@ function Router() {
             <Route path="/company/:slug" component={CompanyDetail} />
             <Route path="/blog" component={BlogList} />
             <Route path="/blog/:slug" component={BlogPost} />
+            <Route path="/sitemap" component={Sitemap} />
             <Route path="/services/:catId/:slug" component={ServiceDetail} />
             <Route path="/services/:id" component={ServiceCategory} />
             {/* State hub — must be before pSEO catch-all */}
