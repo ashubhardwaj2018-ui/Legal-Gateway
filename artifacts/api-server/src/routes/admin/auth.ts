@@ -1,7 +1,8 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import crypto from "crypto";
-import { eq, or, and, isNull } from "drizzle-orm";
-import { db, adminUsersTable, teamMembersTable, rolesTable, rolePermissionsTable, loginHistoryTable, activityLogsTable } from "@workspace/db";
+import nodemailer from "nodemailer";
+import { eq, or, and, isNull, lt } from "drizzle-orm";
+import { db, adminUsersTable, teamMembersTable, rolesTable, rolePermissionsTable, loginHistoryTable, activityLogsTable, passwordResetTokensTable, siteSettingsTable } from "@workspace/db";
 
 export const authRouter: IRouter = Router();
 
@@ -434,4 +435,181 @@ authRouter.patch("/admin/auth/users/:id/password", adminAuthMiddleware, requireP
 authRouter.delete("/admin/auth/users/:id", adminAuthMiddleware, requirePermission("employees", "delete"), async (req, res): Promise<void> => {
   await db.delete(adminUsersTable).where(eq(adminUsersTable.id, parseInt(String(req.params["id"]), 10)));
   res.sendStatus(204);
+});
+
+// ── Force-reset a team member's password (admin only) ─────────────────────────
+authRouter.patch("/admin/auth/team-members/:id/password", adminAuthMiddleware, requirePermission("employees", "edit"), async (req, res): Promise<void> => {
+  const { password } = req.body as { password?: string };
+  if (!password || password.length < 8) { res.status(400).json({ error: "Password must be at least 8 characters" }); return; }
+  const memberId = parseInt(String(req.params["id"]), 10);
+  const [member] = await db.select({ id: teamMembersTable.id, username: teamMembersTable.username })
+    .from(teamMembersTable).where(eq(teamMembersTable.id, memberId)).limit(1);
+  if (!member) { res.status(404).json({ error: "Team member not found" }); return; }
+  await db.update(teamMembersTable)
+    .set({ passwordHash: hashPassword(password), forcePasswordChange: true })
+    .where(eq(teamMembersTable.id, memberId));
+  const reqUser = (req as AuthenticatedRequest).adminUser;
+  const adminUsername = typeof reqUser?.username === "string" ? reqUser.username : "admin";
+  const adminId = typeof reqUser?.userId === "number" ? reqUser.userId : null;
+  await logActivity(adminId, adminUsername, "admin", "team", "force_password_reset", memberId, { targetUsername: member.username });
+  res.json({ ok: true });
+});
+
+// ── Transactional email helper (SMTP from site settings) ──────────────────────
+async function sendTransactionalEmail(opts: { to: string; subject: string; html: string }): Promise<void> {
+  const settings = await db.select({ key: siteSettingsTable.key, value: siteSettingsTable.value })
+    .from(siteSettingsTable)
+    .where(or(
+      eq(siteSettingsTable.key, "email_smtp_host"),
+      eq(siteSettingsTable.key, "email_smtp_port"),
+      eq(siteSettingsTable.key, "email_smtp_user"),
+      eq(siteSettingsTable.key, "email_smtp_pass"),
+      eq(siteSettingsTable.key, "email_smtp_secure"),
+      eq(siteSettingsTable.key, "email_from_name"),
+      eq(siteSettingsTable.key, "email_from_address"),
+    ));
+
+  const cfg: Record<string, string> = {};
+  for (const { key, value } of settings) { if (value) cfg[key] = value; }
+
+  if (!cfg["email_smtp_host"] || !cfg["email_smtp_user"] || !cfg["email_smtp_pass"]) {
+    throw new Error("SMTP not configured. Please configure email settings in Admin → Settings.");
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: cfg["email_smtp_host"],
+    port: parseInt(cfg["email_smtp_port"] ?? "587", 10),
+    secure: cfg["email_smtp_secure"] === "true",
+    auth: { user: cfg["email_smtp_user"], pass: cfg["email_smtp_pass"] },
+  });
+
+  const fromName = cfg["email_from_name"] ?? "Vakil & Co.";
+  const fromAddr = cfg["email_from_address"] ?? cfg["email_smtp_user"];
+
+  await transporter.sendMail({
+    from: `"${fromName}" <${fromAddr}>`,
+    to: opts.to,
+    subject: opts.subject,
+    html: opts.html,
+  });
+}
+
+// ── Forgot password ───────────────────────────────────────────────────────────
+authRouter.post("/admin/auth/forgot-password", async (req, res): Promise<void> => {
+  const { email } = req.body as { email?: string };
+  if (!email || !email.includes("@")) { res.status(400).json({ error: "Valid email required" }); return; }
+
+  // Purge expired tokens for cleanliness (fire-and-forget)
+  db.delete(passwordResetTokensTable)
+    .where(lt(passwordResetTokensTable.expiresAt, new Date()))
+    .catch(() => {});
+
+  // Look up user — check admin first, then team members
+  let userId: number | null = null;
+  let userType: "admin" | "employee" = "admin";
+
+  const [adminUser] = await db.select({ id: adminUsersTable.id, isActive: adminUsersTable.isActive })
+    .from(adminUsersTable).where(eq(adminUsersTable.email, email.toLowerCase())).limit(1);
+
+  if (adminUser && adminUser.isActive) {
+    userId = adminUser.id;
+    userType = "admin";
+  } else {
+    const [employee] = await db.select({ id: teamMembersTable.id, status: teamMembersTable.status })
+      .from(teamMembersTable).where(eq(teamMembersTable.email, email.toLowerCase())).limit(1);
+    if (employee && employee.status === "active") {
+      userId = employee.id;
+      userType = "employee";
+    }
+  }
+
+  // Always respond 200 — never reveal whether an email is registered
+  if (!userId) { res.json({ ok: true }); return; }
+
+  // Create reset token (valid 1 hour)
+  const token = crypto.randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+  await db.insert(passwordResetTokensTable).values({
+    token,
+    userId,
+    userType,
+    email: email.toLowerCase(),
+    expiresAt,
+  });
+
+  // Build reset URL from server-controlled configuration only — never from request headers
+  // to prevent an attacker from supplying a hostile Origin and receiving the token URL.
+  const appOrigin = (() => {
+    if (process.env["APP_URL"]) return process.env["APP_URL"].replace(/\/$/, "");
+    if (process.env["REPLIT_DEV_DOMAIN"]) return `https://${process.env["REPLIT_DEV_DOMAIN"]}`;
+    return "https://vakilco.in";
+  })();
+  const resetUrl = `${appOrigin}/admin/reset-password?token=${token}`;
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px; background: #f9fafb; border-radius: 12px;">
+      <div style="text-align: center; margin-bottom: 24px;">
+        <div style="display: inline-block; background: #0f2044; padding: 16px 24px; border-radius: 8px;">
+          <span style="color: #c9a227; font-size: 20px; font-weight: bold;">⚖ VAKIL & CO.</span>
+        </div>
+      </div>
+      <h2 style="color: #0f2044; margin-bottom: 8px;">Reset Your Password</h2>
+      <p style="color: #555; line-height: 1.6;">You requested a password reset for your Vakil & Co. admin account.</p>
+      <p style="color: #555; line-height: 1.6;">Click the button below to set a new password. This link is valid for <strong>1 hour</strong>.</p>
+      <div style="text-align: center; margin: 32px 0;">
+        <a href="${resetUrl}" style="background: #c9a227; color: #0f2044; font-weight: bold; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-size: 15px; display: inline-block;">
+          Reset Password
+        </a>
+      </div>
+      <p style="color: #888; font-size: 13px;">If you did not request this, you can safely ignore this email — your password will not be changed.</p>
+      <p style="color: #bbb; font-size: 11px; margin-top: 24px; border-top: 1px solid #e5e7eb; padding-top: 16px;">
+        This link expires at ${expiresAt.toUTCString()}. Do not share it with anyone.
+      </p>
+    </div>
+  `;
+
+  try {
+    await sendTransactionalEmail({ to: email, subject: "Reset your Vakil & Co. password", html });
+  } catch {
+    // Don't reveal email/SMTP config errors to the client
+    // The token is already stored — user could retry after SMTP is configured
+  }
+
+  res.json({ ok: true });
+});
+
+// ── Reset password (token-based) ──────────────────────────────────────────────
+authRouter.post("/admin/auth/reset-password", async (req, res): Promise<void> => {
+  const { token, password } = req.body as { token?: string; password?: string };
+  if (!token) { res.status(400).json({ error: "Reset token required" }); return; }
+  if (!password || password.length < 8) { res.status(400).json({ error: "Password must be at least 8 characters" }); return; }
+
+  const [record] = await db.select().from(passwordResetTokensTable)
+    .where(eq(passwordResetTokensTable.token, token)).limit(1);
+
+  if (!record) { res.status(400).json({ error: "Invalid or expired reset link. Please request a new one." }); return; }
+  if (record.usedAt) { res.status(400).json({ error: "This reset link has already been used. Please request a new one." }); return; }
+  if (record.expiresAt < new Date()) { res.status(400).json({ error: "This reset link has expired. Please request a new one." }); return; }
+
+  const newHash = hashPassword(password);
+
+  if (record.userType === "employee") {
+    await db.update(teamMembersTable)
+      .set({ passwordHash: newHash, forcePasswordChange: false })
+      .where(eq(teamMembersTable.id, record.userId));
+  } else {
+    await db.update(adminUsersTable)
+      .set({ passwordHash: newHash })
+      .where(eq(adminUsersTable.id, record.userId));
+  }
+
+  // Invalidate token
+  await db.update(passwordResetTokensTable)
+    .set({ usedAt: new Date() })
+    .where(eq(passwordResetTokensTable.id, record.id));
+
+  await logActivity(record.userId, record.email, record.userType as "admin" | "employee", "auth", "password_reset_complete");
+
+  res.json({ ok: true });
 });

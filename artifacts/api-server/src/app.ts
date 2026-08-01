@@ -82,6 +82,16 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 app.use("/api", apiLimiter);
 app.use("/api/admin/auth/login", loginLimiter);
+
+// Forgot-password: stricter limit — 5 requests per 15 min per IP to prevent token/SMTP abuse
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many password reset requests. Please wait 15 minutes and try again." },
+});
+app.use("/api/admin/auth/forgot-password", forgotPasswordLimiter);
 app.use("/api", router);
 
 export default app;

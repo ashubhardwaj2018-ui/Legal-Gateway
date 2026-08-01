@@ -24,3 +24,4 @@ export * from "./page-content";
 export * from "./rbac";
 export * from "./notifications";
 export * from "./whatsapp";
+export * from "./password-reset-tokens";

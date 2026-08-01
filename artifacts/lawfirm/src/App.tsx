@@ -12,6 +12,8 @@ import StateHub from "@/pages/state-hub";
 import AdminPSEOManager from "@/pages/admin/pseo-manager";
 import NotFound from "@/pages/not-found";
 import AdminLogin from "@/pages/admin/login";
+import ForgotPassword from "@/pages/admin/forgot-password";
+import ResetPassword from "@/pages/admin/reset-password";
 import AdminDashboard from "@/pages/admin/dashboard";
 import AdminLeads from "@/pages/admin/leads";
 import MyLeads from "@/pages/admin/my-leads";
@@ -62,8 +64,10 @@ const queryClient = new QueryClient({
 function Router() {
   return (
     <Switch>
-      {/* Admin login — no layout */}
+      {/* Admin auth pages — no layout */}
       <Route path="/admin/login" component={AdminLogin} />
+      <Route path="/admin/forgot-password" component={ForgotPassword} />
+      <Route path="/admin/reset-password" component={ResetPassword} />
 
       {/* Admin Routes — no public Layout */}
       <Route path="/admin" component={AdminDashboard} />

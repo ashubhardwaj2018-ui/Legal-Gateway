@@ -114,7 +114,7 @@ export function AdminLayout({ children, title, subtitle, actions }: Props) {
   }, []);
 
   async function handleForceChangePwd() {
-    if (changePwdInput.length < 6) { setChangePwdError("Password must be at least 6 characters"); return; }
+    if (changePwdInput.length < 8) { setChangePwdError("Password must be at least 8 characters"); return; }
     setChangePwdPending(true);
     setChangePwdError("");
     try {
@@ -184,7 +184,7 @@ export function AdminLayout({ children, title, subtitle, actions }: Props) {
           </p>
           <div className="space-y-3">
             <div>
-              <label className="text-xs font-medium text-gray-700 block mb-1">New Password (min 6 characters)</label>
+              <label className="text-xs font-medium text-gray-700 block mb-1">New Password (min 8 characters)</label>
               <input
                 type="password"
                 value={changePwdInput}
@@ -197,7 +197,7 @@ export function AdminLayout({ children, title, subtitle, actions }: Props) {
             {changePwdError && <p className="text-xs text-red-600">{changePwdError}</p>}
             <button
               onClick={handleForceChangePwd}
-              disabled={changePwdPending || changePwdInput.length < 6}
+              disabled={changePwdPending || changePwdInput.length < 8}
               className="w-full bg-[#c9a227] hover:bg-[#b8911e] disabled:opacity-50 text-[#0f2044] font-semibold py-2.5 rounded-lg text-sm transition-colors"
             >
               {changePwdPending ? "Saving…" : "Set New Password & Continue"}

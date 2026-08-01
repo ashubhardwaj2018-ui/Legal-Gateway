@@ -13,7 +13,7 @@ import {
   Users, Plus, Pencil, Trash2, X, CheckCircle2, XCircle,
   Clock, Calendar, ChevronRight, Search, Building2, Mail,
   Phone, Shield, Banknote, UserCheck, Award, CalendarCheck, FileText,
-  Timer, LogIn, LogOut, ExternalLink, TrendingUp,
+  Timer, LogIn, LogOut, ExternalLink, TrendingUp, KeyRound,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -365,11 +365,98 @@ function fmtTimestamp(ts: string | null): string {
   return new Date(ts).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
 }
 
+function ResetPasswordDialog({ member, onClose }: { member: TeamMember; onClose: () => void }) {
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [showPass, setShowPass] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
+
+  const mismatch = confirm.length > 0 && password !== confirm;
+  const tooShort = password.length > 0 && password.length < 8;
+
+  const mutation = useMutation({
+    mutationFn: (pw: string) => fetch(`/api/admin/auth/team-members/${member.id}/password`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ password: pw }),
+    }).then(async r => { const d = await r.json(); if (!r.ok) throw new Error((d as { error?: string }).error ?? "Failed"); return d; }),
+    onSuccess: () => setSuccess(true),
+    onError: (e: Error) => setError(e.message),
+  });
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-[#0f2044]">
+            <KeyRound size={16} className="text-[#c9a227]" /> Force Reset Password
+          </DialogTitle>
+        </DialogHeader>
+        {success ? (
+          <div className="py-4 text-center space-y-3">
+            <CheckCircle2 size={36} className="text-green-500 mx-auto" />
+            <p className="text-sm text-gray-700 font-medium">Password updated for <strong>{member.name}</strong>.</p>
+            <p className="text-xs text-gray-400">They will be asked to change it on next login.</p>
+            <Button onClick={onClose} className="mt-2 bg-[#0f2044] text-white hover:bg-[#0f2044]/90">Done</Button>
+          </div>
+        ) : (
+          <div className="space-y-4 pt-1">
+            <p className="text-xs text-gray-500">Set a temporary password for <strong>{member.name}</strong>. They will be prompted to change it on next login.</p>
+            <div>
+              <Label className="text-xs mb-1.5 block">New Password</Label>
+              <div className="relative">
+                <Input
+                  type={showPass ? "text" : "password"}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="Min. 8 characters"
+                  className="pr-10"
+                />
+                <button type="button" onClick={() => setShowPass(s => !s)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  {showPass ? <XCircle size={14} /> : <CheckCircle2 size={14} />}
+                </button>
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs mb-1.5 block">Confirm Password</Label>
+              <Input
+                type={showPass ? "text" : "password"}
+                value={confirm}
+                onChange={e => setConfirm(e.target.value)}
+                placeholder="Re-enter password"
+              />
+            </div>
+            {(tooShort || mismatch || error) && (
+              <p className="text-xs text-red-500">
+                {error || (tooShort ? "Password must be at least 8 characters" : "Passwords do not match")}
+              </p>
+            )}
+            <div className="flex gap-2 justify-end pt-1">
+              <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
+              <Button
+                size="sm"
+                disabled={mutation.isPending || tooShort || mismatch || password.length < 8}
+                onClick={() => { setError(""); mutation.mutate(password); }}
+                className="bg-[#c9a227] text-[#0f2044] hover:bg-[#e0b83a] font-semibold"
+              >
+                {mutation.isPending ? "Saving…" : "Set Password"}
+              </Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function MemberDrawer({ member, onClose, onUpdated }: { member: TeamMember; onClose: () => void; onUpdated: () => void }) {
   const [tab, setTab] = useState<"profile" | "attendance" | "leaves" | "workingHours">("profile");
   const [editOpen, setEditOpen] = useState(false);
   const [attendanceOpen, setAttendanceOpen] = useState(false);
   const [leaveOpen, setLeaveOpen] = useState(false);
+  const [resetPasswordOpen, setResetPasswordOpen] = useState(false);
   const [whMonth, setWhMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const qc = useQueryClient();
 
@@ -430,6 +517,9 @@ function MemberDrawer({ member, onClose, onUpdated }: { member: TeamMember; onCl
           onSaved={() => { qc.invalidateQueries({ queryKey: ["team-member", member.id] }); qc.invalidateQueries({ queryKey: ["team"] }); }}
         />
       )}
+      {resetPasswordOpen && (
+        <ResetPasswordDialog member={member} onClose={() => setResetPasswordOpen(false)} />
+      )}
 
       <div className="fixed inset-0 z-50 flex">
         <div className="flex-1 bg-black/40" onClick={onClose} />
@@ -468,13 +558,17 @@ function MemberDrawer({ member, onClose, onUpdated }: { member: TeamMember; onCl
           </div>
 
           {/* Quick actions */}
-          <div className="flex gap-2 px-6 py-3 border-b bg-white">
+          <div className="flex gap-2 px-6 py-3 border-b bg-white flex-wrap">
             <Button size="sm" onClick={() => setAttendanceOpen(true)}
               className="h-7 text-xs gap-1 bg-[#0f2044] text-white hover:bg-[#0f2044]/90">
               <CalendarCheck size={11} /> Mark Attendance
             </Button>
             <Button size="sm" variant="outline" onClick={() => setLeaveOpen(true)} className="h-7 text-xs gap-1">
               <FileText size={11} /> Apply Leave
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setResetPasswordOpen(true)}
+              className="h-7 text-xs gap-1 border-amber-200 text-amber-700 hover:bg-amber-50">
+              <KeyRound size={11} /> Reset Password
             </Button>
           </div>
 

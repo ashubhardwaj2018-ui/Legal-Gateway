@@ -28,7 +28,11 @@ export default function AdminLogin() {
     });
     const d = await r.json() as { error?: string; user?: { userType?: string } };
     setLoading(false);
-    if (r.ok) navigate(d.user?.userType === "employee" ? "/admin/my-dashboard" : "/admin");
+    if (r.ok) {
+      const user = d.user as { userType?: string; forcePasswordChange?: boolean } | undefined;
+      if (user?.forcePasswordChange) navigate("/admin/my-dashboard"); // AdminLayout shows force-change screen
+      else navigate(user?.userType === "employee" ? "/admin/my-dashboard" : "/admin");
+    }
     else setError(d.error ?? "Login failed");
   };
 
@@ -102,11 +106,16 @@ export default function AdminLogin() {
             </button>
           </form>
 
-          <div className="mt-6 pt-5 border-t border-white/10">
+          <div className="mt-6 pt-5 border-t border-white/10 space-y-2">
+            <div className="text-center">
+              <a href="/admin/forgot-password" className="text-[#c9a227]/70 hover:text-[#c9a227] text-xs transition-colors font-medium">
+                Forgot your password?
+              </a>
+            </div>
             <p className="text-white/25 text-xs text-center">
               Default: <code className="text-white/40">admin</code> / <code className="text-white/40">Admin@2026</code>
             </p>
-            <p className="text-white/20 text-[10px] text-center mt-1">Change password in Admin → Settings after first login</p>
+            <p className="text-white/20 text-[10px] text-center">Change password in Admin → Settings after first login</p>
           </div>
         </div>
 
