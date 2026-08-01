@@ -12,7 +12,136 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Trash2, Send, Eye, FileText, PlusCircle, Printer, MessageCircle } from "lucide-react";
+import { Plus, Trash2, Send, Eye, FileText, PlusCircle, Printer, MessageCircle, Download } from "lucide-react";
+
+// ─── Quotation Print / Download PDF ─────────────────────────────────────────
+
+function printQuotation(q: Quotation) {
+  const items = (q.items ?? []) as Array<{ serviceName: string; description: string; quantity: number; unitPrice: number; total: number }>;
+  const subtotal = q.subtotal ?? 0;
+  const taxAmt = q.taxAmount ?? 0;
+  const total = q.total ?? 0;
+
+  const rows = items.map((it, i) => `<tr>
+    <td>${i + 1}</td>
+    <td style="text-align:left"><strong>${it.serviceName || "—"}</strong>${it.description ? `<br><span style="font-size:10px;color:#888">${it.description}</span>` : ""}</td>
+    <td>${it.quantity}</td>
+    <td>₹${it.unitPrice.toLocaleString("en-IN")}</td>
+    <td>₹${it.total.toLocaleString("en-IN")}</td>
+  </tr>`).join("");
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Quotation — ${q.quotationNumber}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; font-size: 12px; color: #111; background: #fff; padding: 20px; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #0f2044; padding-bottom: 16px; margin-bottom: 16px; }
+  .firm-name { font-size: 22px; font-weight: 900; color: #0f2044; letter-spacing: 1px; }
+  .firm-sub { color: #c9a227; font-size: 11px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; margin: 2px 0 6px; }
+  .firm-addr { color: #555; font-size: 11px; line-height: 1.5; }
+  .doc-box { text-align: right; }
+  .doc-type { font-size: 18px; font-weight: 700; color: #0f2044; text-transform: uppercase; letter-spacing: 1px; }
+  .doc-num { font-size: 13px; font-weight: 700; color: #c9a227; margin: 4px 0; }
+  .doc-meta { font-size: 11px; color: #555; line-height: 1.8; }
+  .bill-section { display: flex; gap: 20px; margin: 16px 0; }
+  .bill-box { flex: 1; background: #f7f7f7; border-radius: 6px; padding: 12px 14px; border-left: 3px solid #0f2044; }
+  .bill-box h4 { font-size: 10px; color: #c9a227; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+  .bill-box p { font-size: 12px; color: #222; line-height: 1.6; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+  table th { background: #0f2044; color: #fff; padding: 8px 6px; font-size: 11px; text-align: right; }
+  table th:first-child, table th:nth-child(2) { text-align: left; }
+  table td { padding: 7px 6px; font-size: 11px; text-align: right; border-bottom: 1px solid #eee; }
+  table td:first-child, table td:nth-child(2) { text-align: left; }
+  table tr:nth-child(even) td { background: #fafafa; }
+  .totals { width: 260px; margin-left: auto; margin-top: 10px; }
+  .totals tr td { padding: 5px 8px; font-size: 12px; }
+  .totals tr td:first-child { color: #555; }
+  .totals tr td:last-child { text-align: right; font-weight: 600; }
+  .total-row td { font-size: 15px; font-weight: 900; color: #0f2044; border-top: 2px solid #0f2044; padding-top: 8px; }
+  .footer { margin-top: 30px; display: flex; justify-content: space-between; align-items: flex-end; }
+  .notes { flex: 1; font-size: 11px; color: #555; line-height: 1.6; }
+  .notes h4 { font-size: 10px; font-weight: 700; color: #0f2044; text-transform: uppercase; margin-bottom: 4px; }
+  .sign { text-align: center; min-width: 120px; }
+  .sign-line { border-top: 1px solid #333; width: 120px; margin: 40px auto 4px; }
+  .sign p { font-size: 10px; color: #555; }
+  @media print { body { padding: 10px; } }
+</style></head><body>
+<div class="header">
+  <div>
+    <div class="firm-name">Vakil &amp; Co.</div>
+    <div class="firm-sub">Advocates &amp; Legal Consultants</div>
+    <div class="firm-addr">
+      123, Legal Complex, Connaught Place, New Delhi — 110001<br>
+      📞 +91 98765 43210 &nbsp;|&nbsp; ✉ info@vakilco.in<br>
+      GSTIN: 07AABCV1234P1Z5 &nbsp;|&nbsp; PAN: AABCV1234P
+    </div>
+  </div>
+  <div class="doc-box">
+    <div class="doc-type">Quotation</div>
+    <div class="doc-num">${q.quotationNumber}</div>
+    <div class="doc-meta">
+      Date: ${new Date(q.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}<br>
+      Valid for: ${q.validityDays} days<br>
+      Status: <strong>${(q.status ?? "draft").toUpperCase()}</strong>
+    </div>
+  </div>
+</div>
+
+<div class="bill-section">
+  <div class="bill-box">
+    <h4>Prepared For</h4>
+    <p><strong>${q.clientName}</strong><br>
+    ${q.clientCompany ? q.clientCompany + "<br>" : ""}
+    ${q.clientPhone ? "📞 " + q.clientPhone + "<br>" : ""}
+    ${q.clientEmail ? "✉ " + q.clientEmail : ""}</p>
+  </div>
+  <div class="bill-box">
+    <h4>Quotation Details</h4>
+    <p>
+      This quotation is valid for <strong>${q.validityDays} days</strong> from the date of issue.<br>
+      For queries, contact us at info@vakilco.in
+    </p>
+  </div>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th style="width:30px">#</th>
+      <th>Service / Description</th>
+      <th style="width:50px">Qty</th>
+      <th style="width:90px">Unit Price</th>
+      <th style="width:90px">Amount</th>
+    </tr>
+  </thead>
+  <tbody>${rows}</tbody>
+</table>
+
+<table class="totals">
+  <tr><td>Subtotal</td><td>₹${subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td></tr>
+  <tr><td>GST (${q.taxPercent}%)</td><td>₹${taxAmt.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td></tr>
+  <tr class="total-row"><td>Grand Total</td><td>₹${total.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td></tr>
+</table>
+
+<div class="footer">
+  <div class="notes">
+    ${q.notes ? `<h4>Notes</h4><p>${q.notes.replace(/\n/g, "<br>")}</p>` : ""}
+    <p style="margin-top:${q.notes ? "10px" : "0"};color:#999;font-size:10px">This is a computer-generated quotation. Subject to acceptance within the validity period.</p>
+  </div>
+  <div class="sign">
+    <div class="sign-line"></div>
+    <p>Authorised Signatory</p>
+    <p>Vakil &amp; Co.</p>
+  </div>
+</div>
+<script>window.onload = function(){ window.print(); }</script>
+</body></html>`;
+
+  const w = window.open("", "_blank");
+  if (!w) return;
+  w.document.write(html);
+  w.document.close();
+}
 
 /** Call /admin/whatsapp/send, store the message, then open WhatsApp Web. */
 async function sendWaFromQuotation(toNumber: string, message: string) {
@@ -290,14 +419,17 @@ function QuotationDetail({ quotation, onClose, onSend }: { quotation: Quotation;
             </div>
           )}
 
-          <div className="flex gap-3">
+          <div className="flex gap-3 flex-wrap">
             {quotation.status === "draft" && (
               <Button onClick={onSend} className="flex-1 bg-[#0f2044] hover:bg-[#0f2044]/90 text-white gap-2">
                 <Send size={14} /> Mark as Sent
               </Button>
             )}
-            <Button variant="outline" onClick={() => window.print()} className="gap-2">
+            <Button variant="outline" onClick={() => printQuotation(quotation)} className="gap-2">
               <Printer size={14} /> Print
+            </Button>
+            <Button variant="outline" onClick={() => printQuotation(quotation)} className="gap-2 bg-[#0f2044] text-white hover:bg-[#c9a227] hover:text-[#0f2044] border-0">
+              <Download size={14} /> Download PDF
             </Button>
             <Button variant="outline" onClick={onClose}>Close</Button>
           </div>
@@ -416,6 +548,9 @@ export default function AdminQuotations() {
                           <Send size={12} /> Send
                         </Button>
                       )}
+                      <Button size="sm" variant="ghost" onClick={() => printQuotation(q)} className="h-7 px-2 text-xs gap-1 text-gray-600 hover:text-[#0f2044] hover:bg-gray-100">
+                        <Download size={12} /> PDF
+                      </Button>
                       {q.clientPhone && (
                         <Button size="sm" variant="ghost"
                           onClick={() => {

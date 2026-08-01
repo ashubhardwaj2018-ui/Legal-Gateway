@@ -99,6 +99,114 @@ ${inv.notes ? `<div style="margin-top:24px;padding:12px;background:#f9f9f9;borde
 <script>window.print();window.close()</script></body></html>`);
 }
 
+function printPortalQuotation(q: Quotation) {
+  // Items may be stored as { serviceName, description, quantity, unitPrice, total } or similar
+  const rawItems = Array.isArray(q.items) ? q.items as Array<Record<string, unknown>> : [];
+  const rows = rawItems.map((it, i) => {
+    const name = String(it.serviceName ?? it.description ?? "—");
+    const desc = it.serviceName && it.description ? String(it.description) : "";
+    const qty = Number(it.quantity ?? it.qty ?? 1);
+    const price = Number(it.unitPrice ?? it.rate ?? 0);
+    const amt = Number(it.total ?? it.amount ?? (qty * price));
+    return `<tr>
+      <td>${i + 1}</td>
+      <td style="text-align:left"><strong>${name}</strong>${desc ? `<br><span style="font-size:10px;color:#888">${desc}</span>` : ""}</td>
+      <td>${qty}</td>
+      <td>₹${price.toLocaleString("en-IN")}</td>
+      <td>₹${amt.toLocaleString("en-IN")}</td>
+    </tr>`;
+  }).join("");
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Quotation — ${q.quotationNumber}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; font-size: 12px; color: #111; background: #fff; padding: 20px; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #0f2044; padding-bottom: 16px; margin-bottom: 16px; }
+  .firm-name { font-size: 22px; font-weight: 900; color: #0f2044; letter-spacing: 1px; }
+  .firm-sub { color: #c9a227; font-size: 11px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; margin: 2px 0 6px; }
+  .firm-addr { color: #555; font-size: 11px; line-height: 1.5; }
+  .doc-box { text-align: right; }
+  .doc-type { font-size: 18px; font-weight: 700; color: #0f2044; text-transform: uppercase; letter-spacing: 1px; }
+  .doc-num { font-size: 13px; font-weight: 700; color: #c9a227; margin: 4px 0; }
+  .doc-meta { font-size: 11px; color: #555; line-height: 1.8; }
+  .bill-box { background: #f7f7f7; border-radius: 6px; padding: 12px 14px; border-left: 3px solid #0f2044; margin: 16px 0; }
+  .bill-box h4 { font-size: 10px; color: #c9a227; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+  table th { background: #0f2044; color: #fff; padding: 8px 6px; font-size: 11px; text-align: right; }
+  table th:first-child, table th:nth-child(2) { text-align: left; }
+  table td { padding: 7px 6px; font-size: 11px; text-align: right; border-bottom: 1px solid #eee; }
+  table td:first-child, table td:nth-child(2) { text-align: left; }
+  table tr:nth-child(even) td { background: #fafafa; }
+  .totals { width: 240px; margin-left: auto; margin-top: 8px; }
+  .totals tr td { padding: 4px 8px; font-size: 12px; }
+  .totals tr td:first-child { color: #555; }
+  .totals tr td:last-child { text-align: right; font-weight: 600; }
+  .total-row td { font-size: 14px; font-weight: 900; color: #0f2044; border-top: 2px solid #0f2044; padding-top: 8px; }
+  .footer { margin-top: 24px; display: flex; justify-content: space-between; align-items: flex-end; }
+  .notes { flex: 1; font-size: 11px; color: #555; line-height: 1.6; }
+  .sign { text-align: center; min-width: 120px; }
+  .sign-line { border-top: 1px solid #333; width: 120px; margin: 40px auto 4px; }
+  .sign p { font-size: 10px; color: #555; }
+  @media print { body { padding: 10px; } }
+</style></head><body>
+<div class="header">
+  <div>
+    <div class="firm-name">Vakil &amp; Co.</div>
+    <div class="firm-sub">Advocates &amp; Legal Consultants</div>
+    <div class="firm-addr">123, Legal Complex, Connaught Place, New Delhi — 110001<br>📞 +91 98765 43210 &nbsp;|&nbsp; ✉ info@vakilco.in</div>
+  </div>
+  <div class="doc-box">
+    <div class="doc-type">Quotation</div>
+    <div class="doc-num">${q.quotationNumber}</div>
+    <div class="doc-meta">
+      Date: ${fmtDate(q.createdAt)}<br>
+      Valid for: ${q.validityDays} days<br>
+      Status: <strong>${(q.status ?? "draft").toUpperCase()}</strong>
+    </div>
+  </div>
+</div>
+<div class="bill-box">
+  <h4>Prepared For</h4>
+  <p><strong>${q.clientName}</strong></p>
+</div>
+<table>
+  <thead>
+    <tr>
+      <th style="width:30px">#</th>
+      <th>Service / Description</th>
+      <th style="width:50px">Qty</th>
+      <th style="width:90px">Unit Price</th>
+      <th style="width:90px">Amount</th>
+    </tr>
+  </thead>
+  <tbody>${rows}</tbody>
+</table>
+<table class="totals">
+  <tr><td>Subtotal</td><td>₹${q.subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td></tr>
+  <tr><td>GST (${q.taxPercent}%)</td><td>₹${q.taxAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td></tr>
+  <tr class="total-row"><td>Grand Total</td><td>₹${q.total.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td></tr>
+</table>
+<div class="footer">
+  <div class="notes">
+    ${q.notes ? `<h4 style="font-size:10px;font-weight:700;color:#0f2044;text-transform:uppercase;margin-bottom:4px">Notes</h4><p>${q.notes}</p>` : ""}
+    <p style="margin-top:10px;color:#999;font-size:10px">This is a computer-generated quotation. Valid for ${q.validityDays} days from date of issue.</p>
+  </div>
+  <div class="sign">
+    <div class="sign-line"></div>
+    <p>Authorised Signatory</p>
+    <p>Vakil &amp; Co.</p>
+  </div>
+</div>
+<script>window.onload = function(){ window.print(); }</script>
+</body></html>`;
+
+  const w = window.open("", "_blank");
+  if (!w) return;
+  w.document.write(html);
+  w.document.close();
+}
+
 // ── Tab config ─────────────────────────────────────────────────────────────────
 const TABS: Array<{ key: Tab; label: string; icon: React.ElementType }> = [
   { key: "cases", label: "My Cases", icon: Briefcase },
@@ -530,9 +638,13 @@ export default function PortalDashboard() {
                         {q.sentAt ? ` · Valid ${q.validityDays} days from ${fmtDate(q.sentAt)}` : ""}
                       </div>
                     </div>
-                    <div className="text-right shrink-0">
+                    <div className="text-right shrink-0 flex flex-col items-end gap-2">
                       <div className="text-xl font-bold text-[#0f2044]">{fmt(q.total)}</div>
                       <div className="text-xs text-gray-400">incl. GST</div>
+                      <button onClick={() => printPortalQuotation(q)}
+                        className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-xl text-xs text-gray-600 hover:bg-[#0f2044] hover:text-white hover:border-[#0f2044] transition-all font-medium">
+                        <Download size={12} />Download
+                      </button>
                     </div>
                   </div>
 

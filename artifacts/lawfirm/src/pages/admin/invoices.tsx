@@ -549,6 +549,7 @@ export default function AdminInvoices() {
                   {selected.status === "draft" && <button onClick={() => markStatus(selected.id, "sent")} className="text-xs px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 font-medium flex items-center gap-1"><Send size={11} />Mark Sent</button>}
                   {(selected.status === "sent" || selected.status === "partial" || selected.status === "overdue") && <button onClick={() => { setShowPayment(true); setPayForm(f => ({ ...f, amount: String(Math.max(0, selBalance).toFixed(2)) })); }} className="text-xs px-3 py-1.5 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 font-medium flex items-center gap-1"><CreditCard size={11} />Add Payment</button>}
                   {selected.status !== "cancelled" && selected.status !== "paid" && <button onClick={() => markStatus(selected.id, "cancelled")} className="text-xs px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 font-medium">Cancel</button>}
+                  <button onClick={() => printInvoice(selected)} className="text-xs px-3 py-1.5 bg-[#0f2044] text-white rounded-lg hover:bg-[#c9a227] hover:text-[#0f2044] font-medium flex items-center gap-1 transition-colors"><Download size={11} />Download PDF</button>
                 </div>
               </div>
 
