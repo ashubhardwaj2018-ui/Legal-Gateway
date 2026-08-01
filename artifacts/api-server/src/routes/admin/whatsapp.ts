@@ -358,6 +358,98 @@ router.get("/admin/whatsapp/dashboard", async (_req, res): Promise<void> => {
 
 // ── Trigger fire (internal helper exported for use in other routes) ───────────
 
+// ── Test Provider Connection ──────────────────────────────────────────────────
+
+router.post("/admin/whatsapp/test-connection", async (_req, res): Promise<void> => {
+  const settings = await getSettings();
+  const provider  = (settings.whatsapp_provider ?? "web").toLowerCase();
+  const apiKey    = settings.whatsapp_api_key ?? "";
+  const phoneId   = settings.whatsapp_phone_number_id ?? "";
+
+  // Web / WhatsApp Web — no credentials needed
+  if (provider === "web") {
+    res.json({ ok: true, provider, message: "WhatsApp Web mode is active. No API credentials are required — staff send via web.whatsapp.com." });
+    return;
+  }
+
+  // Validate credentials are present for all API providers
+  if (!apiKey) {
+    res.json({ ok: false, provider, message: "API Key / Token is not configured. Please enter your credentials and save before testing." });
+    return;
+  }
+
+  // WABA (Meta Cloud API) — lightweight phone number lookup
+  if (provider === "waba") {
+    if (!phoneId) {
+      res.json({ ok: false, provider, message: "Phone Number ID is required for WABA. Please save your settings first." });
+      return;
+    }
+    try {
+      const url = `https://graph.facebook.com/v18.0/${phoneId}?access_token=${encodeURIComponent(apiKey)}`;
+      const r = await fetch(url, { method: "GET", signal: AbortSignal.timeout(8000) });
+      const body = await r.json() as Record<string, unknown>;
+      if (r.ok && body.id) {
+        res.json({ ok: true, provider, message: `WABA connected ✓ — Phone Number ID ${phoneId} verified via Meta Graph API.` });
+      } else {
+        const err = (body.error as Record<string, string> | undefined)?.message ?? "Unexpected response from Meta API.";
+        res.json({ ok: false, provider, message: `WABA error: ${err}` });
+      }
+    } catch (e: unknown) {
+      res.json({ ok: false, provider, message: `Connection to Meta API failed: ${e instanceof Error ? e.message : "network error"}` });
+    }
+    return;
+  }
+
+  // Twilio — verify credentials via account fetch
+  if (provider === "twilio") {
+    // apiKey expected as "AccountSID:AuthToken"
+    const [accountSid, authToken] = apiKey.split(":");
+    if (!accountSid || !authToken) {
+      res.json({ ok: false, provider, message: "For Twilio, enter your credentials as AccountSID:AuthToken in the API Key field." });
+      return;
+    }
+    try {
+      const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}.json`;
+      const r = await fetch(url, {
+        headers: { Authorization: "Basic " + Buffer.from(`${accountSid}:${authToken}`).toString("base64") },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (r.ok) {
+        const body = await r.json() as Record<string, unknown>;
+        res.json({ ok: true, provider, message: `Twilio connected ✓ — Account ${body.friendly_name ?? accountSid} is active.` });
+      } else {
+        res.json({ ok: false, provider, message: `Twilio authentication failed (HTTP ${r.status}). Check your Account SID and Auth Token.` });
+      }
+    } catch (e: unknown) {
+      res.json({ ok: false, provider, message: `Connection to Twilio failed: ${e instanceof Error ? e.message : "network error"}` });
+    }
+    return;
+  }
+
+  // 360dialog
+  if (provider === "360dialog") {
+    try {
+      const r = await fetch("https://waba.360dialog.io/v1/configs/webhook", {
+        headers: { "D360-API-KEY": apiKey, "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(8000),
+      });
+      res.json(r.ok
+        ? { ok: true,  provider, message: "360dialog API key is valid ✓" }
+        : { ok: false, provider, message: `360dialog returned HTTP ${r.status}. Check your API key.` });
+    } catch (e: unknown) {
+      res.json({ ok: false, provider, message: `Connection to 360dialog failed: ${e instanceof Error ? e.message : "network error"}` });
+    }
+    return;
+  }
+
+  // Gupshup / Interakt / other — just confirm credentials are present
+  res.json({
+    ok: true,
+    provider,
+    message: `${provider} credentials are saved. A live test message is required to verify delivery for this provider.`,
+  });
+});
+
 export async function fireWhatsAppTrigger(event: string, leadId: number, extra?: Record<string, string>) {
   try {
     const [trigger] = await db.select().from(whatsappTriggersTable)

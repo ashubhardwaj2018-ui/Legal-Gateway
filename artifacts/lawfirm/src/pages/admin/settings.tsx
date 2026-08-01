@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Save, Building2, Phone, Clock, Share2, Briefcase, MessageCircle } from "lucide-react";
+import { Save, Building2, Phone, Clock, Share2, Briefcase, MessageCircle, Wifi, WifiOff, Loader2, Info } from "lucide-react";
 
 const SETTING_GROUPS = [
   {
@@ -66,6 +66,17 @@ const KEY_LABELS: Record<string, { label: string; placeholder: string; multiline
   whatsapp_business_account_id:{ label: "Business Account ID (WABA)", placeholder: "Meta waba_id" },
 };
 
+const PROVIDER_HINTS: Record<string, { name: string; hint: string; needsKey: boolean; needsPhoneId: boolean }> = {
+  web:       { name: "WhatsApp Web",  hint: "No API needed. Staff send via whatsapp.com. Suitable for small volumes.", needsKey: false, needsPhoneId: false },
+  waba:      { name: "Meta WABA",     hint: "Meta Cloud API. Enter your System User Token as API Key and the Phone Number ID from Meta Business Manager.", needsKey: true, needsPhoneId: true },
+  twilio:    { name: "Twilio",        hint: "Enter credentials as AccountSID:AuthToken in the API Key field. Phone Number ID is your Twilio WhatsApp-enabled number (e.g. +14155238886).", needsKey: true, needsPhoneId: true },
+  "360dialog": { name: "360dialog",  hint: "Enter your 360dialog partner API key. Phone Number ID is optional for account-level actions.", needsKey: true, needsPhoneId: false },
+  gupshup:   { name: "Gupshup",      hint: "Enter your Gupshup App API key. Phone Number ID is your registered source number.", needsKey: true, needsPhoneId: true },
+  interakt:  { name: "Interakt",      hint: "Enter your Interakt API key. Phone Number ID is not required for Interakt.", needsKey: true, needsPhoneId: false },
+};
+
+type TestStatus = { ok: boolean; message: string } | null;
+
 export default function AdminSettings() {
   const queryClient = useQueryClient();
   const { data: settings } = useListSettings();
@@ -75,6 +86,8 @@ export default function AdminSettings() {
   const [values, setValues] = useState<Record<string, string>>({});
   const [activeGroup, setActiveGroup] = useState("firm");
   const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<TestStatus>(null);
 
   useEffect(() => {
     if (settings) {
@@ -83,7 +96,27 @@ export default function AdminSettings() {
     }
   }, [settings]);
 
-  const setValue = (key: string, val: string) => setValues(v => ({ ...v, [key]: val }));
+  const setValue = (key: string, val: string) => {
+    setValues(v => ({ ...v, [key]: val }));
+    if (activeGroup === "whatsapp") setTestResult(null); // reset test on any change
+  };
+
+  const handleTest = async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const r = await fetch("/api/admin/whatsapp/test-connection", {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await r.json() as { ok: boolean; message: string };
+      setTestResult(data);
+    } catch {
+      setTestResult({ ok: false, message: "Could not reach the server. Please check your connection." });
+    } finally {
+      setTesting(false);
+    }
+  };
 
   const handleSave = () => {
     const group = SETTING_GROUPS.find(g => g.id === activeGroup);
@@ -146,11 +179,30 @@ export default function AdminSettings() {
               </div>
             </div>
 
+            {/* Provider hint banner — WhatsApp group only */}
+            {activeGroup === "whatsapp" && (() => {
+              const providerKey = values["whatsapp_provider"] ?? "web";
+              const hint = PROVIDER_HINTS[providerKey] ?? PROVIDER_HINTS.web;
+              return (
+                <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 mb-4 text-xs text-blue-800">
+                  <Info size={14} className="shrink-0 mt-0.5 text-blue-500" />
+                  <div>
+                    <span className="font-semibold">{hint.name}: </span>{hint.hint}
+                    {!hint.needsKey && <span className="ml-1 text-blue-600 font-medium">(API Key not required)</span>}
+                  </div>
+                </div>
+              );
+            })()}
+
             <div className="space-y-4">
               {currentGroup.keys.map(key => {
                 const meta = KEY_LABELS[key] ?? { label: key, placeholder: "" };
+                // For WhatsApp group: dim API fields when provider is "web"
+                const isWebProvider = activeGroup === "whatsapp" && (values["whatsapp_provider"] ?? "web") === "web";
+                const isApiOnlyField = ["whatsapp_api_key", "whatsapp_phone_number_id", "whatsapp_business_account_id"].includes(key);
+                const dimField = isWebProvider && isApiOnlyField;
                 return (
-                  <div key={key}>
+                  <div key={key} className={dimField ? "opacity-40 pointer-events-none" : ""}>
                     <Label className="text-xs text-gray-700">{meta.label}</Label>
                     {meta.type === "select" ? (
                       <select
@@ -159,7 +211,14 @@ export default function AdminSettings() {
                         onChange={e => setValue(key, e.target.value)}
                       >
                         {(meta.options ?? []).map(opt => (
-                          <option key={opt} value={opt}>{opt}</option>
+                          <option key={opt} value={opt}>
+                            {opt === "web" ? "WhatsApp Web (no API)" :
+                             opt === "waba" ? "Meta WABA (Cloud API)" :
+                             opt === "twilio" ? "Twilio" :
+                             opt === "360dialog" ? "360dialog" :
+                             opt === "gupshup" ? "Gupshup" :
+                             opt === "interakt" ? "Interakt" : opt}
+                          </option>
                         ))}
                       </select>
                     ) : meta.multiline ? (
@@ -173,6 +232,7 @@ export default function AdminSettings() {
                     ) : (
                       <Input
                         className="mt-1 h-9 text-sm"
+                        type={key === "whatsapp_api_key" ? "password" : "text"}
                         value={values[key] ?? ""}
                         onChange={e => setValue(key, e.target.value)}
                         placeholder={meta.placeholder}
@@ -183,13 +243,44 @@ export default function AdminSettings() {
               })}
             </div>
 
-            <Button
-              onClick={handleSave}
-              disabled={saving || updateMutation.isPending}
-              className="mt-6 w-full bg-[#0f2044] hover:bg-[#0f2044]/90 text-white gap-2"
-            >
-              <Save size={14} /> {saving ? "Saving..." : `Save ${currentGroup.label}`}
-            </Button>
+            <div className={`mt-6 flex gap-3 ${activeGroup === "whatsapp" ? "flex-col" : ""}`}>
+              <Button
+                onClick={handleSave}
+                disabled={saving || updateMutation.isPending}
+                className="w-full bg-[#0f2044] hover:bg-[#0f2044]/90 text-white gap-2"
+              >
+                <Save size={14} /> {saving ? "Saving..." : `Save ${currentGroup.label}`}
+              </Button>
+
+              {/* Test Connection — WhatsApp group only */}
+              {activeGroup === "whatsapp" && (
+                <div className="space-y-2">
+                  <Button
+                    variant="outline"
+                    onClick={handleTest}
+                    disabled={testing}
+                    className="w-full gap-2 border-green-300 text-green-700 hover:bg-green-50"
+                  >
+                    {testing
+                      ? <><Loader2 size={14} className="animate-spin" /> Testing…</>
+                      : <><Wifi size={14} /> Test Connection</>}
+                  </Button>
+
+                  {testResult && (
+                    <div className={`flex items-start gap-2.5 rounded-lg px-4 py-3 text-sm border ${
+                      testResult.ok
+                        ? "bg-green-50 border-green-200 text-green-800"
+                        : "bg-red-50 border-red-200 text-red-800"
+                    }`}>
+                      {testResult.ok
+                        ? <Wifi size={15} className="shrink-0 mt-0.5 text-green-600" />
+                        : <WifiOff size={15} className="shrink-0 mt-0.5 text-red-500" />}
+                      <span>{testResult.message}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

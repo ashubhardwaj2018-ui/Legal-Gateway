@@ -18,6 +18,12 @@ const DEFAULT_SETTINGS = [
   { key: "twitter_url", value: "#" },
   { key: "facebook_url", value: "#" },
   { key: "instagram_url", value: "#" },
+  // WhatsApp
+  { key: "company_whatsapp",             value: "" },
+  { key: "whatsapp_provider",            value: "web" },
+  { key: "whatsapp_api_key",             value: "" },
+  { key: "whatsapp_phone_number_id",     value: "" },
+  { key: "whatsapp_business_account_id", value: "" },
 ];
 
 const router: IRouter = Router();
