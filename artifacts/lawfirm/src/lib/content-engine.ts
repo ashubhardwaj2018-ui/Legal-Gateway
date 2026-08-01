@@ -167,7 +167,11 @@ export function generatePageSeo(service: ServiceInfo, loc: LocationData): PageSe
   };
 }
 
-export function generateJsonLd(service: ServiceInfo, loc: LocationData, faqs: { q: string; a: string }[]): object[] {
+export function generateJsonLd(
+  service: ServiceInfo,
+  loc: LocationData & { pincode?: string | null; latitude?: number | null; longitude?: number | null },
+  faqs: { q: string; a: string }[],
+): object[] {
   const city = primaryPlace(loc);
   const baseUrl = "https://vakil.co.in";
   const pageUrl = `${baseUrl}/${service.slug}/${loc.slug}`;
@@ -213,5 +217,56 @@ export function generateJsonLd(service: ServiceInfo, loc: LocationData, faqs: { 
     })),
   };
 
-  return [breadcrumb, serviceSchema, faqSchema];
+  // LocalBusiness / LegalService schema
+  const localBusiness: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "LegalService",
+    "@id": `${pageUrl}#local`,
+    name: `${FIRM_NAME} — ${service.name} in ${city}`,
+    description: `Professional ${service.name} services in ${city}, ${loc.state}. Expert CAs, CSs, and Advocates. Transparent fees from ${service.price}.`,
+    url: pageUrl,
+    telephone: "+91-1800-123-4567",
+    priceRange: service.price,
+    currenciesAccepted: "INR",
+    paymentAccepted: "Cash, Credit Card, UPI, Net Banking",
+    openingHours: "Mo-Sa 09:00-19:00",
+    address: {
+      "@type": "PostalAddress",
+      addressLocality: city,
+      addressRegion: loc.state,
+      addressCountry: "IN",
+      ...(loc.pincode ? { postalCode: loc.pincode } : {}),
+    },
+    serviceArea: {
+      "@type": "GeoCircle",
+      geoMidpoint: {
+        "@type": "GeoCoordinates",
+        ...(loc.latitude ? { latitude: loc.latitude } : {}),
+        ...(loc.longitude ? { longitude: loc.longitude } : {}),
+        addressCountry: "IN",
+      },
+    },
+    hasOfferCatalog: {
+      "@type": "OfferCatalog",
+      name: `${service.name} Services`,
+      itemListElement: [
+        {
+          "@type": "Offer",
+          itemOffered: {
+            "@type": "Service",
+            name: service.name,
+          },
+          price: service.price.replace(/[₹,]/g, ""),
+          priceCurrency: "INR",
+        },
+      ],
+    },
+  };
+
+  // Remove geo if no coordinates
+  if (!loc.latitude || !loc.longitude) {
+    delete (localBusiness.serviceArea as Record<string, unknown>).geoMidpoint;
+  }
+
+  return [breadcrumb, serviceSchema, faqSchema, localBusiness];
 }

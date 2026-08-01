@@ -32,14 +32,24 @@ export const locationsTable = pgTable(
   }),
 );
 
-export const serviceLocationsTable = pgTable("service_locations", {
-  id: serial("id").primaryKey(),
-  serviceId: text("service_id").notNull(),
-  locationId: integer("location_id")
-    .notNull()
-    .references(() => locationsTable.id, { onDelete: "cascade" }),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+export const serviceLocationsTable = pgTable(
+  "service_locations",
+  {
+    id: serial("id").primaryKey(),
+    serviceId: text("service_id").notNull(),
+    locationId: integer("location_id")
+      .notNull()
+      .references(() => locationsTable.id, { onDelete: "cascade" }),
+    isFeatured: boolean("is_featured").notNull().default(false),
+    customTitle: text("custom_title"),
+    customDescription: text("custom_description"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    uniqueServiceLocation: index("service_locations_unique_idx").on(table.serviceId, table.locationId),
+  }),
+);
+
 
 export const locationUploadLogsTable = pgTable("location_upload_logs", {
   id: serial("id").primaryKey(),

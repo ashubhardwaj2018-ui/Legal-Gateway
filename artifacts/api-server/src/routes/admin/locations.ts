@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, ilike, or, count, desc, sql, and, inArray } from "drizzle-orm";
-import { db, locationsTable, locationUploadLogsTable } from "@workspace/db";
+import { db, locationsTable, locationUploadLogsTable, serviceLocationsTable } from "@workspace/db";
+import https from "https";
 import * as XLSX from "xlsx";
 import multer from "multer";
 
@@ -613,6 +614,105 @@ router.post("/admin/locations/bulk-delete", async (req, res): Promise<void> => {
   const numIds = ids.map(Number).filter((n) => !isNaN(n));
   await db.delete(locationsTable).where(inArray(locationsTable.id, numIds));
   res.json({ deleted: numIds.length });
+});
+
+// ─── pSEO: Rebuild service-location relationships ────────────────────────────
+// Creates service_locations rows for top N locations × all services.
+// We cap at 5000 locations to keep the table manageable (dynamic pages work regardless).
+
+const ALL_SERVICE_SLUGS_FOR_REBUILD = [
+  // Top services for featured relationship tracking
+  "gst-registration","trademark-registration","private-limited-company","limited-liability-partnership",
+  "individual-income-tax-filing","fssai-registration-online","msmessi-registration","one-person-company",
+  "gst-filing","copyright-registration","startup-india-registration","ngo","trademark-renewal",
+  "legal-notice","property-registration","marriage-registration","digital-signature-certificate",
+  "tds-return-filing","accounting-and-book-keeping","rental-agreement","sole-proprietorship",
+  "partnership-firm","name-change","gst-advisory","trademark-infringement","trust-registration",
+  "section-8-company","society-registration","provident-fund-pf-registration","esi-registration",
+  "company-name-search","iso-certification","iec-importexport-code","non-disclosure-agreement-nda",
+  "employment-agreement","make-a-will","power-of-attorney","property-title-verification",
+  "court-marriage","divorce-lawyer","criminal-lawyer","trademark-registration","trademark-infringement",
+  "permanent-patent","provisional-application","copyright-registration","design-registration",
+  "gst-registration","gst-filing","tds-return-filing","income-tax-notice",
+];
+const UNIQUE_REBUILD_SLUGS = [...new Set(ALL_SERVICE_SLUGS_FOR_REBUILD)];
+
+router.post("/admin/locations/rebuild-relationships", async (req, res): Promise<void> => {
+  const start = Date.now();
+  const MAX_LOCATIONS = 5_000;
+  const BATCH = 200;
+
+  try {
+    // Fetch top locations by population
+    const locations = await db
+      .select({ id: locationsTable.id })
+      .from(locationsTable)
+      .where(eq(locationsTable.isActive, true))
+      .orderBy(desc(locationsTable.population))
+      .limit(MAX_LOCATIONS);
+
+    let inserted = 0;
+
+    // Insert in batches, ignore duplicates via onConflictDoNothing
+    for (let i = 0; i < locations.length; i += BATCH) {
+      const batch = locations.slice(i, i + BATCH);
+      const rows = batch.flatMap((loc) =>
+        UNIQUE_REBUILD_SLUGS.map((slug) => ({
+          serviceId: slug,
+          locationId: loc.id,
+          isFeatured: true,
+        }))
+      );
+
+      try {
+        const result = await db
+          .insert(serviceLocationsTable)
+          .values(rows)
+          .onConflictDoNothing()
+          .returning({ id: serviceLocationsTable.id });
+        inserted += result.length;
+      } catch { /* skip batch on error */ }
+    }
+
+    res.json({
+      inserted,
+      locationsCovered: locations.length,
+      serviceCount: UNIQUE_REBUILD_SLUGS.length,
+      elapsed: Date.now() - start,
+    });
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// ─── Sitemap: ping search engines ────────────────────────────────────────────
+
+function pingUrl(url: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    try {
+      const req = https.get(url, (res) => { resolve(res.statusCode !== undefined && res.statusCode < 400); res.resume(); });
+      req.setTimeout(8000, () => { req.destroy(); resolve(false); });
+      req.on("error", () => resolve(false));
+    } catch { resolve(false); }
+  });
+}
+
+router.post("/admin/sitemap/ping", async (req, res): Promise<void> => {
+  const proto = req.headers["x-forwarded-proto"] ?? "https";
+  const host  = req.headers["x-forwarded-host"] ?? req.headers.host ?? "vakil.co.in";
+  const sitemapUrl = encodeURIComponent(`${proto}://${host}/api/sitemap.xml`);
+
+  const [google, bing] = await Promise.all([
+    pingUrl(`https://www.google.com/ping?sitemap=${sitemapUrl}`),
+    pingUrl(`https://www.bing.com/ping?sitemap=${sitemapUrl}`),
+  ]);
+
+  res.json({
+    google,
+    bing,
+    sitemapSubmitted: decodeURIComponent(sitemapUrl),
+    message: `Pinged at ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} IST`,
+  });
 });
 
 export default router;

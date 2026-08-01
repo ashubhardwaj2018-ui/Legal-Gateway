@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /api/admin/
+
+# Portal client pages
+Disallow: /portal/
+
+# Sitemap index
+Sitemap: https://vakil.co.in/api/sitemap.xml

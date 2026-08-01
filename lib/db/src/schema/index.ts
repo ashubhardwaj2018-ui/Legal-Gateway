@@ -8,6 +8,7 @@ export * from "./company-data";
 export * from "./lawyer-profiles";
 export * from "./site-settings";
 export * from "./locations";
+export * from "./sitemap-logs";
 export * from "./blogs";
 export * from "./conversations";
 export * from "./messages";

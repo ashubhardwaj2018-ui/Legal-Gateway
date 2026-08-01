@@ -1,0 +1,142 @@
+PART 2 – Programmatic SEO (Highest Priority)
+Act as team of sebior developers Completely rebuild the Programmatic SEO engine.
+This is one of the most important modules.
+________________________________________
+Services
+Each service already exists.
+Examples:
+GST Registration
+Company Registration
+Trademark Registration
+ISO Certification
+FSSAI
+MSME
+Copyright
+IEC
+PF
+ESI
+Income Tax
+Accounting
+ROC Compliance
+etc.
+________________________________________
+Location Database
+Admin uploads Excel.
+Locations include:
+Country
+State
+City
+Pincode
+Latitude
+Longitude
+________________________________________
+Auto Relationship
+After location upload the system must automatically create relationships between:
+Every Service
+×
+Every Location
+Example:
+If there are
+250 services
+and
+12,000 cities
+Automatically create
+3,000,000 service-location records
+using relationship tables.
+Do not duplicate service data.
+Use normalized relational tables.
+________________________________________
+Dynamic URL
+Generate URLs like:
+/gst-registration/delhi
+
+/company-registration/gurgaon
+
+/trademark-registration/noida
+
+/fssai-license/mumbai
+Never create static PHP files.
+Everything must be database-driven.
+________________________________________
+Auto SEO Metadata
+Automatically generate for every Service × Location page:
+SEO Title
+Meta Description
+Meta Keywords
+Canonical URL
+Slug
+Breadcrumb
+Schema.org JSON-LD
+Open Graph
+Twitter Card
+FAQ Schema
+Service Schema
+Local Business Schema (where applicable)
+________________________________________
+AI SEO
+Automatically generate:
+Unique introduction
+Location-specific content
+FAQs
+Related services
+Related cities
+Internal links
+Call to Action
+Do not use duplicate content.
+________________________________________
+Internal Linking
+This module is currently incomplete.
+Build complete internal linking.
+Each page should automatically link to:
+•	Same service in nearby cities. 
+•	Other services in same city. 
+•	State page. 
+•	Blog articles. 
+•	Company database. 
+•	FAQs. 
+________________________________________
+Sitemap
+Automatically regenerate XML sitemap whenever:
+•	New service added. 
+•	New city uploaded. 
+•	New blog added. 
+•	New company imported. 
+Include:
+Services
+Service × City pages
+Blogs
+Companies
+Categories
+Landing pages
+Images (optional)
+Split into multiple sitemap files if more than 50,000 URLs.
+Automatically update sitemap index.
+Ping search engines after regeneration (where supported).
+________________________________________
+Robots
+Update robots.txt automatically.
+Reference sitemap index.
+________________________________________
+Canonical
+Generate correct canonical URLs.
+________________________________________
+Database
+Review entire database.
+If relationship tables are missing:
+Create them.
+Optimize indexes.
+Avoid duplicate rows.
+________________________________________
+Final Verification
+Before completion:
+•	Test employee login. 
+•	Test permissions. 
+•	Test opening leads. 
+•	Test updating leads. 
+•	Test chat. 
+•	Test service-location linking. 
+•	Test dynamic SEO pages. 
+•	Test metadata generation. 
+•	Test sitemap generation. 
+•	Test XML validation. 
+•	Fix every broken feature before marking the work complete. 

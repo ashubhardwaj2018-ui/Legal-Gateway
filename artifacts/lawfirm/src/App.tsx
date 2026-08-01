@@ -8,6 +8,8 @@ import Home from "@/pages/home";
 import ServiceCategory from "@/pages/service-category";
 import ServiceDetail from "@/pages/service-detail";
 import ServiceLocation from "@/pages/service-location";
+import StateHub from "@/pages/state-hub";
+import AdminPSEOManager from "@/pages/admin/pseo-manager";
 import NotFound from "@/pages/not-found";
 import AdminLogin from "@/pages/admin/login";
 import AdminDashboard from "@/pages/admin/dashboard";
@@ -91,6 +93,7 @@ function Router() {
       <Route path="/admin/login-history" component={AdminLoginHistory} />
       <Route path="/admin/activity-log" component={AdminActivityLog} />
       <Route path="/admin/whatsapp" component={AdminWhatsApp} />
+      <Route path="/admin/pseo" component={AdminPSEOManager} />
       <Route path="/admin/my-dashboard" component={EmployeeDashboard} />
       <Route path="/admin/team-performance" component={TeamPerformance} />
 
@@ -114,6 +117,8 @@ function Router() {
             <Route path="/blog/:slug" component={BlogPost} />
             <Route path="/services/:catId/:slug" component={ServiceDetail} />
             <Route path="/services/:id" component={ServiceCategory} />
+            {/* State hub — must be before pSEO catch-all */}
+            <Route path="/state/:stateSlug" component={StateHub} />
             {/* Programmatic SEO — must be last specific route */}
             <Route path="/:serviceSlug/:locationSlug" component={ServiceLocation} />
             <Route component={NotFound} />
