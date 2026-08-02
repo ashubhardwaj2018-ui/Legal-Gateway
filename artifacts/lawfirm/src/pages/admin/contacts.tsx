@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, Eye, Check, Download, Filter } from "lucide-react";
+import { Search, Eye, Check, Download, Filter, MessageCircle } from "lucide-react";
 
 
 function DetailModal({ contact, onClose, onMarkRead }: { contact: Contact; onClose: () => void; onMarkRead: () => void }) {
@@ -64,6 +64,16 @@ function DetailModal({ contact, onClose, onMarkRead }: { contact: Contact; onClo
               </Button>
             )}
           </div>
+          {contact.phone && (
+            <a
+              href={`https://wa.me/${contact.phone.replace(/[^\d+]/g, "")}?text=${encodeURIComponent(`Hi ${contact.name}, thank you for reaching out to Vakil & Co. regarding "${contact.subject}". We'll get back to you shortly.`)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex w-full items-center justify-center gap-2 text-xs font-medium text-green-700 border border-green-300 hover:bg-green-50 hover:border-green-400 rounded-lg px-3 py-2 transition-colors"
+            >
+              <MessageCircle size={13} /> Send via WhatsApp
+            </a>
+          )}
         </div>
       </DialogContent>
     </Dialog>

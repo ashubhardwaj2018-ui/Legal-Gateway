@@ -27,6 +27,7 @@ import AdminLawyers from "@/pages/admin/lawyers";
 import AdminSettings from "@/pages/admin/settings";
 import AdminLocations from "@/pages/admin/locations";
 import BulkLocationUpload from "@/pages/admin/bulk-location-upload";
+import BulkServiceUpload from "@/pages/admin/bulk-service-upload";
 import AdminBlogs from "@/pages/admin/blogs";
 import AdminTeam from "@/pages/admin/team";
 import AdminIndianCompanies from "@/pages/admin/indian-companies";
@@ -99,6 +100,7 @@ function Router() {
       <Route path="/admin/activity-log" component={AdminActivityLog} />
       <Route path="/admin/whatsapp" component={AdminWhatsApp} />
       <Route path="/admin/pseo" component={AdminPSEOManager} />
+      <Route path="/admin/bulk-service-upload" component={BulkServiceUpload} />
       <Route path="/admin/my-dashboard" component={EmployeeDashboard} />
       <Route path="/admin/team-performance" component={TeamPerformance} />
 

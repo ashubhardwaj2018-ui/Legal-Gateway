@@ -594,6 +594,43 @@ router.get("/portal/chat/sse", portalAuth, async (req, res): Promise<void> => {
   req.on("close", () => { clearInterval(hb); room.delete(res); });
 });
 
+// ── Client: Profile ───────────────────────────────────────────────────────────
+
+router.get("/portal/profile", portalAuth, async (req, res): Promise<void> => {
+  const email = (req as PortalRequest).portalEmail;
+  const [lead] = await db.select({
+    name: consultationsTable.name,
+    email: consultationsTable.email,
+    phone: consultationsTable.phone,
+    whatsapp: consultationsTable.whatsapp,
+    company: consultationsTable.company,
+    city: consultationsTable.city,
+    state: consultationsTable.state,
+  }).from(consultationsTable)
+    .where(ilike(consultationsTable.email, email))
+    .orderBy(desc(consultationsTable.createdAt))
+    .limit(1);
+  if (!lead) { res.status(404).json({ error: "Profile not found" }); return; }
+  res.json(lead);
+});
+
+router.patch("/portal/profile", portalAuth, async (req, res): Promise<void> => {
+  const email = (req as PortalRequest).portalEmail;
+  const { name, phone, whatsapp, company, city, state } = req.body as Record<string, string>;
+  if (!name?.trim()) { res.status(400).json({ error: "Name is required" }); return; }
+  await db.update(consultationsTable)
+    .set({
+      name: name.trim(),
+      ...(phone !== undefined   ? { phone:    phone.trim()    } : {}),
+      ...(whatsapp !== undefined? { whatsapp: whatsapp.trim() } : {}),
+      ...(company !== undefined ? { company:  company.trim()  } : {}),
+      ...(city !== undefined    ? { city:     city.trim()     } : {}),
+      ...(state !== undefined   ? { state:    state.trim()    } : {}),
+    })
+    .where(ilike(consultationsTable.email, email));
+  res.json({ ok: true });
+});
+
 // ── Client: Messages (legacy, kept for backwards compat) ──────────────────────
 
 router.post("/portal/message", portalAuth, async (req, res): Promise<void> => {

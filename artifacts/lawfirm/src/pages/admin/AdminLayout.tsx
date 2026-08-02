@@ -46,6 +46,7 @@ const navItems: NavItem[] = [
   { href: "/admin/lawyers",         label: "Lawyer Profiles",     icon: User,                          module: "lawyers" },
   { href: "/admin/locations",       label: "Locations (pSEO)",    icon: MapPin,                        module: "locations" },
   { href: "/admin/bulk-location-upload", label: "Bulk Location Upload", icon: Upload,                   module: "locations" },
+  { href: "/admin/bulk-service-upload",  label: "Bulk Service Upload",  icon: Upload,                   module: "services" },
   { href: "/admin/pseo",            label: "pSEO Manager",         icon: Globe,                         module: "locations" },
   { href: "/admin/settings",        label: "Site Settings",       icon: Settings,                      module: "settings" },
   { href: "/admin/page-editor",     label: "Page Editor",         icon: Layers,                        module: "settings" },

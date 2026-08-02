@@ -16,7 +16,7 @@ interface PortalDoc { id: number; leadId: number; clientEmail: string; fileName:
 interface ChatMsg { id: number; leadId: number; clientEmail: string; senderType: string; senderName: string; message: string; createdAt: string; }
 interface TimelineItem { id: number; type: string; actionType: string; description: string; actor: string; createdAt: string; }
 
-type Tab = "cases" | "quotations" | "invoices" | "documents" | "chat" | "progress";
+type Tab = "cases" | "quotations" | "invoices" | "documents" | "chat" | "progress" | "profile";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const CASE_STEPS = ["new", "contacted", "qualified", "proposal", "negotiation", "won"];
@@ -215,6 +215,7 @@ const TABS: Array<{ key: Tab; label: string; icon: React.ElementType }> = [
   { key: "documents", label: "Documents", icon: Paperclip },
   { key: "chat", label: "Chat", icon: MessageSquare },
   { key: "progress", label: "Progress", icon: Activity },
+  { key: "profile", label: "My Profile", icon: User },
 ];
 
 // ── Main Component ─────────────────────────────────────────────────────────────
@@ -248,6 +249,12 @@ export default function PortalDashboard() {
   const [chatSending, setChatSending] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const chatSseRef = useRef<EventSource | null>(null);
+
+  // Profile edit
+  const [profileForm, setProfileForm] = useState({ name: "", phone: "", whatsapp: "", company: "", city: "", state: "" });
+  const [profileLoaded, setProfileLoaded] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileSaved, setProfileSaved] = useState(false);
 
   // Invoice pay
   const [payingInvId, setPayingInvId] = useState<number | null>(null);
@@ -1031,6 +1038,94 @@ export default function PortalDashboard() {
                 )}
               </>
             )}
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════════
+            MY PROFILE TAB
+        ══════════════════════════════════════════════════════════════════ */}
+        {tab === "profile" && (
+          <div className="max-w-lg mx-auto space-y-4">
+            <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-12 h-12 bg-[#0f2044]/10 rounded-2xl flex items-center justify-center text-[#0f2044] font-bold text-lg">
+                  {client?.name?.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <h2 className="font-bold text-[#0f2044]">{client?.name}</h2>
+                  <p className="text-xs text-gray-400">{client?.email}</p>
+                </div>
+              </div>
+
+              {!profileLoaded && token && (() => {
+                fetch(`/api/portal/profile`, { headers: { "x-portal-token": token }, credentials: "include" })
+                  .then(r => r.json())
+                  .then((d: { name: string; phone: string; whatsapp: string; company: string | null; city: string | null; state: string | null }) => {
+                    setProfileForm({
+                      name: d.name ?? "", phone: d.phone ?? "", whatsapp: d.whatsapp ?? "",
+                      company: d.company ?? "", city: d.city ?? "", state: d.state ?? "",
+                    });
+                    setProfileLoaded(true);
+                  }).catch(() => setProfileLoaded(true));
+                return null;
+              })()}
+
+              <div className="space-y-4">
+                {[
+                  { key: "name",      label: "Full Name",      placeholder: "Your full name",        required: true },
+                  { key: "company",   label: "Company / Firm", placeholder: "Your company name",     required: false },
+                  { key: "phone",     label: "Phone Number",   placeholder: "+91 98765 43210",        required: false },
+                  { key: "whatsapp",  label: "WhatsApp Number",placeholder: "+91 98765 43210",        required: false },
+                  { key: "city",      label: "City",           placeholder: "e.g. Mumbai",            required: false },
+                  { key: "state",     label: "State",          placeholder: "e.g. Maharashtra",       required: false },
+                ].map(({ key, label, placeholder, required }) => (
+                  <div key={key}>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">{label}{required && <span className="text-red-400 ml-0.5">*</span>}</label>
+                    <input
+                      type="text"
+                      value={profileForm[key as keyof typeof profileForm]}
+                      onChange={e => setProfileForm(f => ({ ...f, [key]: e.target.value }))}
+                      placeholder={placeholder}
+                      className="w-full h-10 px-3 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-[#c9a227] transition-colors bg-white"
+                    />
+                  </div>
+                ))}
+
+                {profileSaved && (
+                  <div className="flex items-center gap-2 text-green-600 text-sm bg-green-50 rounded-xl px-4 py-2.5">
+                    <CheckCircle size={14} /> Profile updated successfully
+                  </div>
+                )}
+
+                <button
+                  disabled={profileSaving || !profileForm.name.trim()}
+                  onClick={async () => {
+                    if (!token || !profileForm.name.trim()) return;
+                    setProfileSaving(true); setProfileSaved(false);
+                    try {
+                      const r = await fetch("/api/portal/profile", {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json", "x-portal-token": token },
+                        credentials: "include",
+                        body: JSON.stringify(profileForm),
+                      });
+                      if (r.ok) setProfileSaved(true);
+                    } finally { setProfileSaving(false); }
+                  }}
+                  className="w-full h-10 bg-[#0f2044] hover:bg-[#0f2044]/90 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
+                >
+                  {profileSaving ? <Loader2 size={14} className="animate-spin" /> : <User size={14} />}
+                  {profileSaving ? "Saving…" : "Update Profile"}
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+              <p className="text-xs text-gray-400 text-center">
+                Your email address <span className="font-semibold text-gray-600">{client?.email}</span> is your login identifier and cannot be changed here.
+                Contact our team if you need to update your email.
+              </p>
+            </div>
           </div>
         )}
       </div>

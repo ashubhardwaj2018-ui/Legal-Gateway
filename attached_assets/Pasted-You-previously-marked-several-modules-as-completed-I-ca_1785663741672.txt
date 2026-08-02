@@ -1,0 +1,59 @@
+You previously marked several modules as completed.
+I cannot see these features anywhere in the application.
+Your task is NOT to create these modules again.
+Your task is to verify that every completed module is fully integrated into the Website, Admin Panel, Employee Panel, Customer Portal, Navigation, Routing, Database, APIs, and UI.
+If any module exists only partially (backend only or frontend only), complete the integration.
+WhatsApp Integration
+This module was previously marked complete.
+Verify it actually works.
+Each Lead Details page must display a WhatsApp button.
+Each Customer Details page must display a WhatsApp button.
+The button should use the lead's WhatsApp number or fall back to the mobile number.
+If the WhatsApp API is configured, send directly from the CRM.
+Otherwise, open WhatsApp Web with a pre-filled message.
+Record every sent message in the CRM history.
+The WhatsApp module must also appear in the Admin sidebar.
+Customer Portal
+Verify there is:
+•	Customer Login page 
+•	Customer Dashboard 
+•	Customer Sidebar 
+Customer must be able to:
+•	View quotations 
+•	View invoices 
+•	Upload documents 
+•	Download files 
+•	View progress 
+•	Chat with assigned executive 
+•	Update profile
+Programmatic SEO
+Verify:
+•	SEO menu exists in Admin. 
+•	Bulk Location Upload exists. 
+•	Bulk Service Upload exists. 
+•	Internal Linking Manager exists. 
+•	Meta Tag Generator exists. 
+•	Sitemap Generator exists. 
+•	Robots.txt Manager exists. 
+If only backend exists, create the UI.
+________________________________________Company Database
+Verify:
+•	Admin menu 
+•	Upload page 
+•	Search page 
+•	Filters 
+•	Edit page 
+•	Company Details page 
+•	Import history 
+________________________________________
+Routing Audit
+Review every React route.
+If a completed page exists but is not connected to the router, add it.
+No orphan pages should remain.
+________________________________________
+Sidebar Audit
+Every module must appear in the appropriate sidebar based on user permissions.
+________________________________________
+API Audit
+Verify every frontend page is connected to the correct backend API.
+No page should contain placeholder data.
