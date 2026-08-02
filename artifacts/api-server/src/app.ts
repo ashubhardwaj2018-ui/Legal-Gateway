@@ -9,6 +9,10 @@ import { logger } from "./lib/logger";
 
 const app: Express = express();
 
+// Trust the Replit / reverse-proxy layer so express-rate-limit can read
+// X-Forwarded-For correctly and the login limiter doesn't throw a ValidationError.
+app.set("trust proxy", 1);
+
 // ── Security headers ─────────────────────────────────────────────────────────
 app.use(
   helmet({
@@ -20,6 +24,7 @@ app.use(
 // ── CORS ──────────────────────────────────────────────────────────────────────
 const allowedOrigins = [
   /\.replit\.dev$/,
+  /\.replit\.app$/,   // production deployments
   /\.repl\.co$/,
   /localhost/,
   "https://vakil.co.in",
