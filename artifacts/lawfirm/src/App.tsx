@@ -38,6 +38,7 @@ import AdminChat from "@/pages/admin/chat";
 import AdminEmail from "@/pages/admin/email";
 import AdminReports from "@/pages/admin/reports";
 import AdminPageEditor from "@/pages/admin/page-editor";
+import AdminDbManager from "@/pages/admin/db-manager";
 import AdminEmployees from "@/pages/admin/employees";
 import AdminRoles from "@/pages/admin/roles";
 import AdminLoginHistory from "@/pages/admin/login-history";
@@ -105,6 +106,7 @@ function Router() {
       <Route path="/admin/email" component={AdminEmail} />
       <Route path="/admin/reports" component={AdminReports} />
       <Route path="/admin/page-editor" component={AdminPageEditor} />
+      <Route path="/admin/db-manager" component={AdminDbManager} />
       <Route path="/admin/employees" component={AdminEmployees} />
       <Route path="/admin/roles" component={AdminRoles} />
       <Route path="/admin/login-history" component={AdminLoginHistory} />

@@ -6,7 +6,7 @@ import {
   db, portalAccessRequestsTable, portalTokensTable,
   consultationsTable, siteSettingsTable,
 } from "@workspace/db";
-import type { AuthenticatedRequest } from "./index";
+import type { AuthenticatedRequest } from "./auth";
 
 const router: IRouter = Router();
 
@@ -50,7 +50,7 @@ router.post("/admin/portal-access/:id/approve", async (req, res): Promise<void> 
     res.status(400).json({ error: "Request is not pending" }); return;
   }
 
-  const actorName = (req as AuthenticatedRequest).adminUser?.username ?? "Admin";
+  const actorName = String((req as AuthenticatedRequest).adminUser?.username ?? "Admin");
 
   // Mark approved
   await db.update(portalAccessRequestsTable)
@@ -114,7 +114,7 @@ router.post("/admin/portal-access/:id/reject", async (req, res): Promise<void> =
     .where(eq(portalAccessRequestsTable.id, id)).limit(1);
   if (!request) { res.status(404).json({ error: "Request not found" }); return; }
 
-  const actorName = (req as AuthenticatedRequest).adminUser?.username ?? "Admin";
+  const actorName = String((req as AuthenticatedRequest).adminUser?.username ?? "Admin");
 
   await db.update(portalAccessRequestsTable)
     .set({ status: "rejected", reviewedBy: actorName, reviewedAt: new Date() })

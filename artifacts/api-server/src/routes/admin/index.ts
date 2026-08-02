@@ -30,6 +30,7 @@ import portalAccessRouter from "./portal-access";
 import apiManagerRouter from "./api-manager";
 import whatsappRouter from "./whatsapp";
 import aiRouter from "./ai";
+import dbManagerRouter from "./db-manager/index";
 
 const router: IRouter = Router();
 
@@ -82,6 +83,7 @@ router.use(makeModulePermissionMiddleware([
   ["/admin/performance/team",   "team"],
   ["/admin/whatsapp",           "whatsapp"],
   ["/admin/ai",                 "settings"],
+  ["/admin/db-manager",         "database"],
 ]));
 
 
@@ -115,5 +117,6 @@ router.use(portalAccessRouter);
 router.use(apiManagerRouter);
 router.use(whatsappRouter);
 router.use(aiRouter);
+router.use(dbManagerRouter);
 
 export default router;
