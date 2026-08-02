@@ -6,6 +6,7 @@ export const servicesConfigTable = pgTable("services_config", {
   id: serial("id").primaryKey(),
   categoryId: text("category_id").notNull(),
   serviceName: text("service_name").notNull(),
+  slug: text("slug"),
   displayName: text("display_name"),
   description: text("description"),
   basePrice: integer("base_price"),

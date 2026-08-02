@@ -9,10 +9,12 @@ import {
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
+// categoryId must match a SERVICES_DATA key: consult-expert | business-setup | tax-compliance |
+//   trademark-ip | documentation | fundraising | ngo | property-personal | lawyers
 const TEMPLATE_HEADERS = ["name", "slug", "categoryId", "shortDescription", "description", "price", "isActive"];
 const TEMPLATE_EXAMPLE = [
-  ["Private Limited Company Registration", "private-limited-company-registration", "1", "Fast and affordable PLC registration across India.", "Full description here...", "6999", "true"],
-  ["LLP Registration", "llp-registration", "1", "Register your Limited Liability Partnership quickly.", "Full description here...", "4999", "true"],
+  ["Private Limited Company Registration", "private-limited-company-registration", "business-setup", "Fast and affordable PLC registration across India.", "Full description here...", "6999", "true"],
+  ["Trademark Registration", "trademark-registration", "trademark-ip", "Register your trademark quickly.", "Full description here...", "4999", "true"],
 ];
 
 interface ParsedRow {
@@ -45,12 +47,21 @@ function downloadTemplate() {
   URL.revokeObjectURL(url);
 }
 
+const VALID_CATEGORY_IDS = new Set([
+  "consult-expert", "business-setup", "tax-compliance", "trademark-ip",
+  "documentation", "fundraising", "ngo", "property-personal", "lawyers",
+]);
+
 function validateRow(row: Record<string, string>, idx: number): ParsedRow {
   const errors: string[] = [];
   if (!row.name?.trim()) errors.push("name is required");
   if (!row.slug?.trim()) errors.push("slug is required");
   else if (!/^[a-z0-9-]+$/.test(row.slug)) errors.push("slug must be lowercase letters, digits, hyphens only");
-  if (!row.categoryId?.trim() || isNaN(Number(row.categoryId))) errors.push("categoryId must be a number");
+  if (!row.categoryId?.trim()) errors.push("categoryId is required");
+  else if (!VALID_CATEGORY_IDS.has(row.categoryId.trim())) errors.push(`categoryId "${row.categoryId}" is not valid`);
+  if (row.price && (isNaN(Number(row.price)) || !Number.isFinite(Number(row.price)) || Number(row.price) < 0)) {
+    errors.push("price must be a non-negative number");
+  }
   return {
     idx, ...row,
     errors,
@@ -104,10 +115,10 @@ export default function BulkServiceUpload() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rows: valid.map(r => ({
           name: r.name, slug: r.slug,
-          categoryId: Number(r.categoryId),
+          categoryId: r.categoryId,
           shortDescription: r.shortDescription ?? "",
           description: r.description ?? "",
-          price: r.price ? Number(r.price) : null,
+          price: r.price ? Math.round(Number(r.price)) : null,
           isActive: r.isActive !== "false",
         })) }),
       });
