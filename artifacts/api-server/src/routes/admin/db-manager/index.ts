@@ -4,6 +4,26 @@ import { auditLogsTable } from "@workspace/db/schema";
 import { sql, desc, eq, and, gte, lte, type SQL } from "drizzle-orm";
 import { TABLE_MAP, ALLOWED_TABLES, type ColDef } from "./table-registry";
 
+// ── Ensure audit_logs table exists at startup ──────────────────────────────────
+// This makes the DB Manager self-bootstrapping: if the migration hasn't been
+// applied manually the table is created here so audit writes never silently fail.
+
+async function ensureAuditTable() {
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS audit_logs (
+      id          SERIAL PRIMARY KEY,
+      table_name  TEXT        NOT NULL,
+      row_id      TEXT,
+      action      TEXT        NOT NULL,
+      changed_data JSONB,
+      actor_username TEXT,
+      ip_address  TEXT,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+}
+ensureAuditTable().catch(e => console.error("[db-manager] audit table bootstrap failed:", e));
+
 const dbManagerRouter = Router();
 
 // ── Authorization guard ────────────────────────────────────────────────────────
@@ -73,26 +93,28 @@ function isSuperAdmin(req: any): boolean {
   return (req.adminUser as any)?.role === "super_admin";
 }
 
-async function writeAudit(params: {
-  tableName: string;
-  rowId?: string | null;
-  action: string;
-  changedData?: unknown;
-  actorUsername: string;
-  ipAddress?: string;
-}) {
-  try {
-    await db.insert(auditLogsTable).values({
-      tableName: params.tableName,
-      rowId: params.rowId ?? null,
-      action: params.action,
-      changedData: (params.changedData ?? null) as any,
-      actorUsername: params.actorUsername,
-      ipAddress: params.ipAddress ?? null,
-    });
-  } catch (e) {
-    console.error("[audit]", e);
-  }
+type AuditClient = { insert: typeof db.insert };
+
+async function writeAudit(
+  params: {
+    tableName: string;
+    rowId?: string | null;
+    action: string;
+    changedData?: unknown;
+    actorUsername: string;
+    ipAddress?: string;
+  },
+  client: AuditClient = db,
+) {
+  // No try/catch — let errors propagate so callers can fail-fast or rollback.
+  await client.insert(auditLogsTable).values({
+    tableName: params.tableName,
+    rowId: params.rowId ?? null,
+    action: params.action,
+    changedData: (params.changedData ?? null) as any,
+    actorUsername: params.actorUsername,
+    ipAddress: params.ipAddress ?? null,
+  });
 }
 
 // Visible columns (not hidden) for SELECT
@@ -349,25 +371,26 @@ dbManagerRouter.post("/admin/db-manager/:table/records", async (req, res): Promi
     const colList: SQL<unknown> = colsSql.reduce((a: SQL<unknown>, b: SQL<unknown>) => sql`${a}, ${b}`);
     const valList: SQL<unknown> = valsSql.reduce((a: SQL<unknown>, b: SQL<unknown>) => sql`${a}, ${b}`);
 
-    const result = await db.execute(sql`
-      INSERT INTO ${sql.identifier(table)} (${colList})
-      VALUES (${valList})
-      RETURNING *
-    `);
-
-    const newRow = result.rows[0] as Record<string, unknown>;
-    await writeAudit({
-      tableName: table,
-      rowId: String(newRow[tableDef.primaryKey] ?? ""),
-      action: "create",
-      changedData: { after: scrubSensitive(newRow) },
-      actorUsername: getActor(req),
-      ipAddress: req.ip,
+    const safeRow = await db.transaction(async (tx) => {
+      const result = await tx.execute(sql`
+        INSERT INTO ${sql.identifier(table)} (${colList})
+        VALUES (${valList})
+        RETURNING *
+      `);
+      const newRow = result.rows[0] as Record<string, unknown>;
+      await writeAudit({
+        tableName: table,
+        rowId: String(newRow[tableDef.primaryKey] ?? ""),
+        action: "create",
+        changedData: { after: scrubSensitive(newRow) },
+        actorUsername: getActor(req),
+        ipAddress: req.ip,
+      }, tx);
+      // Return only visible (non-hidden) fields
+      const visDbSet = new Set(visibleCols(tableDef.columns).map(c => c.db));
+      return Object.fromEntries(Object.entries(newRow).filter(([k]) => visDbSet.has(k)));
     });
 
-    // Return only visible (non-hidden) fields
-    const visDbSet = new Set(visibleCols(tableDef.columns).map(c => c.db));
-    const safeRow  = Object.fromEntries(Object.entries(newRow).filter(([k]) => visDbSet.has(k)));
     res.status(201).json(safeRow);
   } catch (e) {
     console.error(`[db-manager POST /${table}/records]`, e);
@@ -390,7 +413,7 @@ dbManagerRouter.put("/admin/db-manager/:table/records/:id", async (req, res): Pr
     const allowed   = new Set(tableDef.columns.filter(c => !c.readonly && !c.hidden && c.type !== "id").map(c => c.db));
     const colByName = new Map(tableDef.columns.map(c => [c.name, c]));
 
-    // Fetch before state
+    // Fetch before state (outside transaction — read-only, no need to hold lock)
     const beforeRes = await db.execute(sql`
       SELECT * FROM ${sql.identifier(table)}
       WHERE ${sql.identifier(tableDef.primaryKey)} = ${id}
@@ -413,26 +436,27 @@ dbManagerRouter.put("/admin/db-manager/:table/records/:id", async (req, res): Pr
     if (hasUpdatedAt) setParts.push(sql`updated_at = NOW()`);
 
     const setClause: SQL<unknown> = setParts.reduce((a: SQL<unknown>, b: SQL<unknown>) => sql`${a}, ${b}`);
-    const result = await db.execute(sql`
-      UPDATE ${sql.identifier(table)}
-      SET ${setClause}
-      WHERE ${sql.identifier(tableDef.primaryKey)} = ${id}
-      RETURNING *
-    `);
 
-    const after = result.rows[0] as Record<string, unknown>;
-    await writeAudit({
-      tableName: table,
-      rowId: id,
-      action: "update",
-      changedData: { before: scrubSensitive(before), after: scrubSensitive(after) },
-      actorUsername: getActor(req),
-      ipAddress: req.ip,
+    const safeAfter = await db.transaction(async (tx) => {
+      const result = await tx.execute(sql`
+        UPDATE ${sql.identifier(table)}
+        SET ${setClause}
+        WHERE ${sql.identifier(tableDef.primaryKey)} = ${id}
+        RETURNING *
+      `);
+      const after = result.rows[0] as Record<string, unknown>;
+      await writeAudit({
+        tableName: table,
+        rowId: id,
+        action: "update",
+        changedData: { before: scrubSensitive(before), after: scrubSensitive(after) },
+        actorUsername: getActor(req),
+        ipAddress: req.ip,
+      }, tx);
+      const visDbSet = new Set(visibleCols(tableDef.columns).map(c => c.db));
+      return Object.fromEntries(Object.entries(after).filter(([k]) => visDbSet.has(k)));
     });
 
-    // Return only visible (non-hidden) fields
-    const visDbSet = new Set(visibleCols(tableDef.columns).map(c => c.db));
-    const safeAfter = Object.fromEntries(Object.entries(after).filter(([k]) => visDbSet.has(k)));
     res.json(safeAfter);
   } catch (e) {
     console.error(`[db-manager PUT /${table}/records/${id}]`, e);
@@ -451,35 +475,37 @@ dbManagerRouter.delete("/admin/db-manager/:table/records/:id", async (req, res):
   }
 
   try {
-    let affected = 0;
-    if (tableDef.softDeleteCol) {
-      const sdCol        = tableDef.columns.find(c => c.name === tableDef.softDeleteCol)!;
-      const hasUpdatedAt = tableDef.columns.some(c => c.db === "updated_at");
-      const extraSet     = hasUpdatedAt ? sql`, updated_at = NOW()` : sql``;
-      const r = await db.execute(sql`
-        UPDATE ${sql.identifier(table)}
-        SET ${sql.identifier(sdCol.db)} = true ${extraSet}
-        WHERE ${sql.identifier(tableDef.primaryKey)} = ${id}
-        RETURNING ${sql.identifier(tableDef.primaryKey)}
-      `);
-      affected = r.rows.length;
-    } else {
-      const r = await db.execute(sql`
-        DELETE FROM ${sql.identifier(table)}
-        WHERE ${sql.identifier(tableDef.primaryKey)} = ${id}
-        RETURNING ${sql.identifier(tableDef.primaryKey)}
-      `);
-      affected = r.rows.length;
-    }
+    const sdCol        = tableDef.softDeleteCol ? tableDef.columns.find(c => c.name === tableDef.softDeleteCol)! : null;
+    const hasUpdatedAt = tableDef.columns.some(c => c.db === "updated_at");
+    const extraSet     = hasUpdatedAt ? sql`, updated_at = NOW()` : sql``;
 
-    if (affected === 0) { res.status(404).json({ error: "Record not found" }); return; }
-
-    await writeAudit({
-      tableName: table, rowId: id, action: "delete",
-      actorUsername: getActor(req), ipAddress: req.ip,
+    const affected = await db.transaction(async (tx) => {
+      let cnt = 0;
+      if (sdCol) {
+        const r = await tx.execute(sql`
+          UPDATE ${sql.identifier(table)}
+          SET ${sql.identifier(sdCol.db)} = true ${extraSet}
+          WHERE ${sql.identifier(tableDef.primaryKey)} = ${id}
+          RETURNING ${sql.identifier(tableDef.primaryKey)}
+        `);
+        cnt = r.rows.length;
+      } else {
+        const r = await tx.execute(sql`
+          DELETE FROM ${sql.identifier(table)}
+          WHERE ${sql.identifier(tableDef.primaryKey)} = ${id}
+          RETURNING ${sql.identifier(tableDef.primaryKey)}
+        `);
+        cnt = r.rows.length;
+      }
+      if (cnt === 0) throw Object.assign(new Error("Record not found"), { status: 404 });
+      await writeAudit({ tableName: table, rowId: id, action: "delete", actorUsername: getActor(req), ipAddress: req.ip }, tx);
+      return cnt;
     });
+
+    void affected; // used only for side-effect
     res.json({ ok: true });
-  } catch (e) {
+  } catch (e: any) {
+    if (e?.status === 404) { res.status(404).json({ error: "Record not found" }); return; }
     console.error(`[db-manager DELETE /${table}/records/${id}]`, e);
     res.status(500).json({ error: String(e) });
   }
@@ -497,16 +523,21 @@ dbManagerRouter.post("/admin/db-manager/:table/records/:id/restore", async (req,
     const sdCol        = tableDef.columns.find(c => c.name === tableDef.softDeleteCol)!;
     const hasUpdatedAt = tableDef.columns.some(c => c.db === "updated_at");
     const extraSet     = hasUpdatedAt ? sql`, updated_at = NOW()` : sql``;
-    const r = await db.execute(sql`
-      UPDATE ${sql.identifier(table)}
-      SET ${sql.identifier(sdCol.db)} = false ${extraSet}
-      WHERE ${sql.identifier(tableDef.primaryKey)} = ${id}
-      RETURNING ${sql.identifier(tableDef.primaryKey)}
-    `);
-    if (r.rows.length === 0) { res.status(404).json({ error: "Record not found" }); return; }
-    await writeAudit({ tableName: table, rowId: id, action: "restore", actorUsername: getActor(req), ipAddress: req.ip });
+
+    await db.transaction(async (tx) => {
+      const r = await tx.execute(sql`
+        UPDATE ${sql.identifier(table)}
+        SET ${sql.identifier(sdCol.db)} = false ${extraSet}
+        WHERE ${sql.identifier(tableDef.primaryKey)} = ${id}
+        RETURNING ${sql.identifier(tableDef.primaryKey)}
+      `);
+      if (r.rows.length === 0) throw Object.assign(new Error("Record not found"), { status: 404 });
+      await writeAudit({ tableName: table, rowId: id, action: "restore", actorUsername: getActor(req), ipAddress: req.ip }, tx);
+    });
+
     res.json({ ok: true });
-  } catch (e) {
+  } catch (e: any) {
+    if (e?.status === 404) { res.status(404).json({ error: "Record not found" }); return; }
     console.error(`[db-manager restore/${id}]`, e);
     res.status(500).json({ error: String(e) });
   }
@@ -531,30 +562,33 @@ dbManagerRouter.post("/admin/db-manager/:table/bulk-delete", async (req, res): P
       .map(id => sql`${id}` as SQL<unknown>)
       .reduce((a: SQL<unknown>, b: SQL<unknown>) => sql`${a}, ${b}`);
 
-    let actualDeleted = 0;
-    if (tableDef.softDeleteCol) {
-      const sdCol = tableDef.columns.find(c => c.name === tableDef.softDeleteCol)!;
-      const r = await db.execute(sql`
-        UPDATE ${sql.identifier(table)}
-        SET ${sql.identifier(sdCol.db)} = true
-        WHERE ${sql.identifier(tableDef.primaryKey)} IN (${idList})
-        RETURNING ${sql.identifier(tableDef.primaryKey)}
-      `);
-      actualDeleted = r.rows.length;
-    } else {
-      const r = await db.execute(sql`
-        DELETE FROM ${sql.identifier(table)}
-        WHERE ${sql.identifier(tableDef.primaryKey)} IN (${idList})
-        RETURNING ${sql.identifier(tableDef.primaryKey)}
-      `);
-      actualDeleted = r.rows.length;
-    }
-
-    await writeAudit({
-      tableName: table, action: "bulk_delete",
-      changedData: { ids, count: actualDeleted },
-      actorUsername: getActor(req), ipAddress: req.ip,
+    const actualDeleted = await db.transaction(async (tx) => {
+      let cnt = 0;
+      if (tableDef.softDeleteCol) {
+        const sdCol = tableDef.columns.find(c => c.name === tableDef.softDeleteCol)!;
+        const r = await tx.execute(sql`
+          UPDATE ${sql.identifier(table)}
+          SET ${sql.identifier(sdCol.db)} = true
+          WHERE ${sql.identifier(tableDef.primaryKey)} IN (${idList})
+          RETURNING ${sql.identifier(tableDef.primaryKey)}
+        `);
+        cnt = r.rows.length;
+      } else {
+        const r = await tx.execute(sql`
+          DELETE FROM ${sql.identifier(table)}
+          WHERE ${sql.identifier(tableDef.primaryKey)} IN (${idList})
+          RETURNING ${sql.identifier(tableDef.primaryKey)}
+        `);
+        cnt = r.rows.length;
+      }
+      await writeAudit({
+        tableName: table, action: "bulk_delete",
+        changedData: { ids, count: cnt },
+        actorUsername: getActor(req), ipAddress: req.ip,
+      }, tx);
+      return cnt;
     });
+
     res.json({ ok: true, deleted: actualDeleted });
   } catch (e) {
     console.error(`[db-manager bulk-delete/${table}]`, e);
@@ -598,19 +632,22 @@ dbManagerRouter.post("/admin/db-manager/:table/bulk-edit", async (req, res): Pro
     const idList: SQL<unknown>    = ids.map(id => sql`${id}` as SQL<unknown>)
                                        .reduce((a: SQL<unknown>, b: SQL<unknown>) => sql`${a}, ${b}`);
 
-    const r = await db.execute(sql`
-      UPDATE ${sql.identifier(table)}
-      SET ${setClause}
-      WHERE ${sql.identifier(tableDef.primaryKey)} IN (${idList})
-      RETURNING ${sql.identifier(tableDef.primaryKey)}
-    `);
-    const actualUpdated = r.rows.length;
-
-    await writeAudit({
-      tableName: table, action: "bulk_edit",
-      changedData: { ids, patch: scrubSensitive(patch), count: actualUpdated },
-      actorUsername: getActor(req), ipAddress: req.ip,
+    const actualUpdated = await db.transaction(async (tx) => {
+      const r = await tx.execute(sql`
+        UPDATE ${sql.identifier(table)}
+        SET ${setClause}
+        WHERE ${sql.identifier(tableDef.primaryKey)} IN (${idList})
+        RETURNING ${sql.identifier(tableDef.primaryKey)}
+      `);
+      const cnt = r.rows.length;
+      await writeAudit({
+        tableName: table, action: "bulk_edit",
+        changedData: { ids, patch: scrubSensitive(patch), count: cnt },
+        actorUsername: getActor(req), ipAddress: req.ip,
+      }, tx);
+      return cnt;
     });
+
     res.json({ ok: true, updated: actualUpdated });
   } catch (e) {
     console.error(`[db-manager bulk-edit/${table}]`, e);
