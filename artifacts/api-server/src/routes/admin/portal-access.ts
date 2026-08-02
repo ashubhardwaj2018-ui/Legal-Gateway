@@ -101,7 +101,39 @@ router.post("/admin/portal-access/:id/approve", async (req, res): Promise<void> 
     } catch { /* SMTP not configured or failed */ }
   }
 
-  res.json({ ok: true, emailSent, devLink: !emailSent ? link : undefined });
+  res.json({ ok: true, emailSent, link });
+});
+
+// ── GET /admin/portal-access/:id/link — get (or regenerate) the access link ───
+
+router.get("/admin/portal-access/:id/link", async (req, res): Promise<void> => {
+  const id = parseInt(String(req.params.id ?? ""), 10);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+
+  const [request] = await db.select().from(portalAccessRequestsTable)
+    .where(eq(portalAccessRequestsTable.id, id)).limit(1);
+  if (!request) { res.status(404).json({ error: "Request not found" }); return; }
+  if (request.status !== "approved") { res.status(400).json({ error: "Request is not approved" }); return; }
+
+  const email = request.email.toLowerCase().trim();
+
+  // Reuse existing non-expired token, or generate a fresh one
+  const [existing] = await db.select().from(portalTokensTable)
+    .where(eq(portalTokensTable.email, email)).limit(1);
+
+  let token: string;
+  if (existing && new Date(existing.expiresAt) > new Date()) {
+    token = existing.token;
+  } else {
+    await db.delete(portalTokensTable).where(eq(portalTokensTable.email, email));
+    token = generateToken();
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await db.insert(portalTokensTable).values({ email, token, expiresAt });
+  }
+
+  const appUrl = process.env.APP_URL ?? `https://${process.env.REPLIT_DOMAINS?.split(",")[0] ?? "localhost"}`;
+  const link = `${appUrl}/portal/dashboard?token=${token}`;
+  res.json({ link });
 });
 
 // ── POST /admin/portal-access/:id/reject — reject request ─────────────────────

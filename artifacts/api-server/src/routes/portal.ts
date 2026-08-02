@@ -108,14 +108,9 @@ router.post("/portal/request-access", async (req, res): Promise<void> => {
 
   const normalised = email.toLowerCase().trim();
 
-  // Check the email exists as a lead/consultation
+  // Look up existing consultation to auto-fill name/phone (optional — request is allowed regardless)
   const leads = await db.select().from(consultationsTable)
     .where(ilike(consultationsTable.email, normalised)).limit(1);
-  if (leads.length === 0) {
-    // Return the same generic message to avoid email enumeration
-    res.json({ ok: true, requested: true, hint: "Your request has been submitted. We'll review it and send you access if approved." });
-    return;
-  }
 
   // If there's already a pending request for this email, don't duplicate
   const existing = await db.select({ id: portalAccessRequestsTable.id, status: portalAccessRequestsTable.status })

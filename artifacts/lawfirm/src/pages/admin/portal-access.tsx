@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { AdminLayout } from "./AdminLayout";
 import {
   Users, CheckCircle, XCircle, Clock, RefreshCw,
-  Mail, Phone, MessageSquare, Trash2, ExternalLink, Copy, Check,
+  Mail, Phone, MessageSquare, Trash2, ExternalLink, Copy, Check, Link,
 } from "lucide-react";
 
 interface AccessRequest {
@@ -58,15 +58,28 @@ export default function PortalAccessPage() {
       const r = await fetch(`/api/admin/portal-access/${id}/approve`, { method: "POST" });
       const d = await r.json();
       if (r.ok) {
-        if (d.devLink) {
-          setDevLinks(prev => ({ ...prev, [id]: d.devLink }));
-          showToast("Approved! SMTP not configured — copy the dev link below to send manually.", true);
-        } else {
-          showToast("Approved and access link sent to client.");
-        }
+        if (d.link) setDevLinks(prev => ({ ...prev, [id]: d.link }));
+        if (d.emailSent) showToast("Approved and access link sent to client by email.");
+        else showToast("Approved! Copy the access link below to share with the client.", true);
         await load();
       } else {
         showToast(d.error ?? "Failed to approve", false);
+      }
+    } finally {
+      setActionPending(null);
+    }
+  }
+
+  async function getLink(id: number) {
+    setActionPending(id);
+    try {
+      const r = await fetch(`/api/admin/portal-access/${id}/link`);
+      const d = await r.json();
+      if (r.ok && d.link) {
+        setDevLinks(prev => ({ ...prev, [id]: d.link }));
+        showToast("Access link ready — copy it below.");
+      } else {
+        showToast(d.error ?? "Failed to get link", false);
       }
     } finally {
       setActionPending(null);
@@ -232,14 +245,14 @@ export default function PortalAccessPage() {
                           </div>
                         )}
 
-                        {/* Dev link (when SMTP not configured) */}
+                        {/* Access link box */}
                         {devLink && (
-                          <div className="mt-3 flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                            <ExternalLink size={12} className="text-amber-600 shrink-0" />
-                            <span className="text-xs text-amber-700 flex-1 truncate font-mono">{devLink}</span>
+                          <div className="mt-3 flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+                            <Link size={12} className="text-blue-600 shrink-0" />
+                            <span className="text-xs text-blue-800 flex-1 truncate font-mono">{devLink}</span>
                             <button
                               onClick={() => copyLink(req.id, devLink)}
-                              className="text-amber-700 hover:text-amber-900 transition-colors shrink-0"
+                              className="text-blue-700 hover:text-blue-900 transition-colors shrink-0"
                               title="Copy link"
                             >
                               {copied === req.id ? <Check size={13} className="text-green-600" /> : <Copy size={13} />}
@@ -278,6 +291,16 @@ export default function PortalAccessPage() {
                           >
                             <CheckCircle size={13} />
                             Approve
+                          </button>
+                        )}
+                        {req.status === "approved" && (
+                          <button
+                            onClick={() => getLink(req.id)}
+                            disabled={isActing}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-semibold rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            <Link size={13} />
+                            {isActing ? "Getting…" : "Get Link"}
                           </button>
                         )}
                         <button
