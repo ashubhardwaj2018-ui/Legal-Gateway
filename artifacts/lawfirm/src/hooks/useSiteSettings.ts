@@ -16,6 +16,8 @@ export interface SiteSettings {
   twitter_url: string;
   facebook_url: string;
   instagram_url: string;
+  // WhatsApp
+  company_whatsapp: string;
   // Branding
   logo_url: string;
   website_whatsapp: string;
@@ -40,6 +42,7 @@ const DEFAULTS: SiteSettings = {
   twitter_url:      "#",
   facebook_url:     "#",
   instagram_url:    "#",
+  company_whatsapp: "",
   logo_url:         "",
   website_whatsapp: "",
   support_email:    "",

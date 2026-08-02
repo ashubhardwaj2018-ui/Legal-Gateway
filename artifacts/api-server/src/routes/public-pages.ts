@@ -14,6 +14,8 @@ const PUBLIC_SETTING_KEYS = [
   "hours_weekdays", "hours_saturday", "hours_sunday",
   "gst_number",
   "linkedin_url", "twitter_url", "facebook_url", "instagram_url",
+  // WhatsApp (display number for footer/contact)
+  "company_whatsapp",
   // Branding
   "logo_url", "website_whatsapp", "support_email", "footer_text", "copyright_text",
 ];
