@@ -6,7 +6,7 @@ import {
   Plus, Search, Printer, Trash2, X, IndianRupee, CreditCard,
   ChevronRight, Eye, Send, CheckCircle2, Clock, AlertCircle,
   FileText, ReceiptText, ShoppingCart, Download, Pencil,
-  PlusCircle, Minus, MessageCircle,
+  PlusCircle, Minus, MessageCircle, Link2, Check,
 } from "lucide-react";
 
 async function sendWaFromInvoice(toNumber: string, message: string) {
@@ -402,6 +402,24 @@ export default function AdminInvoices() {
   const [showPayment, setShowPayment] = useState(false);
   const [payForm, setPayForm] = useState({ amount: "", mode: "upi", transactionId: "", notes: "", paidAt: new Date().toISOString().slice(0, 10) });
 
+  const [copiedId, setCopiedId] = useState<number | null>(null);
+
+  const handleCopyLink = async (id: number) => {
+    try {
+      const r = await fetch(`/api/admin/invoices/${id}/share-link`, {
+        method: "POST", credentials: "include",
+      });
+      if (!r.ok) throw new Error("Failed");
+      const { token } = await r.json() as { token: string; expiresAt: string };
+      const url = `${window.location.origin}${import.meta.env.BASE_URL}public/doc/${token}`;
+      await navigator.clipboard.writeText(url);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(c => c === id ? null : c), 3000);
+    } catch {
+      alert("Could not generate link. Please try again.");
+    }
+  };
+
   const load = useCallback(async () => {
     setLoading(true);
     const p = new URLSearchParams();
@@ -607,6 +625,7 @@ export default function AdminInvoices() {
                               title="Send WhatsApp"
                             ><MessageCircle size={13} /></button>
                           )}
+                          <button onClick={() => handleCopyLink(inv.id)} className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors" title="Copy share link">{copiedId === inv.id ? <Check size={13} className="text-green-500" /> : <Link2 size={13} />}</button>
                           <button onClick={() => openCreate(inv)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Pencil size={13} /></button>
                           <button onClick={() => deleteInvoice(inv.id)} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={13} /></button>
                         </div>
@@ -655,6 +674,7 @@ export default function AdminInvoices() {
                     {(selected.status === "sent" || selected.status === "partial" || selected.status === "overdue") && <button onClick={() => { setShowPayment(true); setPayForm(f => ({ ...f, amount: String(Math.max(0, selBalance).toFixed(2)) })); }} className="text-xs px-3 py-1.5 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 font-medium flex items-center gap-1"><CreditCard size={11} />Add Payment</button>}
                     {selected.status !== "cancelled" && selected.status !== "paid" && <button onClick={() => markStatus(selected.id, "cancelled")} className="text-xs px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 font-medium">Cancel</button>}
                     <button onClick={() => printInvoice(selected)} className="text-xs px-3 py-1.5 bg-[#0f2044] text-white rounded-lg hover:bg-[#c9a227] hover:text-[#0f2044] font-medium flex items-center gap-1 transition-colors"><Download size={11} />Download PDF</button>
+                    <button onClick={() => handleCopyLink(selected.id)} className="text-xs px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 font-medium flex items-center gap-1 transition-colors">{copiedId === selected.id ? <><Check size={11} />Copied!</> : <><Link2 size={11} />Copy Link</>}</button>
                   </div>
                 </div>
                 {selected.clientPhone && (

@@ -1,9 +1,10 @@
 import { Router, type IRouter } from "express";
+import { randomBytes } from "node:crypto";
 import { createNotification } from "./notifications";
 import { fireWhatsAppTrigger } from "./whatsapp";
 import type { AuthenticatedRequest } from "./auth";
 import { eq, ilike, and, desc, count, asc } from "drizzle-orm";
-import { db, invoicesTable, invoicePaymentsTable } from "@workspace/db";
+import { db, invoicesTable, invoicePaymentsTable, sharedDocumentTokensTable } from "@workspace/db";
 
 const router: IRouter = Router();
 
@@ -175,6 +176,25 @@ router.delete("/admin/invoices/:id", async (req, res): Promise<void> => {
   const [del] = await db.delete(invoicesTable).where(eq(invoicesTable.id, id)).returning();
   if (!del) { res.status(404).json({ error: "Not found" }); return; }
   res.sendStatus(204);
+});
+
+// ── POST /admin/invoices/:id/share-link ──────────────────────────────────────
+// Generate (or reuse) a 30-day public token for this invoice.
+router.post("/admin/invoices/:id/share-link", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+  const [inv] = await db.select({ id: invoicesTable.id }).from(invoicesTable).where(eq(invoicesTable.id, id));
+  if (!inv) { res.status(404).json({ error: "Invoice not found" }); return; }
+
+  const token     = randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+
+  const [row] = await db
+    .insert(sharedDocumentTokensTable)
+    .values({ token, docType: "invoice", docId: String(id), expiresAt })
+    .returning();
+
+  res.json({ token: row.token, expiresAt: row.expiresAt });
 });
 
 router.get("/admin/invoices/:id/payments", async (req, res): Promise<void> => {

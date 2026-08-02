@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
+import { randomBytes } from "node:crypto";
 import { eq, desc } from "drizzle-orm";
-import { db, quotationsTable } from "@workspace/db";
+import { db, quotationsTable, sharedDocumentTokensTable } from "@workspace/db";
 import { requirePermission } from "./auth";
 import { fireWhatsAppTrigger } from "./whatsapp";
 import {
@@ -136,6 +137,26 @@ router.post("/admin/quotations/:id/send", requirePermission("quotations", "send"
     }).catch(() => {});
   }
   res.json(result);
+});
+
+// ── POST /admin/quotations/:id/share-link ────────────────────────────────────
+// Generate a 30-day public token for this quotation.
+router.post("/admin/quotations/:id/share-link", async (req, res): Promise<void> => {
+  const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(rawId, 10);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+  const [quot] = await db.select({ id: quotationsTable.id }).from(quotationsTable).where(eq(quotationsTable.id, id));
+  if (!quot) { res.status(404).json({ error: "Quotation not found" }); return; }
+
+  const token     = randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+  const [row] = await db
+    .insert(sharedDocumentTokensTable)
+    .values({ token, docType: "quotation", docId: String(id), expiresAt })
+    .returning();
+
+  res.json({ token: row.token, expiresAt: row.expiresAt });
 });
 
 export default router;

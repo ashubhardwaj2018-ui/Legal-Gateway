@@ -28,3 +28,4 @@ export * from "./password-reset-tokens";
 export * from "./api-integrations";
 export * from "./page-content-versions";
 export * from "./audit-logs";
+export * from "./shared-document-tokens";

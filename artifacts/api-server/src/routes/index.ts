@@ -9,6 +9,7 @@ import { blogsRouter } from "./blogs";
 import companiesRouter from "./companies";
 import portalRouter from "./portal";
 import publicPagesRouter from "./public-pages";
+import publicDocRouter from "./public-doc";
 import adminRouter from "./admin/index";
 
 const router: IRouter = Router();
@@ -27,6 +28,7 @@ router.use(blogsRouter);
 router.use(companiesRouter);
 router.use(portalRouter);
 router.use(publicPagesRouter);
+router.use(publicDocRouter);
 
 // ── Admin routes last (protected by adminAuthMiddleware inside) ────────────────
 router.use(adminRouter);

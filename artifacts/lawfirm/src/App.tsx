@@ -50,6 +50,7 @@ import PortalAccessPage from "@/pages/admin/portal-access";
 import ApiManagerPage from "@/pages/admin/api-manager";
 import PortalLogin from "@/pages/portal/login";
 import PortalDashboard from "@/pages/portal/dashboard";
+import DocView from "@/pages/public/DocView";
 import IndianCompanies from "@/pages/indian-companies";
 import CompanyDetail from "@/pages/company-detail";
 import BlogList from "@/pages/blog-list";
@@ -118,6 +119,9 @@ function Router() {
       <Route path="/admin/team-performance" component={TeamPerformance} />
       <Route path="/admin/portal-access" component={PortalAccessPage} />
       <Route path="/admin/api-manager" component={ApiManagerPage} />
+
+      {/* Public document view — no auth, no layout */}
+      <Route path="/public/doc/:token" component={DocView} />
 
       {/* Customer Portal */}
       <Route path="/portal" component={PortalLogin} />

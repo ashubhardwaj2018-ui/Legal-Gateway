@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Trash2, Send, Eye, FileText, PlusCircle, Printer, MessageCircle, Download } from "lucide-react";
+import { Plus, Trash2, Send, Eye, FileText, PlusCircle, Printer, MessageCircle, Download, Link2, Check } from "lucide-react";
 
 // ─── Quotation Print / Download PDF ─────────────────────────────────────────
 
@@ -427,7 +427,10 @@ function QuotationForm({ onSuccess }: { onSuccess: () => void }) {
   );
 }
 
-function QuotationDetail({ quotation, onClose, onSend }: { quotation: Quotation; onClose: () => void; onSend: () => void }) {
+function QuotationDetail({ quotation, onClose, onSend, onCopyLink, copied }: {
+  quotation: Quotation; onClose: () => void; onSend: () => void;
+  onCopyLink?: () => void; copied?: boolean;
+}) {
   const items = (quotation.items ?? []) as QuotationItem[];
 
   return (
