@@ -24,6 +24,12 @@ const DEFAULT_SETTINGS = [
   { key: "whatsapp_api_key",             value: "" },
   { key: "whatsapp_phone_number_id",     value: "" },
   { key: "whatsapp_business_account_id", value: "" },
+  // Website & Branding
+  { key: "logo_url",        value: "" },
+  { key: "website_whatsapp",value: "" },
+  { key: "support_email",   value: "" },
+  { key: "footer_text",     value: "Premium legal services made accessible. We combine decades of expertise with modern technology to deliver exceptional legal solutions across India." },
+  { key: "copyright_text",  value: "" },
 ];
 
 const router: IRouter = Router();

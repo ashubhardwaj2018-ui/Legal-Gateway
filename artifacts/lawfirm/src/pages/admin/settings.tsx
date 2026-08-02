@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Save, Building2, Phone, Clock, Share2, Briefcase, MessageCircle, Wifi, WifiOff, Loader2, Info } from "lucide-react";
+import { Save, Building2, Phone, Clock, Share2, Briefcase, MessageCircle, Wifi, WifiOff, Loader2, Info, Globe } from "lucide-react";
+import { SITE_SETTINGS_QUERY_KEY } from "@/hooks/useSiteSettings";
 
 const SETTING_GROUPS = [
   {
@@ -40,6 +41,12 @@ const SETTING_GROUPS = [
     icon: MessageCircle,
     keys: ["company_whatsapp", "whatsapp_provider", "whatsapp_api_key", "whatsapp_phone_number_id", "whatsapp_business_account_id"],
   },
+  {
+    id: "branding",
+    label: "Website & Branding",
+    icon: Globe,
+    keys: ["logo_url", "website_whatsapp", "support_email", "footer_text", "copyright_text"],
+  },
 ];
 
 const KEY_LABELS: Record<string, { label: string; placeholder: string; multiline?: boolean; type?: "select"; options?: string[] }> = {
@@ -59,11 +66,17 @@ const KEY_LABELS: Record<string, { label: string; placeholder: string; multiline
   facebook_url: { label: "Facebook URL", placeholder: "https://facebook.com/vakilco" },
   instagram_url: { label: "Instagram URL", placeholder: "https://instagram.com/vakilco" },
   // WhatsApp
-  company_whatsapp:            { label: "Company WhatsApp Number", placeholder: "+91 98765 43210" },
+  company_whatsapp:            { label: "Company WhatsApp Number (CRM)", placeholder: "+91 98765 43210" },
   whatsapp_provider:           { label: "Provider", placeholder: "web", type: "select" as const, options: ["web", "waba", "twilio", "360dialog", "gupshup", "interakt"] },
   whatsapp_api_key:            { label: "API Key / Token", placeholder: "Leave blank if using WhatsApp Web" },
   whatsapp_phone_number_id:    { label: "Phone Number ID (WABA)", placeholder: "Meta phone_number_id" },
   whatsapp_business_account_id:{ label: "Business Account ID (WABA)", placeholder: "Meta waba_id" },
+  // Branding
+  logo_url:        { label: "Logo URL", placeholder: "https://yoursite.com/logo.png" },
+  website_whatsapp:{ label: "WhatsApp Number (Website Link)", placeholder: "+91 98765 43210 — shown as click-to-chat on website" },
+  support_email:   { label: "Support Email", placeholder: "support@vakilco.in — shown in footer & contact section" },
+  footer_text:     { label: "Footer Description Text", placeholder: "Short description shown under your logo in the footer", multiline: true },
+  copyright_text:  { label: "Copyright Text", placeholder: `© ${new Date().getFullYear()} Vakil & Co. All rights reserved.` },
 };
 
 const PROVIDER_HINTS: Record<string, { name: string; hint: string; needsKey: boolean; needsPhoneId: boolean }> = {
@@ -128,6 +141,7 @@ export default function AdminSettings() {
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListSettingsQueryKey() });
+          queryClient.invalidateQueries({ queryKey: SITE_SETTINGS_QUERY_KEY });
           toast({ title: "Settings saved", description: `${group.label} updated successfully` });
           setSaving(false);
         },
@@ -178,6 +192,19 @@ export default function AdminSettings() {
                 <p className="text-xs text-gray-500">Configure {currentGroup.label.toLowerCase()}</p>
               </div>
             </div>
+
+            {/* Logo preview — Branding group only */}
+            {activeGroup === "branding" && values["logo_url"] && (
+              <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg flex items-center gap-4">
+                <img
+                  src={values["logo_url"]}
+                  alt="Logo preview"
+                  className="h-12 max-w-[160px] object-contain rounded"
+                  onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+                />
+                <span className="text-xs text-gray-500">Logo preview — shown in navbar &amp; footer</span>
+              </div>
+            )}
 
             {/* Provider hint banner — WhatsApp group only */}
             {activeGroup === "whatsapp" && (() => {

@@ -14,6 +14,8 @@ const PUBLIC_SETTING_KEYS = [
   "hours_weekdays", "hours_saturday", "hours_sunday",
   "gst_number",
   "linkedin_url", "twitter_url", "facebook_url", "instagram_url",
+  // Branding
+  "logo_url", "website_whatsapp", "support_email", "footer_text", "copyright_text",
 ];
 
 const DEFAULT_PUBLIC: Record<string, string> = {
@@ -28,6 +30,7 @@ const DEFAULT_PUBLIC: Record<string, string> = {
   hours_saturday:  "10:00 AM – 4:00 PM",
   hours_sunday:    "Closed",
   gst_number:      "27AABCV1234F1Z5",
+  footer_text:     "Premium legal services made accessible. We combine decades of expertise with modern technology to deliver exceptional legal solutions across India.",
 };
 
 // GET /api/settings — public endpoint; returns only safe display fields

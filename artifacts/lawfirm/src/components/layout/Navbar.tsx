@@ -53,13 +53,23 @@ export function Navbar() {
 
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 group shrink-0 mr-3">
-            <div className="bg-primary text-secondary p-1.5 rounded-lg group-hover:bg-secondary group-hover:text-primary transition-colors">
-              <Scale size={20} />
-            </div>
-            <div className="leading-none hidden sm:block">
-              <div className="font-serif font-bold text-base text-primary">VAKIL & CO.</div>
-              <div className="text-[8px] uppercase tracking-widest text-muted-foreground font-semibold">Legal Associates</div>
-            </div>
+            {settings.logo_url ? (
+              <img
+                src={settings.logo_url}
+                alt={settings.site_name || "Logo"}
+                className="h-9 max-w-[160px] object-contain"
+              />
+            ) : (
+              <>
+                <div className="bg-primary text-secondary p-1.5 rounded-lg group-hover:bg-secondary group-hover:text-primary transition-colors">
+                  <Scale size={20} />
+                </div>
+                <div className="leading-none hidden sm:block">
+                  <div className="font-serif font-bold text-base text-primary">VAKIL & CO.</div>
+                  <div className="text-[8px] uppercase tracking-widest text-muted-foreground font-semibold">Legal Associates</div>
+                </div>
+              </>
+            )}
           </Link>
 
           {/* Desktop nav */}

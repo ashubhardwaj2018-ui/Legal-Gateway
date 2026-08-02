@@ -16,35 +16,48 @@ export interface SiteSettings {
   twitter_url: string;
   facebook_url: string;
   instagram_url: string;
+  // Branding
+  logo_url: string;
+  website_whatsapp: string;
+  support_email: string;
+  footer_text: string;
+  copyright_text: string;
 }
 
 const DEFAULTS: SiteSettings = {
-  site_name:       "Vakil & Co. Legal Associates",
-  site_tagline:    "India's Premium Legal Network",
-  phone_primary:   "1800-123-4567",
-  phone_secondary: "+91 22 6789 0123",
-  email_primary:   "consult@vakilco.in",
-  email_secondary: "info@vakilco.in",
-  address:         "Level 7, Capital Building, BKC, Bandra East, Mumbai - 400051",
-  hours_weekdays:  "9:00 AM – 7:00 PM",
-  hours_saturday:  "10:00 AM – 4:00 PM",
-  hours_sunday:    "Closed",
-  gst_number:      "27AABCV1234F1Z5",
-  linkedin_url:    "#",
-  twitter_url:     "#",
-  facebook_url:    "#",
-  instagram_url:   "#",
+  site_name:        "Vakil & Co. Legal Associates",
+  site_tagline:     "India's Premium Legal Network",
+  phone_primary:    "1800-123-4567",
+  phone_secondary:  "+91 22 6789 0123",
+  email_primary:    "consult@vakilco.in",
+  email_secondary:  "info@vakilco.in",
+  address:          "Level 7, Capital Building, BKC, Bandra East, Mumbai - 400051",
+  hours_weekdays:   "9:00 AM – 7:00 PM",
+  hours_saturday:   "10:00 AM – 4:00 PM",
+  hours_sunday:     "Closed",
+  gst_number:       "27AABCV1234F1Z5",
+  linkedin_url:     "#",
+  twitter_url:      "#",
+  facebook_url:     "#",
+  instagram_url:    "#",
+  logo_url:         "",
+  website_whatsapp: "",
+  support_email:    "",
+  footer_text:      "Premium legal services made accessible. We combine decades of expertise with modern technology to deliver exceptional legal solutions across India.",
+  copyright_text:   "",
 };
+
+export const SITE_SETTINGS_QUERY_KEY = ["site-settings-public"] as const;
 
 export function useSiteSettings() {
   const { data } = useQuery<SiteSettings>({
-    queryKey: ["site-settings-public"],
+    queryKey: SITE_SETTINGS_QUERY_KEY,
     queryFn: async () => {
       const r = await fetch("/api/settings");
       if (!r.ok) return DEFAULTS;
       return r.json();
     },
-    staleTime: 5 * 60 * 1000, // cache 5 min — changes rarely
+    staleTime: 30 * 1000, // 30 s — changes reflect quickly
   });
   return data ?? DEFAULTS;
 }
