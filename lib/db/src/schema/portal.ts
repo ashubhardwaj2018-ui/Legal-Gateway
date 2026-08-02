@@ -24,7 +24,7 @@ export const portalMessagesTable = pgTable("portal_messages", {
   emailIdx: index("portal_messages_email_idx").on(t.clientEmail),
 }));
 
-// Documents uploaded by clients through the portal
+// Documents exchanged through the portal (client → firm, or firm → client)
 export const portalDocumentsTable = pgTable("portal_documents", {
   id: serial("id").primaryKey(),
   leadId: integer("lead_id").notNull(),
@@ -33,6 +33,8 @@ export const portalDocumentsTable = pgTable("portal_documents", {
   fileUrl: text("file_url").notNull(),
   fileSize: integer("file_size").notNull().default(0),
   mimeType: text("mime_type").notNull().default("application/octet-stream"),
+  /** "client_to_firm" = uploaded by client; "firm_to_client" = sent by admin/employee */
+  direction: text("direction").notNull().default("client_to_firm"),
   uploadedAt: timestamp("uploaded_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({
   leadIdx: index("portal_documents_lead_idx").on(t.leadId),

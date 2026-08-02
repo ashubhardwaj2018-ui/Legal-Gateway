@@ -15,6 +15,7 @@ import {
   Activity, Phone, Mail, Building2, MapPin, Tag, Star,
   Calendar, Target, User, AlertCircle, Pencil, UserPlus,
   FileText, Video, PhoneCall, RefreshCw, Users, MessageCircle as MessageCircleWa, ExternalLink,
+  Upload, ArrowDownToLine,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -284,12 +285,45 @@ function LeadDetailDrawer({ leadId, onClose, onUpdated }: { leadId: number; onCl
   });
 
   // Portal documents
-  interface PortalDoc { id: number; fileName: string; fileUrl: string; fileSize: number; mimeType: string; uploadedAt: string; clientEmail: string; }
-  const { data: portalDocs = [] } = useQuery<PortalDoc[]>({
+  interface PortalDoc { id: number; fileName: string; fileUrl: string; fileSize: number; mimeType: string; uploadedAt: string; clientEmail: string; direction: string; }
+  const { data: portalDocs = [], refetch: refetchPortalDocs } = useQuery<PortalDoc[]>({
     queryKey: ["portal-docs", leadId],
     queryFn: () => api(`/admin/leads/${leadId}/portal-documents`),
     enabled: tab === "portal-docs",
   });
+
+  // Admin upload state (send docs to client)
+  const [adminUploading, setAdminUploading] = useState(false);
+  const [adminUploadError, setAdminUploadError] = useState<string | null>(null);
+  const adminFileInputRef = useRef<HTMLInputElement>(null);
+
+  const adminUploadDoc = async (file: File) => {
+    setAdminUploading(true);
+    setAdminUploadError(null);
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64 = (reader.result as string).split(",")[1];
+        const r = await fetch(`/api/admin/leads/${leadId}/portal-documents`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fileName: file.name, mimeType: file.type, fileData: base64 }),
+        });
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({ error: "Upload failed" }));
+          setAdminUploadError((err as { error?: string }).error ?? "Upload failed");
+        } else {
+          refetchPortalDocs();
+        }
+        setAdminUploading(false);
+      };
+      reader.onerror = () => { setAdminUploadError("Failed to read file"); setAdminUploading(false); };
+      reader.readAsDataURL(file);
+    } catch {
+      setAdminUploadError("Upload failed");
+      setAdminUploading(false);
+    }
+  };
 
   // WhatsApp messages for this lead
   interface WaMsg { id: number; toNumber: string; message: string; templateName?: string; senderName?: string; senderType: string; status: string; createdAt: string; direction: string; }
@@ -1007,41 +1041,105 @@ function LeadDetailDrawer({ leadId, onClose, onUpdated }: { leadId: number; onCl
 
               {/* PORTAL DOCS TAB */}
               {tab === "portal-docs" && (
-                <div className="space-y-3">
+                <div className="space-y-4">
+                  {/* Send file to client */}
+                  <div className="border border-dashed border-[#c9a227]/40 rounded-xl p-4 bg-[#c9a227]/5">
+                    <p className="text-xs font-semibold text-[#0f2044] mb-2 flex items-center gap-1.5">
+                      <ArrowDownToLine size={13} className="text-[#c9a227]" />
+                      Send a document to client
+                    </p>
+                    <input
+                      ref={adminFileInputRef}
+                      type="file"
+                      className="hidden"
+                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xls,.xlsx,.txt"
+                      onChange={e => { const f = e.target.files?.[0]; if (f) adminUploadDoc(f); e.target.value = ""; }}
+                    />
+                    <button
+                      onClick={() => adminFileInputRef.current?.click()}
+                      disabled={adminUploading}
+                      className="flex items-center gap-2 px-4 py-2 bg-[#0f2044] text-white rounded-lg text-xs font-medium hover:bg-[#1a3060] transition-all disabled:opacity-50"
+                    >
+                      {adminUploading ? (
+                        <><RefreshCw size={12} className="animate-spin" />Uploading…</>
+                      ) : (
+                        <><Upload size={12} />Choose File to Send</>
+                      )}
+                    </button>
+                    {adminUploadError && (
+                      <p className="text-xs text-red-500 mt-2">{adminUploadError}</p>
+                    )}
+                    <p className="text-[10px] text-gray-400 mt-1.5">PDF, Word, Excel, Images up to 10 MB. The file will appear in the client's portal immediately.</p>
+                  </div>
+
+                  {/* Document list */}
                   {portalDocs.length === 0 ? (
-                    <div className="flex flex-col items-center py-12 text-gray-400">
+                    <div className="flex flex-col items-center py-10 text-gray-400">
                       <Paperclip size={28} className="mb-2 opacity-30" />
-                      <p className="text-sm">Client has not uploaded any documents</p>
+                      <p className="text-sm">No documents exchanged yet</p>
                     </div>
                   ) : (
-                    <div className="rounded-xl border border-gray-100 divide-y">
-                      {portalDocs.map(doc => {
-                        const filename = doc.fileUrl.split("/").pop() ?? "";
-                        return (
-                          <div key={doc.id} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50">
-                            <div className="w-8 h-8 bg-[#0f2044]/10 rounded-lg flex items-center justify-center shrink-0">
-                              <FileDoc size={14} className="text-[#0f2044]" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-sm text-[#0f2044] truncate">{doc.fileName}</p>
-                              <p className="text-[10px] text-gray-400">
-                                {doc.fileSize < 1024 ? `${doc.fileSize} B` : doc.fileSize < 1024 * 1024 ? `${(doc.fileSize / 1024).toFixed(1)} KB` : `${(doc.fileSize / (1024 * 1024)).toFixed(1)} MB`}
-                                {" · "}{new Date(doc.uploadedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
-                              </p>
-                              <p className="text-[10px] text-gray-300">{doc.clientEmail}</p>
-                            </div>
-                            <a
-                              href={`/api/admin/portal/files/${filename}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              download={doc.fileName}
-                              className="flex items-center gap-1 px-2.5 py-1.5 border border-gray-200 rounded-lg text-[11px] text-gray-600 hover:bg-[#0f2044] hover:text-white hover:border-[#0f2044] transition-all"
-                            >
-                              <Download size={11} />Download
-                            </a>
+                    <div className="space-y-2">
+                      {/* From Client */}
+                      {portalDocs.filter(d => d.direction !== "firm_to_client").length > 0 && (
+                        <div>
+                          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Uploaded by Client</p>
+                          <div className="rounded-xl border border-gray-100 divide-y">
+                            {portalDocs.filter(d => d.direction !== "firm_to_client").map(doc => {
+                              const filename = doc.fileUrl.split("/").pop() ?? "";
+                              return (
+                                <div key={doc.id} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50">
+                                  <div className="w-8 h-8 bg-[#0f2044]/10 rounded-lg flex items-center justify-center shrink-0">
+                                    <FileDoc size={14} className="text-[#0f2044]" />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-medium text-sm text-[#0f2044] truncate">{doc.fileName}</p>
+                                    <p className="text-[10px] text-gray-400">
+                                      {doc.fileSize < 1024 ? `${doc.fileSize} B` : doc.fileSize < 1024 * 1024 ? `${(doc.fileSize / 1024).toFixed(1)} KB` : `${(doc.fileSize / (1024 * 1024)).toFixed(1)} MB`}
+                                      {" · "}{new Date(doc.uploadedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                                    </p>
+                                  </div>
+                                  <a href={`/api/admin/portal/files/${filename}`} target="_blank" rel="noreferrer" download={doc.fileName}
+                                    className="flex items-center gap-1 px-2.5 py-1.5 border border-gray-200 rounded-lg text-[11px] text-gray-600 hover:bg-[#0f2044] hover:text-white hover:border-[#0f2044] transition-all">
+                                    <Download size={11} />Download
+                                  </a>
+                                </div>
+                              );
+                            })}
                           </div>
-                        );
-                      })}
+                        </div>
+                      )}
+
+                      {/* Sent to Client */}
+                      {portalDocs.filter(d => d.direction === "firm_to_client").length > 0 && (
+                        <div>
+                          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Sent to Client</p>
+                          <div className="rounded-xl border border-[#c9a227]/30 divide-y bg-[#c9a227]/5">
+                            {portalDocs.filter(d => d.direction === "firm_to_client").map(doc => {
+                              const filename = doc.fileUrl.split("/").pop() ?? "";
+                              return (
+                                <div key={doc.id} className="flex items-center gap-3 px-4 py-3 hover:bg-[#c9a227]/10">
+                                  <div className="w-8 h-8 bg-[#c9a227]/20 rounded-lg flex items-center justify-center shrink-0">
+                                    <FileDoc size={14} className="text-[#0f2044]" />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-medium text-sm text-[#0f2044] truncate">{doc.fileName}</p>
+                                    <p className="text-[10px] text-gray-400">
+                                      {doc.fileSize < 1024 ? `${doc.fileSize} B` : doc.fileSize < 1024 * 1024 ? `${(doc.fileSize / 1024).toFixed(1)} KB` : `${(doc.fileSize / (1024 * 1024)).toFixed(1)} MB`}
+                                      {" · "}{new Date(doc.uploadedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                                    </p>
+                                  </div>
+                                  <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full bg-[#c9a227]/20 text-[#7a5f00] mr-1">Sent</span>
+                                  <a href={`/api/admin/portal/files/${filename}`} target="_blank" rel="noreferrer" download={doc.fileName}
+                                    className="flex items-center gap-1 px-2.5 py-1.5 border border-[#c9a227]/40 rounded-lg text-[11px] text-[#7a5f00] hover:bg-[#0f2044] hover:text-white hover:border-[#0f2044] transition-all">
+                                    <Download size={11} />Download
+                                  </a>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

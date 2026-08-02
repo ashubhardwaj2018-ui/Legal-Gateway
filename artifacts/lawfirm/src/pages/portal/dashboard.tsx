@@ -12,7 +12,7 @@ interface ClientInfo { email: string; name: string; company: string | null; }
 interface Case { id: number; name: string; service: string; status: string; priority: string | null; assignedTo: string | null; nextFollowUp: string | null; notes: string | null; createdAt: string; message: string | null; }
 interface Invoice { id: number; number: string; status: string; subtotal: string | null; gstAmount: string | null; total: string | null; paidAmount: string | null; dueDate: string | null; items: unknown; notes: string | null; createdAt: string; }
 interface Quotation { id: number; quotationNumber: string; clientName: string; items: unknown; subtotal: number; taxPercent: number; taxAmount: number; total: number; status: string; notes: string | null; validityDays: number; sentAt: string | null; acceptedAt: string | null; rejectedAt: string | null; rejectedReason: string | null; createdAt: string; }
-interface PortalDoc { id: number; leadId: number; clientEmail: string; fileName: string; fileUrl: string; fileSize: number; mimeType: string; uploadedAt: string; }
+interface PortalDoc { id: number; leadId: number; clientEmail: string; fileName: string; fileUrl: string; fileSize: number; mimeType: string; uploadedAt: string; direction?: string; }
 interface ChatMsg { id: number; leadId: number; clientEmail: string; senderType: string; senderName: string; message: string; createdAt: string; }
 interface TimelineItem { id: number; type: string; actionType: string; description: string; actor: string; createdAt: string; }
 
@@ -852,6 +852,45 @@ export default function PortalDashboard() {
               <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center text-gray-400">No active cases found.</div>
             ) : (
               <>
+                {/* Documents from the firm */}
+                {(() => {
+                  const firmDocs = documents.filter(d => d.direction === "firm_to_client");
+                  if (firmDocs.length === 0) return null;
+                  return (
+                    <div className="bg-gradient-to-br from-[#0f2044]/5 to-[#c9a227]/5 rounded-2xl border border-[#c9a227]/30 p-5">
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="w-7 h-7 bg-[#c9a227] rounded-lg flex items-center justify-center shrink-0">
+                          <Download size={13} className="text-[#0f2044]" />
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-[#0f2044] text-sm">From Our Team</h3>
+                          <p className="text-[10px] text-gray-400">Documents sent to you by our legal team</p>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        {firmDocs.map(doc => (
+                          <div key={doc.id} className="bg-white rounded-xl border border-[#c9a227]/20 flex items-center gap-3 px-4 py-3 hover:border-[#c9a227]/50 transition-colors">
+                            <div className="w-9 h-9 bg-[#c9a227]/15 rounded-xl flex items-center justify-center shrink-0">
+                              <FileText size={16} className="text-[#0f2044]" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-[#0f2044] text-sm truncate">{doc.fileName}</p>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#c9a227]/20 text-[#7a5f00] font-semibold">From Firm</span>
+                                <span className="text-[10px] text-gray-400">{fmtSize(doc.fileSize)} · {fmtDate(doc.uploadedAt)}</span>
+                              </div>
+                            </div>
+                            <a href={`/api${doc.fileUrl}?token=${token}`} target="_blank" rel="noreferrer"
+                              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#0f2044] text-white text-xs font-medium hover:bg-[#1a3060] transition-all shrink-0">
+                              <Download size={11} />Download
+                            </a>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {/* Upload zone */}
                 <div className="bg-white rounded-2xl border-2 border-dashed border-gray-200 hover:border-[#c9a227] transition-all p-8 text-center cursor-pointer"
                   onClick={() => fileInputRef.current?.click()}
@@ -872,33 +911,41 @@ export default function PortalDashboard() {
                   )}
                 </div>
 
-                {/* Document list */}
-                {dataLoading ? (
-                  <div className="bg-white rounded-2xl p-12 text-center"><Loader2 size={24} className="animate-spin text-[#c9a227] mx-auto" /></div>
-                ) : documents.length === 0 ? (
-                  <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center">
-                    <Paperclip size={32} className="text-gray-200 mx-auto mb-3" />
-                    <p className="text-gray-400 text-sm">No documents uploaded yet for this case.</p>
-                  </div>
-                ) : (
-                  <div className="bg-white rounded-2xl border border-gray-100 divide-y divide-gray-50">
-                    {documents.map(doc => (
-                      <div key={doc.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50/50 transition-colors">
-                        <div className="w-9 h-9 bg-[#0f2044]/10 rounded-xl flex items-center justify-center shrink-0">
-                          <FileText size={16} className="text-[#0f2044]" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-[#0f2044] text-sm truncate">{doc.fileName}</p>
-                          <p className="text-xs text-gray-400">{fmtSize(doc.fileSize)} · {fmtDate(doc.uploadedAt)}</p>
-                        </div>
-                        <a href={`/api${doc.fileUrl}`} target="_blank" rel="noreferrer"
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 text-xs text-gray-600 hover:bg-[#0f2044] hover:text-white hover:border-[#0f2044] transition-all font-medium">
-                          <Download size={11} />Download
-                        </a>
+                {/* Client-uploaded documents */}
+                {(() => {
+                  const clientDocs = documents.filter(d => d.direction !== "firm_to_client");
+                  if (dataLoading) return (
+                    <div className="bg-white rounded-2xl p-12 text-center"><Loader2 size={24} className="animate-spin text-[#c9a227] mx-auto" /></div>
+                  );
+                  if (clientDocs.length === 0) return (
+                    <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center">
+                      <Paperclip size={32} className="text-gray-200 mx-auto mb-3" />
+                      <p className="text-gray-400 text-sm">No documents uploaded yet for this case.</p>
+                    </div>
+                  );
+                  return (
+                    <div>
+                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 px-1">Uploaded by You</p>
+                      <div className="bg-white rounded-2xl border border-gray-100 divide-y divide-gray-50">
+                        {clientDocs.map(doc => (
+                          <div key={doc.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50/50 transition-colors">
+                            <div className="w-9 h-9 bg-[#0f2044]/10 rounded-xl flex items-center justify-center shrink-0">
+                              <FileText size={16} className="text-[#0f2044]" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-[#0f2044] text-sm truncate">{doc.fileName}</p>
+                              <p className="text-xs text-gray-400">{fmtSize(doc.fileSize)} · {fmtDate(doc.uploadedAt)}</p>
+                            </div>
+                            <a href={`/api${doc.fileUrl}?token=${token}`} target="_blank" rel="noreferrer"
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 text-xs text-gray-600 hover:bg-[#0f2044] hover:text-white hover:border-[#0f2044] transition-all font-medium">
+                              <Download size={11} />Download
+                            </a>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                )}
+                    </div>
+                  );
+                })()}
               </>
             )}
           </div>

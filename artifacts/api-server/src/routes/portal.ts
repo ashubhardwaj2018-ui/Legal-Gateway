@@ -380,8 +380,9 @@ router.get("/portal/documents", portalAuth, async (req, res): Promise<void> => {
     .limit(1);
   if (!c) { res.status(403).json({ error: "Access denied" }); return; }
 
+  // Return all docs for this lead (both client-uploaded and firm-sent)
   const docs = await db.select().from(portalDocumentsTable)
-    .where(and(eq(portalDocumentsTable.leadId, leadId), ilike(portalDocumentsTable.clientEmail, email)))
+    .where(eq(portalDocumentsTable.leadId, leadId))
     .orderBy(desc(portalDocumentsTable.uploadedAt));
   res.json(docs);
 });
@@ -447,6 +448,7 @@ router.post("/portal/documents", portalAuth, async (req, res): Promise<void> => 
       fileUrl: `/api/portal/documents/files/${safeName}`,
       fileSize: buf.length,
       mimeType: declaredMime,
+      direction: "client_to_firm",
     }).returning();
   } catch (err) {
     // Clean up file if DB insert fails
@@ -471,14 +473,14 @@ router.get("/portal/documents/files/:filename", portalAuth, async (req, res): Pr
   const basename = path.basename(rawName);
   if (!basename || basename !== rawName) { res.status(400).json({ error: "Invalid filename" }); return; }
 
-  // Look up the document record by stored URL and verify ownership
+  // Look up the document record by stored URL (any direction)
   const fileUrl = `/api/portal/documents/files/${basename}`;
   const [doc] = await db.select().from(portalDocumentsTable)
-    .where(and(eq(portalDocumentsTable.fileUrl, fileUrl), ilike(portalDocumentsTable.clientEmail, email)))
+    .where(eq(portalDocumentsTable.fileUrl, fileUrl))
     .limit(1);
   if (!doc) { res.status(403).json({ error: "Access denied" }); return; }
 
-  // Extra: verify the lead also belongs to this email (defence in depth)
+  // Verify the lead belongs to the requesting client's email (defence in depth)
   const [lead] = await db.select({ id: consultationsTable.id })
     .from(consultationsTable)
     .where(and(eq(consultationsTable.id, doc.leadId), ilike(consultationsTable.email, email)))

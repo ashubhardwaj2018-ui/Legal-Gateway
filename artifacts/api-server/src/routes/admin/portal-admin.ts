@@ -111,6 +111,62 @@ router.get("/admin/leads/:leadId/portal-documents", async (req, res): Promise<vo
   res.json(docs);
 });
 
+// Admin uploads a file to send back to the client through the portal
+router.post("/admin/leads/:leadId/portal-documents", async (req, res): Promise<void> => {
+  const leadId = parseInt(String(req.params.leadId ?? ""), 10);
+  if (isNaN(leadId)) { res.status(400).json({ error: "Invalid leadId" }); return; }
+
+  const [lead] = await db.select({ id: consultationsTable.id, email: consultationsTable.email })
+    .from(consultationsTable).where(eq(consultationsTable.id, leadId)).limit(1);
+  if (!lead) { res.status(404).json({ error: "Lead not found" }); return; }
+
+  const { fileName, mimeType, fileData } = req.body as {
+    fileName?: string; mimeType?: string; fileData?: string;
+  };
+  if (!fileName || !fileData) { res.status(400).json({ error: "fileName and fileData required" }); return; }
+
+  const declaredMime = mimeType ?? "application/octet-stream";
+  if (!ALLOWED_MIME_TYPES.has(declaredMime)) {
+    res.status(415).json({ error: "File type not allowed. Accepted: PDF, Word, Excel, Images, Plain text." }); return;
+  }
+
+  let buf: Buffer;
+  try { buf = Buffer.from(fileData, "base64"); } catch {
+    res.status(400).json({ error: "Invalid file data" }); return;
+  }
+  if (buf.length > MAX_FILE_BYTES) {
+    res.status(413).json({ error: "File too large. Maximum size is 10 MB." }); return;
+  }
+
+  const safeBase = path.basename(fileName).replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 200);
+  const safeName = `${Date.now()}_${safeBase}`;
+  const filePath = path.resolve(UPLOAD_DIR, safeName);
+  if (!filePath.startsWith(path.resolve(UPLOAD_DIR) + path.sep)) {
+    res.status(400).json({ error: "Invalid filename" }); return;
+  }
+
+  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+  fs.writeFileSync(filePath, buf);
+
+  let doc;
+  try {
+    [doc] = await db.insert(portalDocumentsTable).values({
+      leadId,
+      clientEmail: lead.email.toLowerCase(),
+      fileName: safeBase,
+      fileUrl: `/api/portal/documents/files/${safeName}`,
+      fileSize: buf.length,
+      mimeType: declaredMime,
+      direction: "firm_to_client",
+    }).returning();
+  } catch (err) {
+    try { fs.unlinkSync(filePath); } catch { /* ignore */ }
+    throw err;
+  }
+
+  res.status(201).json(doc);
+});
+
 // Serve portal document files — admin only (auth already enforced by parent router)
 router.get("/admin/portal/files/:filename", (req, res): void => {
   // Strictly contain to UPLOAD_DIR: strip any path separators
