@@ -203,6 +203,28 @@ export default function TeamPerformance() {
     else { setSortKey(key); setSortDir("desc"); }
   }
 
+  function exportAttendanceCsv() {
+    if (!attendanceReport.length) return;
+    const headers = ["Employee", "Designation", "Department", "Present Days", "Late Days", "Total Hours", "Overtime Hours"];
+    const rows = attendanceReport.map(r => [
+      r.name,
+      r.designation,
+      r.department,
+      String(r.presentDays),
+      String(r.lateDays),
+      r.totalMinutes > 0 ? (r.totalMinutes / 60).toFixed(2) : "0.00",
+      r.overtimeMinutes > 0 ? (r.overtimeMinutes / 60).toFixed(2) : "0.00",
+    ]);
+    const csv = [headers.join(","), ...rows.map(r => r.map(v => `"${v.replace(/"/g, '""')}"`).join(","))].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `attendance-${attendanceMonth}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   function exportCsv() {
     if (!sorted.length) return;
     const headers = COLS.map(c => c.label);
@@ -526,16 +548,25 @@ export default function TeamPerformance() {
               <input type="month" value={attendanceMonth} onChange={e => { setAttendanceMonth(e.target.value); setExpandedEmployee(null); }}
                 className="h-8 border border-gray-200 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0f2044]/20" />
             </div>
-            <button onClick={() => setShowCorrections(v => !v)}
-              className={`flex items-center gap-2 text-xs px-3 py-2 rounded-xl font-medium transition-all ${showCorrections ? "bg-orange-500 text-white" : "bg-white border border-gray-200 text-gray-600 hover:border-orange-400"}`}>
-              <ClipboardList size={13} />
-              Pending Corrections
-              {allCorrections.length > 0 && (
-                <span className="bg-red-500 text-white text-[10px] font-bold rounded-full px-1.5 leading-4 min-w-[18px] text-center">
-                  {allCorrections.length}
-                </span>
-              )}
-            </button>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={exportAttendanceCsv}
+                disabled={!attendanceReport.length}
+                className="h-8 text-xs bg-[#0f2044] text-white hover:bg-[#0f2044]/90 flex items-center gap-1.5"
+              >
+                <Download size={13} /> Export CSV
+              </Button>
+              <button onClick={() => setShowCorrections(v => !v)}
+                className={`flex items-center gap-2 text-xs px-3 py-2 rounded-xl font-medium transition-all ${showCorrections ? "bg-orange-500 text-white" : "bg-white border border-gray-200 text-gray-600 hover:border-orange-400"}`}>
+                <ClipboardList size={13} />
+                Pending Corrections
+                {allCorrections.length > 0 && (
+                  <span className="bg-red-500 text-white text-[10px] font-bold rounded-full px-1.5 leading-4 min-w-[18px] text-center">
+                    {allCorrections.length}
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
 
           {/* Corrections panel */}
