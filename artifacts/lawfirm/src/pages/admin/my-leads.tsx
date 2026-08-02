@@ -189,12 +189,20 @@ function LeadDetailPanel({ leadId, onUpdated }: { leadId: number; onUpdated: () 
           </Select>
         </div>
 
-        <div className="flex items-center gap-4 mt-3 text-xs text-white/70">
+        <div className="flex items-center gap-3 mt-3 text-xs text-white/70 flex-wrap">
           <a href={`tel:${lead.phone}`} className="flex items-center gap-1.5 hover:text-white transition-colors">
             <PhoneCall size={11} /> {lead.phone}
           </a>
           <a href={`mailto:${lead.email}`} className="flex items-center gap-1.5 hover:text-white transition-colors">
             <MessageSquare size={11} /> {lead.email}
+          </a>
+          <a
+            href={`https://wa.me/${((lead as Lead & { whatsapp?: string }).whatsapp || lead.phone).replace(/[^\d+]/g, "")}?text=${encodeURIComponent(`Hi ${lead.name}, this is from Vakil & Co. regarding your enquiry on ${lead.serviceInterest}. How can we assist you today?`)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 bg-green-600 hover:bg-green-500 text-white px-2.5 py-1 rounded-full transition-colors font-medium"
+          >
+            <MessageSquare size={11} /> WhatsApp
           </a>
         </div>
       </div>
