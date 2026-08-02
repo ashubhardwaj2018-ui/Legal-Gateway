@@ -326,7 +326,7 @@ router.patch("/admin/leads/:id", async (req: AuthenticatedRequest, res): Promise
         body: `Status changed to "${body.status}" on lead #${id}`,
         entityType: "lead",
         entityId: id,
-        link: `/admin/leads/${id}`,
+        link: `/admin/my-leads`,
       });
     }
   }

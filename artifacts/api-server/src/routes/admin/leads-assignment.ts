@@ -237,7 +237,7 @@ router.post("/admin/leads/:id/assign", async (req: AuthenticatedRequest, res): P
       body: `You have been assigned a lead by ${actorName}`,
       entityType: "lead",
       entityId: id,
-      link: `/admin/leads/${id}`,
+      link: `/admin/my-leads`,
     });
   }
 
