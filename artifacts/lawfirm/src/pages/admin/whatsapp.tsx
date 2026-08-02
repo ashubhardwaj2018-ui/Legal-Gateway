@@ -10,6 +10,7 @@ import {
   MessageCircle, Plus, Trash2, Edit2, Check, X, Send, Users, Zap,
   History, BarChart2, ExternalLink, Copy, ToggleLeft, ToggleRight,
   Loader2, ChevronDown, Search, Filter, RefreshCw, AlertCircle, CheckCircle2,
+  Settings2, Phone, Eye, EyeOff, Save,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -19,7 +20,7 @@ interface WaTrigger { id: number; event: string; templateId?: number; isEnabled:
 interface WaDashboard { sentToday: number; totalMessages: number; failedMessages: number; activeTemplates: number; activeTriggers: number; recentMessages: WaMessage[]; }
 interface Lead { id: number; name: string; phone: string; whatsapp?: string; serviceInterest: string; status: string; city?: string; state?: string; }
 
-type Tab = "dashboard" | "templates" | "bulk" | "triggers" | "history";
+type Tab = "dashboard" | "templates" | "bulk" | "triggers" | "history" | "settings";
 
 const CATEGORIES = ["general", "welcome", "followup", "quotation", "invoice", "payment", "assignment", "status", "broadcast"];
 const CATEGORY_COLORS: Record<string, string> = {
@@ -51,6 +52,62 @@ const PLACEHOLDERS = [
   "{{QuotationNo}}", "{{InvoiceNo}}", "{{Amount}}", "{{AssignedEmployee}}",
   "{{DueDate}}", "{{Website}}", "{{CompanyWhatsApp}}", "{{SupportEmail}}",
 ];
+
+// ── WhatsApp Settings constants ───────────────────────────────────────────────
+const COUNTRY_CODES = [
+  { code: "+91", name: "India" }, { code: "+1", name: "USA / Canada" },
+  { code: "+44", name: "UK" }, { code: "+971", name: "UAE" },
+  { code: "+65", name: "Singapore" }, { code: "+61", name: "Australia" },
+  { code: "+49", name: "Germany" }, { code: "+33", name: "France" },
+  { code: "+81", name: "Japan" }, { code: "+86", name: "China" },
+  { code: "+27", name: "South Africa" }, { code: "+55", name: "Brazil" },
+];
+
+const PROVIDERS = [
+  { value: "web",       label: "WhatsApp Web (wa.me links only)" },
+  { value: "waba",      label: "Meta WABA — Official Cloud API" },
+  { value: "twilio",    label: "Twilio" },
+  { value: "interakt",  label: "Interakt" },
+  { value: "gupshup",   label: "Gupshup" },
+  { value: "msg91",     label: "MSG91" },
+  { value: "360dialog", label: "360dialog" },
+];
+
+const PROVIDER_FIELDS: Record<string, Array<{
+  key: string; label: string; sensitive?: boolean; required?: boolean;
+  placeholder?: string; hint?: string;
+}>> = {
+  waba: [
+    { key: "whatsapp_api_key",             label: "System User Token",          sensitive: true, required: true, placeholder: "EAA..." },
+    { key: "whatsapp_phone_number_id",     label: "Phone Number ID",             required: true, placeholder: "Numeric ID from Meta Business Manager" },
+    { key: "whatsapp_business_account_id", label: "Business Account ID (WABA)", required: true, placeholder: "Numeric WABA ID" },
+    { key: "whatsapp_verify_token",        label: "Webhook Verify Token",        sensitive: true, placeholder: "Any random string you choose",
+      hint: "Set this in Meta App Dashboard → Webhooks. Webhook URL to configure: /api/webhooks/whatsapp" },
+  ],
+  twilio: [
+    { key: "whatsapp_account_sid", label: "Account SID",   required: true, placeholder: "AC..." },
+    { key: "whatsapp_api_key",     label: "Auth Token",    sensitive: true, required: true },
+    { key: "whatsapp_from_number", label: "From Number",   required: true, placeholder: "whatsapp:+14155238886",
+      hint: "Must be a WhatsApp-enabled Twilio number" },
+  ],
+  interakt: [
+    { key: "whatsapp_api_key",     label: "API Key",         sensitive: true, required: true },
+    { key: "whatsapp_from_number", label: "WhatsApp Number", placeholder: "+91...", hint: "Your Interakt registered number" },
+  ],
+  gupshup: [
+    { key: "whatsapp_api_key",     label: "API Key",       sensitive: true, required: true },
+    { key: "whatsapp_app_name",    label: "App Name",      placeholder: "Your Gupshup app name" },
+    { key: "whatsapp_from_number", label: "Source Number", placeholder: "+91..." },
+  ],
+  msg91: [
+    { key: "whatsapp_api_key",    label: "Auth Key",  sensitive: true, required: true },
+    { key: "whatsapp_sender_id",  label: "Sender ID", placeholder: "e.g. VAKILCO" },
+  ],
+  "360dialog": [
+    { key: "whatsapp_api_key",     label: "Partner API Key", sensitive: true, required: true },
+    { key: "whatsapp_from_number", label: "Phone Number",    placeholder: "+91..." },
+  ],
+};
 
 const api = async (path: string, opts?: RequestInit) => {
   const r = await fetch(`/api${path}`, {
@@ -224,13 +281,68 @@ export default function AdminWhatsApp() {
     m.toNumber.includes(histSearch) || m.senderName?.toLowerCase().includes(histSearch.toLowerCase())
   );
 
+  // ── Settings state ────────────────────────────────────────────────────────────
+  const [sf, setSf] = useState<Record<string, string>>({});
+  const [showSecret, setShowSecret] = useState<Record<string, boolean>>({});
+  const [testingConn, setTestingConn] = useState(false);
+  const [connResult, setConnResult] = useState<{ ok: boolean; message: string } | null>(null);
+
+  const { data: settingsRaw = [] } = useQuery<Array<{ key: string; value: string }>>({
+    queryKey: ["wa-settings"],
+    queryFn: () => api("/admin/settings"),
+    enabled: tab === "settings",
+  });
+
+  useEffect(() => {
+    if (settingsRaw.length) {
+      setSf(Object.fromEntries(settingsRaw.map(({ key, value }) => [key, value])));
+    }
+  }, [settingsRaw]);
+
+  const saveSettings = useMutation({
+    mutationFn: (data: Record<string, string>) =>
+      api("/admin/settings", {
+        method: "PUT",
+        body: JSON.stringify({ settings: Object.entries(data).map(([key, value]) => ({ key, value })) }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["wa-settings"] });
+      setConnResult({ ok: true, message: "Settings saved successfully." });
+      setTimeout(() => setConnResult(null), 4000);
+    },
+    onError: () => setConnResult({ ok: false, message: "Failed to save settings." }),
+  });
+
+  const handleSaveSettings = () => saveSettings.mutate(sf);
+
+  const handleTestConn = async () => {
+    setTestingConn(true);
+    setConnResult(null);
+    try {
+      // Save current form first so the backend reads fresh credentials
+      await api("/admin/settings", {
+        method: "PUT",
+        body: JSON.stringify({ settings: Object.entries(sf).map(([key, value]) => ({ key, value })) }),
+      });
+      const r = await api("/admin/whatsapp/test-connection", { method: "POST" }) as Record<string, unknown>;
+      setConnResult({
+        ok:      Boolean(r.success ?? r.ok ?? true),
+        message: String(r.message ?? "Connection successful"),
+      });
+    } catch (e: unknown) {
+      setConnResult({ ok: false, message: e instanceof Error ? e.message : "Test failed" });
+    }
+    setTestingConn(false);
+  };
+
   // ── Tabs ──────────────────────────────────────────────────────────────────────
   const TABS: Array<{ key: Tab; label: string; icon: React.ElementType }> = [
-    { key: "dashboard", label: "Dashboard", icon: BarChart2 },
-    { key: "templates", label: "Templates", icon: MessageCircle },
-    { key: "bulk",      label: "Bulk Send",  icon: Users },
-    { key: "triggers",  label: "Auto-Triggers", icon: Zap },
-    { key: "history",   label: "Message History", icon: History },
+    { key: "dashboard", label: "Dashboard",      icon: BarChart2 },
+    { key: "templates", label: "Templates",      icon: MessageCircle },
+    { key: "bulk",      label: "Bulk Send",      icon: Users },
+    { key: "triggers",  label: "Auto-Triggers",  icon: Zap },
+    { key: "history",   label: "History",        icon: History },
+    { key: "settings",  label: "Settings",       icon: Settings2 },
   ];
 
   return (
@@ -294,7 +406,7 @@ export default function AdminWhatsApp() {
                 </div>
               ))}
             </div>
-            <div className="mt-4 text-xs text-white/40">Currently using WhatsApp Web fallback. Configure WhatsApp Business API in Site Settings → WhatsApp Provider for direct sending.</div>
+            <div className="mt-4 text-xs text-white/40">Open the <button onClick={() => setTab("settings")} className="underline hover:text-white/70 transition-colors">Settings tab</button> to configure your API provider, credentials, and fallback behaviour.</div>
           </div>
         </div>
       )}
@@ -555,6 +667,180 @@ export default function AdminWhatsApp() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════
+          SETTINGS TAB
+      ════════════════════════════════════════════ */}
+      {tab === "settings" && (
+        <div className="space-y-5 max-w-2xl">
+
+          {/* Business Identity */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
+            <h3 className="font-semibold text-[#0f2044] text-sm flex items-center gap-2">
+              <Phone size={14} className="text-[#c9a227]" /> Business Identity
+            </h3>
+            <div>
+              <label className="text-xs font-medium text-gray-600">Business Name</label>
+              <input
+                className="mt-1 h-9 w-full border border-gray-200 rounded-lg px-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0f2044]/30"
+                placeholder="e.g. Vakil & Co. Legal Associates"
+                value={sf.whatsapp_business_name ?? ""}
+                onChange={e => setSf(p => ({ ...p, whatsapp_business_name: e.target.value }))}
+              />
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="text-xs font-medium text-gray-600">Country Code</label>
+                <select
+                  className="mt-1 h-9 w-full border border-gray-200 rounded-lg px-3 text-sm focus:outline-none bg-white"
+                  value={sf.whatsapp_country_code ?? "+91"}
+                  onChange={e => setSf(p => ({ ...p, whatsapp_country_code: e.target.value }))}
+                >
+                  {COUNTRY_CODES.map(c => (
+                    <option key={c.code} value={c.code}>{c.code} — {c.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="col-span-2">
+                <label className="text-xs font-medium text-gray-600">Company WhatsApp Number</label>
+                <input
+                  className="mt-1 h-9 w-full border border-gray-200 rounded-lg px-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0f2044]/30"
+                  placeholder="9876543210 (without country code)"
+                  value={sf.company_whatsapp ?? ""}
+                  onChange={e => setSf(p => ({ ...p, company_whatsapp: e.target.value }))}
+                />
+                <p className="text-[10px] text-gray-400 mt-1">{"Used for wa.me links and {{CompanyWhatsApp}} placeholder in templates"}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* API Provider */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
+            <h3 className="font-semibold text-[#0f2044] text-sm flex items-center gap-2">
+              <Zap size={14} className="text-[#c9a227]" /> API Provider
+            </h3>
+            <div>
+              <label className="text-xs font-medium text-gray-600">Provider</label>
+              <select
+                className="mt-1 h-9 w-full border border-gray-200 rounded-lg px-3 text-sm focus:outline-none bg-white"
+                value={sf.whatsapp_provider ?? "web"}
+                onChange={e => setSf(p => ({ ...p, whatsapp_provider: e.target.value }))}
+              >
+                {PROVIDERS.map(p => (
+                  <option key={p.value} value={p.value}>{p.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Dynamic credentials */}
+            {(!sf.whatsapp_provider || sf.whatsapp_provider === "web") ? (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
+                <strong>WhatsApp Web mode</strong> — messages open as wa.me links in the browser.
+                No API credentials needed. Upgrade to an API provider to enable direct sending and auto-triggers.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {(PROVIDER_FIELDS[sf.whatsapp_provider] ?? []).map(field => (
+                  <div key={field.key}>
+                    <label className="text-xs font-medium text-gray-600">
+                      {field.label}
+                      {field.required && <span className="text-red-400 ml-0.5">*</span>}
+                    </label>
+                    <div className="relative mt-1">
+                      <input
+                        type={field.sensitive && !showSecret[field.key] ? "password" : "text"}
+                        className="h-9 w-full border border-gray-200 rounded-lg px-3 text-sm pr-9 focus:outline-none focus:ring-1 focus:ring-[#0f2044]/30"
+                        placeholder={field.placeholder ?? ""}
+                        value={sf[field.key] ?? ""}
+                        onChange={e => setSf(p => ({ ...p, [field.key]: e.target.value }))}
+                        autoComplete="off"
+                      />
+                      {field.sensitive && (
+                        <button
+                          type="button"
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                          onClick={() => setShowSecret(s => ({ ...s, [field.key]: !s[field.key] }))}
+                        >
+                          {showSecret[field.key] ? <EyeOff size={13} /> : <Eye size={13} />}
+                        </button>
+                      )}
+                    </div>
+                    {field.hint && <p className="text-[10px] text-gray-400 mt-1">{field.hint}</p>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Fallback */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-5">
+            <h3 className="font-semibold text-[#0f2044] text-sm flex items-center gap-2 mb-4">
+              <RefreshCw size={14} className="text-[#c9a227]" /> Fallback Settings
+            </h3>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-gray-700">Fallback to WhatsApp Web</p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  When API delivery fails, open a wa.me link so staff can send the message manually instead of silently failing.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSf(p => ({ ...p, whatsapp_fallback_web: p.whatsapp_fallback_web === "true" ? "false" : "true" }))}
+                className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                  sf.whatsapp_fallback_web === "true"
+                    ? "bg-green-100 text-green-700 border border-green-200"
+                    : "bg-gray-100 text-gray-500 border border-gray-200"
+                }`}
+              >
+                {sf.whatsapp_fallback_web === "true"
+                  ? <><ToggleRight size={14} /> Enabled</>
+                  : <><ToggleLeft  size={14} /> Disabled</>}
+              </button>
+            </div>
+          </div>
+
+          {/* Result banner */}
+          {connResult && (
+            <div className={`flex items-start gap-2 text-sm px-4 py-3 rounded-xl border ${
+              connResult.ok
+                ? "bg-green-50 border-green-200 text-green-800"
+                : "bg-red-50 border-red-200 text-red-800"
+            }`}>
+              {connResult.ok
+                ? <CheckCircle2 size={16} className="mt-0.5 shrink-0" />
+                : <AlertCircle  size={16} className="mt-0.5 shrink-0" />}
+              {connResult.message}
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex items-center gap-3 pb-2">
+            {sf.whatsapp_provider && sf.whatsapp_provider !== "web" && (
+              <button
+                type="button"
+                onClick={handleTestConn}
+                disabled={testingConn}
+                className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50 disabled:opacity-50 transition-colors"
+              >
+                {testingConn
+                  ? <><Loader2 size={14} className="animate-spin" /> Testing…</>
+                  : <><Zap size={14} className="text-[#c9a227]" /> Test Connection</>}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleSaveSettings}
+              disabled={saveSettings.isPending}
+              className="flex items-center gap-2 px-5 py-2 bg-[#0f2044] hover:bg-[#0f2044]/90 text-white rounded-xl text-sm font-medium disabled:opacity-50 transition-colors"
+            >
+              {saveSettings.isPending
+                ? <><Loader2 size={14} className="animate-spin" /> Saving…</>
+                : <><Save size={14} /> Save Settings</>}
+            </button>
+          </div>
         </div>
       )}
     </AdminLayout>

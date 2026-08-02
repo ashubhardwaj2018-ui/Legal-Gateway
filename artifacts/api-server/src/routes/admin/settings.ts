@@ -20,10 +20,18 @@ const DEFAULT_SETTINGS = [
   { key: "instagram_url", value: "#" },
   // WhatsApp
   { key: "company_whatsapp",             value: "" },
+  { key: "whatsapp_country_code",        value: "+91" },
+  { key: "whatsapp_business_name",       value: "" },
   { key: "whatsapp_provider",            value: "web" },
+  { key: "whatsapp_fallback_web",        value: "false" },
   { key: "whatsapp_api_key",             value: "" },
   { key: "whatsapp_phone_number_id",     value: "" },
   { key: "whatsapp_business_account_id", value: "" },
+  { key: "whatsapp_verify_token",        value: "" },
+  { key: "whatsapp_account_sid",         value: "" },
+  { key: "whatsapp_from_number",         value: "" },
+  { key: "whatsapp_app_name",            value: "" },
+  { key: "whatsapp_sender_id",           value: "" },
   // Website & Branding
   { key: "logo_url",        value: "" },
   { key: "website_whatsapp",value: "" },
