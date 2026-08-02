@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, and, sql, ilike, isNull } from "drizzle-orm";
-import { db, teamMembersTable, attendanceTable, leaveRequestsTable, workingHoursTable, attendanceCorrectionsTable } from "@workspace/db";
+import { db, teamMembersTable, attendanceTable, leaveRequestsTable, workingHoursTable, attendanceCorrectionsTable, notificationsTable } from "@workspace/db";
 import type { AuthenticatedRequest } from "./auth";
 
 const router: IRouter = Router();
@@ -404,6 +404,21 @@ router.patch("/admin/attendance-corrections/:id", async (req, res): Promise<void
 
   // @ts-expect-error updated is assigned inside the transaction callback
   if (!updated) { res.status(409).json({ error: "Correction already reviewed by another admin" }); return; }
+
+  // Notify the employee — fire-and-forget so a failed insert never blocks the response
+  db.insert(notificationsTable).values({
+    recipientId:   correction.employeeId,
+    recipientType: "employee",
+    type:          "attendance_correction",
+    title:         status === "approved"
+      ? "Attendance Correction Approved ✓"
+      : "Attendance Correction Rejected",
+    body:  `Your correction request for ${correction.date} has been ${status} by ${reviewer}.`,
+    entityType: "attendance_correction",
+    entityId:   correction.id,
+    link:       "/admin/attendance?tab=corrections",
+  }).catch(() => { /* non-fatal */ });
+
   res.json(updated);
 });
 
