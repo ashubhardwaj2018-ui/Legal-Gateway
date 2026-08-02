@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Hash, Lock, Plus, Send, Smile, Paperclip, Pin,
   Pencil, Trash2, CornerUpLeft, X, ChevronDown,
-  Users, Search, Bell, AtSign, Check, CheckCheck,
+  Users, Search, AtSign, CheckCheck,
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -61,10 +61,9 @@ export default function AdminChat() {
   const [loading, setLoading] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
 
-  // Current user
-  const [myName, setMyName] = useState(() => localStorage.getItem("chat_name") ?? "");
-  const [myColor, setMyColor] = useState(() => localStorage.getItem("chat_color") ?? "");
-  const [showNamePicker, setShowNamePicker] = useState(false);
+  // Current user — derived from session, never from localStorage or manual picker
+  const [myName, setMyName] = useState("");
+  const [myColor, setMyColor] = useState("");
 
   // Input
   const [text, setText] = useState("");
@@ -97,19 +96,12 @@ export default function AdminChat() {
     messagesEndRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "auto" });
   }, []);
 
-  // Set name
-  const pickName = (name: string) => {
-    const color = nameColor(name);
-    setMyName(name); setMyColor(color);
-    localStorage.setItem("chat_name", name); localStorage.setItem("chat_color", color);
-    setShowNamePicker(false);
-  };
-
-  // Load channels
+  // Load channels + always resolve identity from session (never from localStorage/manual picker)
   const loadChannels = useCallback(async () => {
-    const [chR, mbR] = await Promise.all([
+    const [chR, mbR, meR] = await Promise.all([
       fetch("/api/admin/chat/channels").then(r => r.json()),
       fetch("/api/admin/chat/members").then(r => r.json()),
+      fetch("/api/admin/auth/me").then(r => r.ok ? r.json() : null).catch(() => null),
     ]);
     const chs: Channel[] = Array.isArray(chR) ? chR : [];
     const mbs: Member[] = Array.isArray(mbR) ? mbR : [];
@@ -126,20 +118,14 @@ export default function AdminChat() {
       if (!activeChannel) setActiveChannel(chs[0] ?? null);
     }
     setMembers(mbs);
-    // Auto-detect identity from session if not set
-    const savedName = localStorage.getItem("chat_name");
-    if (!savedName) {
-      try {
-        const me = await fetch("/api/admin/auth/me").then(r => r.ok ? r.json() : null);
-        if (me?.user?.username) {
-          const uname = me.user.username as string;
-          const match = mbs.find(m => m.username === uname || m.name.toLowerCase().replace(/\s+/g, "") === uname.toLowerCase());
-          const resolvedName = match ? match.name : uname === "admin" ? "Admin" : uname;
-          const color = nameColor(resolvedName);
-          setMyName(resolvedName); setMyColor(color);
-          localStorage.setItem("chat_name", resolvedName); localStorage.setItem("chat_color", color);
-        }
-      } catch { /* ignore */ }
+    // Always resolve name from session — no manual override allowed
+    if (meR?.user?.username) {
+      const uname = meR.user.username as string;
+      const match = mbs.find((m: Member) => m.username === uname || m.name.toLowerCase().replace(/\s+/g, "") === uname.toLowerCase());
+      const resolvedName = match ? match.name : uname === "admin" ? "Admin" : uname;
+      const color = nameColor(resolvedName);
+      setMyName(resolvedName);
+      setMyColor(color);
     }
   }, [activeChannel]);
 
@@ -221,7 +207,7 @@ export default function AdminChat() {
   }, []);
 
   const sendMessage = async () => {
-    if (!activeChannel || !myName) { setShowNamePicker(true); return; }
+    if (!activeChannel || !myName) return;
     const color = myColor || nameColor(myName);
 
     // Send pending file if any
@@ -262,7 +248,7 @@ export default function AdminChat() {
   };
 
   const react = async (msgId: number, emoji: string) => {
-    if (!myName) { setShowNamePicker(true); return; }
+    if (!myName) return;
     await fetch(`/api/admin/chat/messages/${msgId}/react`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ emoji, userName: myName }) });
     setEmojiTarget(null);
   };
@@ -322,18 +308,18 @@ export default function AdminChat() {
           <Search size={12} /> <span>Search messages</span>
         </button>
 
-        {/* Current user */}
-        <button onClick={() => setShowNamePicker(true)} className="mx-3 mt-2 flex items-center gap-2 bg-white/5 hover:bg-white/10 rounded-lg px-3 py-2 transition-colors group">
+        {/* Current user — read-only, auto-resolved from session */}
+        <div className="mx-3 mt-2 flex items-center gap-2 bg-white/5 rounded-lg px-3 py-2">
           {myName ? (
             <>
               <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0" style={{ backgroundColor: myColor || nameColor(myName) }}>{initials(myName)}</div>
-              <span className="text-white/80 text-xs font-medium truncate flex-1 text-left">{myName}</span>
-              <Pencil size={10} className="text-white/30 group-hover:text-white/60 shrink-0" />
+              <span className="text-white/80 text-xs font-medium truncate flex-1">{myName}</span>
+              <span className="text-white/30 text-[9px]">You</span>
             </>
           ) : (
-            <span className="text-white/40 text-xs">Set your name…</span>
+            <span className="text-white/30 text-xs">Loading…</span>
           )}
-        </button>
+        </div>
 
         <div className="flex-1 overflow-y-auto py-2 space-y-0.5">
           {/* Channels */}
@@ -588,31 +574,6 @@ export default function AdminChat() {
           </>
         )}
       </div>
-
-      {/* ─── NAME PICKER ─── */}
-      {showNamePicker && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
-            <h3 className="font-bold text-[#0f2044] text-base mb-1">Who are you?</h3>
-            <p className="text-gray-400 text-sm mb-4">Select your name to start chatting</p>
-            <div className="space-y-2 max-h-64 overflow-y-auto mb-3">
-              {members.map(m => (
-                <button key={m.id} onClick={() => pickName(m.name)} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border-2 transition-all hover:border-[#0f2044] text-left ${myName === m.name ? "border-[#0f2044] bg-[#0f2044]/5" : "border-gray-200"}`}>
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ backgroundColor: nameColor(m.name) }}>{initials(m.name)}</div>
-                  <div><div className="text-sm font-semibold text-gray-800">{m.name}</div><div className="text-xs text-gray-400">{m.designation}</div></div>
-                  {myName === m.name && <Check size={14} className="text-[#0f2044] ml-auto" />}
-                </button>
-              ))}
-              <button onClick={() => pickName("Admin")} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border-2 transition-all hover:border-[#0f2044] text-left ${myName === "Admin" ? "border-[#0f2044] bg-[#0f2044]/5" : "border-gray-200"}`}>
-                <div className="w-8 h-8 rounded-full bg-[#c9a227] flex items-center justify-center text-white text-xs font-bold shrink-0">AD</div>
-                <div className="text-sm font-semibold text-gray-800">Admin</div>
-                {myName === "Admin" && <Check size={14} className="text-[#0f2044] ml-auto" />}
-              </button>
-            </div>
-            <button onClick={() => setShowNamePicker(false)} className="w-full py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors">Cancel</button>
-          </div>
-        </div>
-      )}
 
       {/* ─── CREATE CHANNEL ─── */}
       {showCreateChannel && (
