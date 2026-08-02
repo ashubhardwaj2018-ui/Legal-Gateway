@@ -1,9 +1,49 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { pageContentTable } from "@workspace/db/schema";
+import { pageContentTable, siteSettingsTable } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
 
 const publicPagesRouter = Router();
+
+// Public-safe keys that the website may display (no credentials/tokens)
+const PUBLIC_SETTING_KEYS = [
+  "site_name", "site_tagline",
+  "phone_primary", "phone_secondary",
+  "email_primary", "email_secondary",
+  "address",
+  "hours_weekdays", "hours_saturday", "hours_sunday",
+  "gst_number",
+  "linkedin_url", "twitter_url", "facebook_url", "instagram_url",
+];
+
+const DEFAULT_PUBLIC: Record<string, string> = {
+  site_name:       "Vakil & Co. Legal Associates",
+  site_tagline:    "India's Premium Legal Network",
+  phone_primary:   "1800-123-4567",
+  phone_secondary: "+91 22 6789 0123",
+  email_primary:   "consult@vakilco.in",
+  email_secondary: "info@vakilco.in",
+  address:         "Level 7, Capital Building, BKC, Bandra East, Mumbai - 400051",
+  hours_weekdays:  "9:00 AM – 7:00 PM",
+  hours_saturday:  "10:00 AM – 4:00 PM",
+  hours_sunday:    "Closed",
+  gst_number:      "27AABCV1234F1Z5",
+};
+
+// GET /api/settings — public endpoint; returns only safe display fields
+publicPagesRouter.get("/settings", async (_req, res): Promise<void> => {
+  try {
+    const stored = await db.select().from(siteSettingsTable);
+    const storedMap = new Map(stored.map(s => [s.key, s.value]));
+    const result: Record<string, string> = {};
+    for (const key of PUBLIC_SETTING_KEYS) {
+      result[key] = storedMap.get(key) ?? DEFAULT_PUBLIC[key] ?? "";
+    }
+    res.json(result);
+  } catch {
+    res.status(500).json({ error: "Failed to fetch settings" });
+  }
+});
 
 // GET /api/pages/:page — public endpoint to fetch page content
 publicPagesRouter.get("/pages/:page", async (req, res): Promise<void> => {

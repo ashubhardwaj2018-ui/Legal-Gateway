@@ -4,6 +4,7 @@ import { Menu, X, ChevronDown, ChevronRight, Scale, Phone, LogIn } from "lucide-
 import { SERVICES_DATA } from "@/data/services";
 import { toSlug } from "@/lib/slug";
 import { cn } from "@/lib/utils";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 type CategoryId = keyof typeof SERVICES_DATA;
 
@@ -23,6 +24,7 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 export function Navbar() {
+  const settings = useSiteSettings();
   const [isScrolled, setIsScrolled] = useState(false);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -160,10 +162,15 @@ export function Navbar() {
 
           {/* Right side: Phone + Login */}
           <div className="hidden lg:flex items-center gap-3 ml-auto shrink-0">
-            <a href="tel:18001234567" className="hidden xl:flex items-center gap-1.5 text-primary text-sm font-medium hover:text-secondary transition-colors whitespace-nowrap">
-              <Phone size={14} className="text-secondary shrink-0" />
-              1800-123-4567
-            </a>
+            {settings.phone_primary && (
+              <a
+                href={`tel:${settings.phone_primary.replace(/[^\d+]/g, "")}`}
+                className="hidden xl:flex items-center gap-1.5 text-primary text-sm font-medium hover:text-secondary transition-colors whitespace-nowrap"
+              >
+                <Phone size={14} className="text-secondary shrink-0" />
+                {settings.phone_primary}
+              </a>
+            )}
             <Link href="/portal" className="flex items-center gap-1.5 text-sm font-semibold text-primary border border-primary/30 hover:border-secondary hover:text-secondary rounded-lg px-3 py-1.5 transition-all whitespace-nowrap">
               <LogIn size={14} />
               Client Login
@@ -230,10 +237,12 @@ export function Navbar() {
           })}
 
           <div className="pt-4 pb-2 flex flex-col gap-3">
-            <a href="tel:18001234567" className="flex items-center gap-2 text-primary font-medium justify-center text-sm">
-              <Phone size={16} className="text-secondary" />
-              1800-123-4567
-            </a>
+            {settings.phone_primary && (
+              <a href={`tel:${settings.phone_primary.replace(/[^\d+]/g, "")}`} className="flex items-center gap-2 text-primary font-medium justify-center text-sm">
+                <Phone size={16} className="text-secondary" />
+                {settings.phone_primary}
+              </a>
+            )}
             <Link href="/portal" onClick={() => setMobileOpen(false)} className="flex items-center justify-center gap-2 border border-primary/30 text-primary font-semibold rounded-lg py-2.5 text-sm hover:border-secondary hover:text-secondary transition-all">
               <LogIn size={15} />
               Client Login

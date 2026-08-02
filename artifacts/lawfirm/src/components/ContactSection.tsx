@@ -6,8 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { CheckCircle, Loader2, Mail, Phone, MapPin } from "lucide-react";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 export function ContactSection() {
+  const settings = useSiteSettings();
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -55,39 +57,60 @@ export function ContactSection() {
             className="lg:col-span-2 flex flex-col gap-8"
           >
             <div className="bg-primary rounded-2xl p-8 text-white flex flex-col gap-6">
-              <h3 className="text-2xl font-serif font-bold">Vakil & Co.</h3>
+              <h3 className="text-2xl font-serif font-bold">{settings.site_name}</h3>
               <p className="text-white/70 text-sm leading-relaxed">
-                India's premium legal network. Our team of expert lawyers is ready to assist you with any legal matter.
+                {settings.site_tagline}. Our team of expert lawyers is ready to assist you with any legal matter.
               </p>
               <div className="flex flex-col gap-5 mt-2">
                 <div className="flex items-start gap-3">
                   <div className="w-9 h-9 rounded-full bg-secondary/20 flex items-center justify-center shrink-0">
                     <MapPin size={16} className="text-secondary" />
                   </div>
-                  <p className="text-sm text-white/80 leading-relaxed">
-                    Level 7, Capital Building, BKC,<br />Bandra East, Mumbai - 400051
-                  </p>
+                  <p className="text-sm text-white/80 leading-relaxed">{settings.address}</p>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-full bg-secondary/20 flex items-center justify-center shrink-0">
                     <Phone size={16} className="text-secondary" />
                   </div>
-                  <p className="text-sm text-white/80">1800-123-4567 (Toll Free)</p>
+                  <div className="flex flex-col gap-0.5">
+                    <a href={`tel:${settings.phone_primary.replace(/[^\d+]/g, "")}`} className="text-sm text-white/80 hover:text-white transition-colors">
+                      {settings.phone_primary}
+                    </a>
+                    {settings.phone_secondary && (
+                      <a href={`tel:${settings.phone_secondary.replace(/[^\d+]/g, "")}`} className="text-xs text-white/60 hover:text-white/80 transition-colors">
+                        {settings.phone_secondary}
+                      </a>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-full bg-secondary/20 flex items-center justify-center shrink-0">
                     <Mail size={16} className="text-secondary" />
                   </div>
-                  <p className="text-sm text-white/80">consult@vakilco.in</p>
+                  <div className="flex flex-col gap-0.5">
+                    <a href={`mailto:${settings.email_primary}`} className="text-sm text-white/80 hover:text-white transition-colors">
+                      {settings.email_primary}
+                    </a>
+                    {settings.email_secondary && (
+                      <a href={`mailto:${settings.email_secondary}`} className="text-xs text-white/60 hover:text-white/80 transition-colors">
+                        {settings.email_secondary}
+                      </a>
+                    )}
+                  </div>
                 </div>
+                {settings.gst_number && (
+                  <div className="text-xs text-white/50 border-t border-white/10 pt-3 mt-1">
+                    GST: <span className="font-mono text-white/70">{settings.gst_number}</span>
+                  </div>
+                )}
               </div>
             </div>
             <div className="bg-secondary/10 border border-secondary/20 rounded-2xl p-6">
               <h4 className="font-serif font-bold text-primary text-lg mb-2">Office Hours</h4>
               <div className="space-y-2 text-sm text-muted-foreground">
-                <div className="flex justify-between"><span>Monday – Friday</span><span className="font-medium text-primary">9:00 AM – 7:00 PM</span></div>
-                <div className="flex justify-between"><span>Saturday</span><span className="font-medium text-primary">10:00 AM – 4:00 PM</span></div>
-                <div className="flex justify-between"><span>Sunday</span><span className="font-medium text-muted-foreground">Closed</span></div>
+                <div className="flex justify-between"><span>Monday – Friday</span><span className="font-medium text-primary">{settings.hours_weekdays}</span></div>
+                <div className="flex justify-between"><span>Saturday</span><span className="font-medium text-primary">{settings.hours_saturday}</span></div>
+                <div className="flex justify-between"><span>Sunday</span><span className="font-medium text-muted-foreground">{settings.hours_sunday}</span></div>
               </div>
             </div>
           </motion.div>
