@@ -41,7 +41,7 @@ export function Navbar() {
   }, []);
 
   const open = (id: string) => { if (closeTimer.current) clearTimeout(closeTimer.current); setActiveMenu(id); };
-  const close = () => { closeTimer.current = setTimeout(() => setActiveMenu(null), 110); };
+  const close = () => { closeTimer.current = setTimeout(() => setActiveMenu(null), 350); };
 
   return (
     <nav className={cn(
