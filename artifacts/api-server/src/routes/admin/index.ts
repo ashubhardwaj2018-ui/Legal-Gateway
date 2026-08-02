@@ -27,6 +27,7 @@ import performanceRouter from "./performance";
 import notificationsRouter, { startFollowUpScheduler } from "./notifications";
 import portalAdminRouter from "./portal-admin";
 import portalAccessRouter from "./portal-access";
+import apiManagerRouter from "./api-manager";
 import whatsappRouter from "./whatsapp";
 
 const router: IRouter = Router();
@@ -109,6 +110,7 @@ router.use(performanceRouter);
 router.use(notificationsRouter);
 router.use(portalAdminRouter);
 router.use(portalAccessRouter);
+router.use(apiManagerRouter);
 router.use(whatsappRouter);
 
 export default router;

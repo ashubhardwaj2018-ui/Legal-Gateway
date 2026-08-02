@@ -7,7 +7,7 @@ import {
   Settings, Building2, Mail, User, Scale, Menu, X, ChevronRight,
   Briefcase, ExternalLink, MapPin, BookOpen, UserCog, CheckSquare, TrendingUp,
   LogOut, ShieldCheck, Loader2, Layers, Shield, History, Activity, BarChart2, Upload,
-  MessageCircle, Globe, KeyRound,
+  MessageCircle, Globe, KeyRound, Cpu,
 } from "lucide-react";
 
 interface NavItem {
@@ -49,6 +49,7 @@ const navItems: NavItem[] = [
   { href: "/admin/bulk-service-upload",  label: "Bulk Service Upload",  icon: Upload,                   module: "services" },
   { href: "/admin/pseo",            label: "pSEO Manager",         icon: Globe,                         module: "locations" },
   { href: "/admin/portal-access",   label: "Client Portal Access",icon: KeyRound,                      module: null },
+  { href: "/admin/api-manager",     label: "API Manager",         icon: Cpu,                           module: null },
   { href: "/admin/settings",        label: "Site Settings",       icon: Settings,                      module: "settings" },
   { href: "/admin/page-editor",     label: "Page Editor",         icon: Layers,                        module: "settings" },
 ];
