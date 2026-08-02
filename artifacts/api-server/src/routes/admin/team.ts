@@ -1,8 +1,20 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, and, sql } from "drizzle-orm";
-import { db, teamMembersTable, attendanceTable, leaveRequestsTable, workingHoursTable } from "@workspace/db";
+import { eq, desc, and, sql, ilike, isNull } from "drizzle-orm";
+import { db, teamMembersTable, attendanceTable, leaveRequestsTable, workingHoursTable, attendanceCorrectionsTable } from "@workspace/db";
+import type { AuthenticatedRequest } from "./auth";
 
 const router: IRouter = Router();
+
+// ── IST date helpers ──────────────────────────────────────────────────────────
+// Fixed UTC+5:30 offset: deterministic YYYY-MM-DD regardless of runtime locale/ICU.
+// Adding 330 min to UTC epoch then reading toISOString().slice(0,10) gives IST date.
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+function todayIST(): string {
+  return new Date(Date.now() + IST_OFFSET_MS).toISOString().slice(0, 10);
+}
+function currentMonthIST(): string {
+  return todayIST().slice(0, 7);
+}
 
 // ── Team Members ──────────────────────────────────────────────────────────────
 
@@ -179,7 +191,7 @@ router.get("/admin/team/:id/working-hours", async (req, res): Promise<void> => {
 
 router.post("/admin/team/:id/clock-in", async (req, res): Promise<void> => {
   const employeeId = parseInt(req.params.id as string, 10);
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayIST();
   const now = new Date();
   const status = (req.body as { status?: string }).status ?? "present";
 
@@ -199,7 +211,7 @@ router.post("/admin/team/:id/clock-in", async (req, res): Promise<void> => {
 
 router.post("/admin/team/:id/clock-out", async (req, res): Promise<void> => {
   const employeeId = parseInt(req.params.id as string, 10);
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayIST();
   const now = new Date();
 
   const [existing] = await db.select().from(workingHoursTable)
@@ -254,7 +266,7 @@ router.put("/admin/team/:id/working-hours/:date", async (req, res): Promise<void
 
 // Today's working summary for all employees
 router.get("/admin/working-hours/today", async (_req, res): Promise<void> => {
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayIST();
   const rows = await db.select({
     id: workingHoursTable.id,
     employeeId: workingHoursTable.employeeId,
@@ -275,7 +287,7 @@ router.get("/admin/working-hours/today", async (_req, res): Promise<void> => {
 // Monthly summary per employee
 router.get("/admin/team/:id/working-hours/summary", async (req, res): Promise<void> => {
   const employeeId = parseInt(req.params.id as string, 10);
-  const month = (req.query as { month?: string }).month ?? new Date().toISOString().slice(0, 7);
+  const month = (req.query as { month?: string }).month ?? currentMonthIST();
   const { ilike } = await import("drizzle-orm");
   const rows = await db.select({
     totalDays: sql<number>`count(*)`,
@@ -286,6 +298,153 @@ router.get("/admin/team/:id/working-hours/summary", async (req, res): Promise<vo
   }).from(workingHoursTable)
     .where(and(eq(workingHoursTable.employeeId, employeeId), ilike(workingHoursTable.date, `${month}%`)));
   res.json(rows[0] ?? { totalDays: 0, totalMinutes: 0, presentDays: 0, wfhDays: 0, halfDays: 0 });
+});
+
+// NOTE: Self-service /admin/attendance/me/* routes live in attendance-self-service.ts
+// and are registered BEFORE makeModulePermissionMiddleware — accessible to all
+// authenticated users without a "team" permission.
+
+// ── Admin: correction management ─────────────────────────────────────────────
+
+// GET all corrections — admin only
+router.get("/admin/attendance-corrections", async (req, res): Promise<void> => {
+  if ((req as AuthenticatedRequest).adminUser?.userType !== "admin") {
+    res.status(403).json({ error: "Admin access required" }); return;
+  }
+  const { status } = req.query as { status?: string };
+  const baseQuery = db.select({
+    id: attendanceCorrectionsTable.id,
+    employeeId: attendanceCorrectionsTable.employeeId,
+    employeeName: teamMembersTable.name,
+    date: attendanceCorrectionsTable.date,
+    requestedClockIn: attendanceCorrectionsTable.requestedClockIn,
+    requestedClockOut: attendanceCorrectionsTable.requestedClockOut,
+    reason: attendanceCorrectionsTable.reason,
+    status: attendanceCorrectionsTable.status,
+    reviewedBy: attendanceCorrectionsTable.reviewedBy,
+    createdAt: attendanceCorrectionsTable.createdAt,
+  }).from(attendanceCorrectionsTable)
+    .innerJoin(teamMembersTable, eq(attendanceCorrectionsTable.employeeId, teamMembersTable.id))
+    .orderBy(desc(attendanceCorrectionsTable.createdAt));
+
+  const rows = status && status !== "all"
+    ? await baseQuery.where(eq(attendanceCorrectionsTable.status, status))
+    : await baseQuery;
+  res.json(rows);
+});
+
+// PATCH approve / reject a correction — admin only, pending-only, atomic transaction
+router.patch("/admin/attendance-corrections/:id", async (req, res): Promise<void> => {
+  if ((req as AuthenticatedRequest).adminUser?.userType !== "admin") {
+    res.status(403).json({ error: "Admin access required" }); return;
+  }
+
+  const id = parseInt(req.params.id as string, 10);
+  const { status } = req.body as { status: "approved" | "rejected" };
+  if (!["approved", "rejected"].includes(status)) {
+    res.status(400).json({ error: "status must be 'approved' or 'rejected'" }); return;
+  }
+
+  // Pre-flight: confirm the correction exists and is still pending
+  const [correction] = await db.select().from(attendanceCorrectionsTable)
+    .where(eq(attendanceCorrectionsTable.id, id));
+  if (!correction) { res.status(404).json({ error: "Not found" }); return; }
+
+  // Reviewer derived exclusively from the authenticated session
+  const authUser = (req as AuthenticatedRequest).adminUser;
+  const reviewer: string = typeof authUser?.username === "string" ? authUser.username : "admin";
+
+  let updated: typeof correction;
+
+  await db.transaction(async (tx) => {
+    // Atomic conditional update: only succeeds if the record is still pending.
+    // Two concurrent reviews will race here; the second will update 0 rows and
+    // the transaction will resolve as a no-op (the pre-flight error above runs
+    // outside the transaction so a concurrent approval could pass it, but only
+    // one can actually commit the status change).
+    const rows = await tx.update(attendanceCorrectionsTable)
+      .set({ status, reviewedBy: reviewer })
+      .where(and(eq(attendanceCorrectionsTable.id, id), eq(attendanceCorrectionsTable.status, "pending")))
+      .returning();
+    // If 0 rows updated, a concurrent review already claimed this correction
+    if (!rows[0]) return; // transaction becomes a no-op; handled below
+    updated = rows[0];
+
+    if (status === "approved" && (correction.requestedClockIn || correction.requestedClockOut)) {
+      // Fetch existing record first so we can merge timestamps and preserve break minutes
+      const [existing] = await tx.select().from(workingHoursTable)
+        .where(and(eq(workingHoursTable.employeeId, correction.employeeId), eq(workingHoursTable.date, correction.date)));
+
+      // Merge: use corrected value where provided, fall back to existing stored value
+      const mergedCi = correction.requestedClockIn ?? existing?.clockIn ?? null;
+      const mergedCo = correction.requestedClockOut ?? existing?.clockOut ?? null;
+      const breakMins = existing?.breakMinutes ?? 0;
+
+      // Recompute net minutes from merged pair minus recorded breaks
+      const totalMinutes = mergedCi && mergedCo
+        ? Math.max(0, Math.round((mergedCo.getTime() - mergedCi.getTime()) / 60000) - breakMins)
+        : existing?.totalMinutes ?? null;
+
+      if (existing) {
+        await tx.update(workingHoursTable).set({
+          clockIn: mergedCi,
+          clockOut: mergedCo,
+          totalMinutes,
+          status: "present",
+        }).where(eq(workingHoursTable.id, existing.id));
+      } else {
+        await tx.insert(workingHoursTable).values({
+          employeeId: correction.employeeId,
+          date: correction.date,
+          clockIn: mergedCi, clockOut: mergedCo, totalMinutes, status: "present",
+        });
+      }
+    }
+  });
+
+  // @ts-expect-error updated is assigned inside the transaction callback
+  if (!updated) { res.status(409).json({ error: "Correction already reviewed by another admin" }); return; }
+  res.json(updated);
+});
+
+// ── Attendance report (admin) ─────────────────────────────────────────────────
+
+// GET /admin/attendance/report?month=YYYY-MM
+router.get("/admin/attendance/report", async (req, res): Promise<void> => {
+  const m = (req.query as { month?: string }).month ?? currentMonthIST();
+
+  const members = await db.select({
+    id: teamMembersTable.id,
+    name: teamMembersTable.name,
+    designation: teamMembersTable.designation,
+    department: teamMembersTable.department,
+  }).from(teamMembersTable).where(eq(teamMembersTable.status, "active")).orderBy(teamMembersTable.name);
+
+  const rows = await Promise.all(members.map(async (member) => {
+    const [stats] = await db.select({
+      presentDays:     sql<number>`count(*) filter (where status in ('present', 'work_from_home'))`,
+      lateDays:        sql<number>`count(*) filter (where clock_in is not null and (clock_in at time zone 'Asia/Kolkata')::time > '09:30:00')`,
+      totalMinutes:    sql<number>`coalesce(sum(total_minutes), 0)`,
+      overtimeMinutes: sql<number>`coalesce(sum(greatest(0, total_minutes - 480)), 0)`,
+    }).from(workingHoursTable)
+      .where(and(eq(workingHoursTable.employeeId, member.id), ilike(workingHoursTable.date, `${m}%`)));
+
+    const [{ correctionsPending }] = await db.select({
+      correctionsPending: sql<number>`count(*)`,
+    }).from(attendanceCorrectionsTable)
+      .where(and(eq(attendanceCorrectionsTable.employeeId, member.id), eq(attendanceCorrectionsTable.status, "pending")));
+
+    return {
+      ...member,
+      presentDays:        Number(stats?.presentDays ?? 0),
+      lateDays:           Number(stats?.lateDays ?? 0),
+      totalMinutes:       Number(stats?.totalMinutes ?? 0),
+      overtimeMinutes:    Number(stats?.overtimeMinutes ?? 0),
+      correctionsPending: Number(correctionsPending ?? 0),
+    };
+  }));
+
+  res.json(rows);
 });
 
 export default router;

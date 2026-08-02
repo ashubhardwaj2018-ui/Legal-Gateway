@@ -9,6 +9,7 @@ import locationsRouter from "./locations";
 import leadsRouter from "./leads";
 import leadsAssignmentRouter from "./leads-assignment";
 import teamRouter from "./team";
+import attendanceMeRouter from "./attendance-self-service";
 import indianCompaniesRouter from "./indian-companies";
 import tasksRouter from "./tasks";
 import invoicesRouter from "./invoices";
@@ -51,6 +52,10 @@ router.use(adminAuthMiddleware);
 // Auto-log all successful mutations (POST/PUT/PATCH/DELETE) to activity_logs
 router.use(crudActivityMiddleware);
 
+// Self-service attendance routes — accessible to all authenticated users (no module
+// permission needed); must be registered before makeModulePermissionMiddleware.
+router.use(attendanceMeRouter);
+
 // Enforce module-level permissions for non-admin (employee) sessions.
 // Admins have permissions.all = true and skip all checks.
 // Each tuple: [URL prefix, module name] — sorted longest-first for correct matching.
@@ -58,7 +63,9 @@ router.use(makeModulePermissionMiddleware([
   ["/admin/activity-logs",      "employees"],
   ["/admin/login-history",      "employees"],
   ["/admin/indian-companies",   "indian_companies"],
-  ["/admin/working-hours",      "team"],
+  ["/admin/attendance-corrections", "team"],
+  ["/admin/attendance/report",      "team"],
+  ["/admin/working-hours",          "team"],
   ["/admin/company-data",       "company_data"],
   ["/admin/dashboard",          "dashboard"],
   ["/admin/quotations",         "quotations"],

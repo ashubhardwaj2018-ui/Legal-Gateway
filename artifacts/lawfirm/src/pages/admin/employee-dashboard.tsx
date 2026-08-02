@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -9,6 +9,7 @@ import {
   FileText, Activity, RefreshCw, Video, Award, Loader2, MessageSquare,
   Mail, Send, ChevronRight, ArrowUpRight, Clock, AlertCircle, CheckCircle2,
   Star, Hash, Circle, MoreHorizontal, PlusCircle, X,
+  Calendar, LogIn, LogOut, Coffee, ClipboardList,
 } from "lucide-react";
 import { AdminLayout } from "./AdminLayout";
 import { Button } from "@/components/ui/button";
@@ -941,14 +942,435 @@ function FollowUpsTab() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// ATTENDANCE TAB
+// ═══════════════════════════════════════════════════════════════════════════════
+
+interface WorkingHoursRecord {
+  id: number;
+  date: string;
+  clockIn: string | null;
+  clockOut: string | null;
+  totalMinutes: number | null;
+  breakMinutes: number | null;
+  breakStartAt: string | null;
+  status: string;
+}
+
+interface CorrectionRecord {
+  id: number;
+  date: string;
+  requestedClockIn: string | null;
+  requestedClockOut: string | null;
+  reason: string | null;
+  status: string;
+  createdAt: string;
+}
+
+function AttendanceTab() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const [view, setView] = useState<"today" | "history" | "corrections">("today");
+  // IST month default: fixed UTC+5:30 offset, locale-independent
+  const [month, setMonth] = useState(() =>
+    new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 7)
+  );
+  const [showCorrForm, setShowCorrForm] = useState(false);
+  const [corrForm, setCorrForm] = useState({ date: "", clockIn: "", clockOut: "", reason: "" });
+  const [liveNow, setLiveNow] = useState(new Date());
+
+  useEffect(() => {
+    const iv = setInterval(() => setLiveNow(new Date()), 30000);
+    return () => clearInterval(iv);
+  }, []);
+
+  const { data: todayRec } = useQuery<WorkingHoursRecord | null>({
+    queryKey: ["att-today"],
+    queryFn: () => api("/admin/attendance/me/today"),
+    refetchInterval: 60000,
+  });
+  const { data: monthlyHours = [] } = useQuery<WorkingHoursRecord[]>({
+    queryKey: ["att-hours", month],
+    queryFn: () => api(`/admin/attendance/me/hours?month=${month}`),
+    enabled: view === "history",
+  });
+  const { data: myCorrections = [] } = useQuery<CorrectionRecord[]>({
+    queryKey: ["att-corrections-me"],
+    queryFn: () => api("/admin/attendance/me/corrections"),
+    enabled: view === "corrections",
+  });
+
+  const clockInMut = useMutation({
+    mutationFn: () => api("/admin/attendance/me/clock-in", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["att-today"] }); toast({ title: "Clocked in ✓" }); },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+  const clockOutMut = useMutation({
+    mutationFn: () => api("/admin/attendance/me/clock-out", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["att-today"] }); toast({ title: "Clocked out ✓" }); },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+  const breakStartMut = useMutation({
+    mutationFn: () => api("/admin/attendance/me/break-start", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["att-today"] }); toast({ title: "Break started" }); },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+  const breakEndMut = useMutation({
+    mutationFn: () => api("/admin/attendance/me/break-end", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["att-today"] }); toast({ title: "Break ended" }); },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+  const submitCorrMut = useMutation({
+    mutationFn: (data: typeof corrForm) => api("/admin/attendance/me/corrections", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data),
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["att-corrections-me"] });
+      setCorrForm({ date: "", clockIn: "", clockOut: "", reason: "" });
+      setShowCorrForm(false);
+      toast({ title: "Correction request submitted" });
+    },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+
+  const isClockedIn = !!(todayRec?.clockIn && !todayRec?.clockOut);
+  const isClockedOut = !!todayRec?.clockOut;
+  const isOnBreak = !!todayRec?.breakStartAt;
+
+  const fmtTime = (ts: string | null | undefined) => {
+    if (!ts) return "—";
+    return new Date(ts).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+  };
+  const fmtMins = (mins: number | null | undefined) => {
+    if (!mins || mins <= 0) return "0h 0m";
+    return `${Math.floor(mins / 60)}h ${mins % 60}m`;
+  };
+
+  const liveMinutes = useMemo(() => {
+    if (todayRec?.clockIn && !todayRec.clockOut) {
+      const totalMs = liveNow.getTime() - new Date(todayRec.clockIn).getTime();
+      // Subtract completed break time
+      let breakMs = (todayRec.breakMinutes ?? 0) * 60000;
+      // Also subtract elapsed time of the current active break (breakStartAt set, not yet ended)
+      if (todayRec.breakStartAt) {
+        breakMs += Math.max(0, liveNow.getTime() - new Date(todayRec.breakStartAt).getTime());
+      }
+      return Math.max(0, Math.round((totalMs - breakMs) / 60000));
+    }
+    return todayRec?.totalMinutes ?? 0;
+  }, [todayRec, liveNow]);
+
+  const { presentDays, totalMins, overtimeMins } = useMemo(() => {
+    const presentDays = monthlyHours.filter(r => ["present", "work_from_home"].includes(r.status)).length;
+    const totalMins = monthlyHours.reduce((s, r) => s + (r.totalMinutes ?? 0), 0);
+    const overtimeMins = monthlyHours.reduce((s, r) => s + Math.max(0, (r.totalMinutes ?? 0) - 480), 0);
+    return { presentDays, totalMins, overtimeMins };
+  }, [monthlyHours]);
+
+  const calOffset = useMemo(() => {
+    const [y, m] = month.split("-").map(Number);
+    return (new Date(y, m - 1, 1).getDay() + 6) % 7;
+  }, [month]);
+  const daysInMonth = useMemo(() => {
+    const [y, m] = month.split("-").map(Number);
+    return new Date(y, m, 0).getDate();
+  }, [month]);
+
+  const STATUS_PILL: Record<string, string> = {
+    present: "bg-green-100 text-green-700",
+    absent: "bg-red-100 text-red-700",
+    half_day: "bg-amber-100 text-amber-700",
+    work_from_home: "bg-blue-100 text-blue-700",
+    holiday: "bg-purple-100 text-purple-700",
+  };
+  const STATUS_CAL: Record<string, string> = {
+    present: "bg-green-100 text-green-700",
+    absent: "bg-red-100 text-red-600",
+    half_day: "bg-amber-100 text-amber-700",
+    work_from_home: "bg-blue-100 text-blue-700",
+    holiday: "bg-purple-100 text-purple-700",
+  };
+
+  return (
+    <div className="space-y-5">
+      {/* Sub-tab nav */}
+      <div className="flex gap-2 flex-wrap">
+        {([
+          { key: "today", label: "Today", icon: Clock },
+          { key: "history", label: "Monthly History", icon: Calendar },
+          { key: "corrections", label: "Corrections", icon: ClipboardList },
+        ] as const).map(({ key, label, icon: Icon }) => (
+          <button key={key} onClick={() => setView(key)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${view === key ? "bg-[#0f2044] text-white" : "bg-white border border-gray-200 text-gray-600 hover:border-[#0f2044]"}`}>
+            <Icon size={14} /> {label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── TODAY ── */}
+      {view === "today" && (
+        <div className="space-y-4">
+          <div className="bg-gradient-to-br from-[#0f2044] to-[#1a3060] rounded-2xl p-6 text-white">
+            <div className="flex items-start justify-between mb-5">
+              <div>
+                <p className="text-white/50 text-xs mb-0.5">Today</p>
+                <p className="font-bold">{new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" })}</p>
+              </div>
+              <span className={`text-xs px-3 py-1 rounded-full font-semibold border ${isClockedOut ? "bg-green-500/20 text-green-300 border-green-500/30" : isOnBreak ? "bg-amber-500/20 text-amber-300 border-amber-500/30" : isClockedIn ? "bg-blue-500/20 text-blue-300 border-blue-500/30" : "bg-white/10 text-white/50 border-white/20"}`}>
+                {isClockedOut ? "Completed" : isOnBreak ? "On Break" : isClockedIn ? "Working" : "Not Started"}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              {[
+                { label: "Clock In", value: fmtTime(todayRec?.clockIn) },
+                { label: "Clock Out", value: fmtTime(todayRec?.clockOut) },
+                { label: "Net Hours", value: fmtMins(liveMinutes), gold: true },
+              ].map(({ label, value, gold }) => (
+                <div key={label} className="text-center">
+                  <p className="text-white/40 text-[10px] mb-1">{label}</p>
+                  <p className={`font-mono font-bold text-lg ${gold ? "text-[#c9a227]" : "text-white"}`}>{value}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <button onClick={() => clockInMut.mutate()} disabled={!!todayRec?.clockIn || clockInMut.isPending}
+                className="py-2.5 rounded-xl text-xs font-semibold bg-green-500 hover:bg-green-600 text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5">
+                {clockInMut.isPending ? <Loader2 size={13} className="animate-spin" /> : <LogIn size={13} />} Clock In
+              </button>
+              <button onClick={() => clockOutMut.mutate()} disabled={!isClockedIn || isClockedOut || isOnBreak || clockOutMut.isPending}
+                className="py-2.5 rounded-xl text-xs font-semibold bg-red-500 hover:bg-red-600 text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5">
+                {clockOutMut.isPending ? <Loader2 size={13} className="animate-spin" /> : <LogOut size={13} />} Clock Out
+              </button>
+              <button onClick={() => breakStartMut.mutate()} disabled={!isClockedIn || isClockedOut || isOnBreak || breakStartMut.isPending}
+                className="py-2.5 rounded-xl text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5">
+                {breakStartMut.isPending ? <Loader2 size={13} className="animate-spin" /> : <Coffee size={13} />} Start Break
+              </button>
+              <button onClick={() => breakEndMut.mutate()} disabled={!isOnBreak || breakEndMut.isPending}
+                className="py-2.5 rounded-xl text-xs font-semibold bg-[#c9a227] hover:bg-[#c9a227]/90 text-[#0f2044] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5">
+                {breakEndMut.isPending ? <Loader2 size={13} className="animate-spin" /> : <Coffee size={13} />} End Break
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              { label: "Break Time",  value: fmtMins(todayRec?.breakMinutes), color: "text-amber-600",  bg: "bg-amber-50" },
+              { label: "Net Hours",   value: fmtMins(liveMinutes),             color: "text-green-600",  bg: "bg-green-50" },
+              { label: "Overtime",    value: fmtMins(Math.max(0, liveMinutes - 480)), color: "text-orange-600", bg: "bg-orange-50" },
+              { label: "Status",      value: (todayRec?.status ?? "—").replace(/_/g, " "), color: "text-[#0f2044]", bg: "bg-blue-50" },
+            ].map(s => (
+              <div key={s.label} className={`${s.bg} rounded-xl p-3 text-center`}>
+                <p className={`text-base font-bold ${s.color} capitalize`}>{s.value}</p>
+                <p className="text-[10px] text-gray-500 mt-0.5">{s.label}</p>
+              </div>
+            ))}
+          </div>
+
+          {!todayRec && (
+            <div className="text-center py-10 text-gray-400 bg-white rounded-xl border border-gray-100">
+              <Clock size={28} className="mx-auto mb-2 opacity-30" />
+              <p className="text-sm">No attendance recorded today. Press "Clock In" to start.</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── MONTHLY HISTORY ── */}
+      {view === "history" && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <label className="text-sm font-medium text-gray-600">Month:</label>
+            <input type="month" value={month} onChange={e => setMonth(e.target.value)}
+              className="h-9 border border-gray-200 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0f2044]/20" />
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { label: "Days Present", value: presentDays,        color: "text-green-600" },
+              { label: "Total Hours",  value: fmtMins(totalMins), color: "text-[#0f2044]" },
+              { label: "Overtime",     value: fmtMins(overtimeMins), color: "text-orange-500" },
+            ].map(s => (
+              <div key={s.label} className="bg-white rounded-xl border border-gray-100 p-3 text-center">
+                <p className={`text-lg font-bold ${s.color}`}>{s.value}</p>
+                <p className="text-[10px] text-gray-500 mt-0.5">{s.label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Calendar */}
+          <div className="bg-white rounded-xl border border-gray-100 p-4">
+            <p className="text-xs font-semibold text-gray-500 mb-3">Attendance Calendar</p>
+            <div className="grid grid-cols-7 gap-1 mb-1">
+              {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(d => (
+                <div key={d} className="text-center text-[10px] font-semibold text-gray-400 py-1">{d}</div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-1">
+              {Array.from({ length: calOffset }).map((_, i) => <div key={`e${i}`} />)}
+              {Array.from({ length: daysInMonth }, (_, i) => {
+                const day = i + 1;
+                const ds = `${month}-${String(day).padStart(2, "0")}`;
+                const rec = monthlyHours.find(r => r.date === ds);
+                return (
+                  <div key={day} className={`aspect-square flex flex-col items-center justify-center rounded-lg text-xs ${rec ? (STATUS_CAL[rec.status] ?? "bg-gray-100 text-gray-500") : "bg-gray-50 text-gray-300"}`}>
+                    <span className="font-bold">{day}</span>
+                    {rec && <span className="text-[8px]">{rec.status === "work_from_home" ? "WFH" : rec.status === "half_day" ? "½" : rec.status.slice(0, 3)}</span>}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex flex-wrap gap-3 mt-3 pt-3 border-t border-gray-50">
+              {[{ s: "present", l: "Present" }, { s: "absent", l: "Absent" }, { s: "half_day", l: "Half Day" }, { s: "work_from_home", l: "WFH" }].map(({ s, l }) => (
+                <div key={s} className="flex items-center gap-1.5">
+                  <div className={`w-3 h-3 rounded-sm ${(STATUS_CAL[s] ?? "bg-gray-100").split(" ")[0]}`} />
+                  <span className="text-[10px] text-gray-500">{l}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Table */}
+          <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-[#0f2044] text-white">
+                  {["Date", "Clock In", "Clock Out", "Break", "Net Hours", "Overtime", "Status"].map(h => (
+                    <th key={h} className="px-3 py-2 text-left font-semibold whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {monthlyHours.length === 0 ? (
+                  <tr><td colSpan={7} className="text-center py-8 text-gray-400">No records for {month}.</td></tr>
+                ) : monthlyHours.map(r => {
+                  const ot = Math.max(0, (r.totalMinutes ?? 0) - 480);
+                  return (
+                    <tr key={r.id} className="hover:bg-gray-50">
+                      <td className="px-3 py-2 font-medium text-[#0f2044]">{r.date}</td>
+                      <td className="px-3 py-2">{fmtTime(r.clockIn)}</td>
+                      <td className="px-3 py-2">{fmtTime(r.clockOut)}</td>
+                      <td className="px-3 py-2">{fmtMins(r.breakMinutes)}</td>
+                      <td className="px-3 py-2 font-medium">{fmtMins(r.totalMinutes)}</td>
+                      <td className="px-3 py-2">{ot > 0 ? <span className="text-orange-500 font-medium">{fmtMins(ot)}</span> : <span className="text-gray-300">—</span>}</td>
+                      <td className="px-3 py-2">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium capitalize ${STATUS_PILL[r.status] ?? "bg-gray-100 text-gray-600"}`}>
+                          {r.status.replace(/_/g, " ")}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              {monthlyHours.length > 0 && (
+                <tfoot>
+                  <tr className="bg-gray-50 font-semibold text-xs">
+                    <td className="px-3 py-2 text-gray-600" colSpan={4}>Monthly Total</td>
+                    <td className="px-3 py-2 text-[#0f2044]">{fmtMins(totalMins)}</td>
+                    <td className="px-3 py-2 text-orange-500">{fmtMins(overtimeMins)}</td>
+                    <td className="px-3 py-2 text-gray-500">{presentDays} days</td>
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── CORRECTIONS ── */}
+      {view === "corrections" && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-[#0f2044]">Correction Requests</h3>
+            <button onClick={() => setShowCorrForm(v => !v)}
+              className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-xl bg-[#0f2044] text-white hover:bg-[#1a3060] transition-colors">
+              <PlusCircle size={13} /> Request Correction
+            </button>
+          </div>
+
+          {showCorrForm && (
+            <div className="bg-white rounded-xl border border-[#0f2044]/20 p-5 space-y-4">
+              <h4 className="text-sm font-semibold text-[#0f2044]">New Correction Request</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">Date *</label>
+                  <input type="date" value={corrForm.date} onChange={e => setCorrForm(f => ({ ...f, date: e.target.value }))}
+                    className="w-full h-9 border border-gray-200 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0f2044]/20" />
+                </div>
+                <div />
+                <div>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">Correct Clock In</label>
+                  <input type="time" value={corrForm.clockIn} onChange={e => setCorrForm(f => ({ ...f, clockIn: e.target.value }))}
+                    className="w-full h-9 border border-gray-200 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0f2044]/20" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">Correct Clock Out</label>
+                  <input type="time" value={corrForm.clockOut} onChange={e => setCorrForm(f => ({ ...f, clockOut: e.target.value }))}
+                    className="w-full h-9 border border-gray-200 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0f2044]/20" />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500 mb-1 block">Reason *</label>
+                <Textarea placeholder="Explain why the correction is needed…" value={corrForm.reason}
+                  onChange={e => setCorrForm(f => ({ ...f, reason: e.target.value }))}
+                  rows={3} className="resize-none text-sm" />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setShowCorrForm(false)}>Cancel</Button>
+                <Button onClick={() => submitCorrMut.mutate(corrForm)}
+                  disabled={!corrForm.date || !corrForm.reason.trim() || submitCorrMut.isPending}
+                  className="bg-[#0f2044] text-white hover:bg-[#1a3060] gap-2">
+                  {submitCorrMut.isPending ? <><Loader2 size={14} className="animate-spin" />Submitting…</> : "Submit Request"}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+            {myCorrections.length === 0 ? (
+              <div className="text-center py-12 text-gray-400">
+                <ClipboardList size={28} className="mx-auto mb-2 opacity-30" />
+                <p className="text-sm">No correction requests yet.</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {myCorrections.map(c => (
+                  <div key={c.id} className="px-4 py-3 flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-[#0f2044] text-sm">{c.date}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{c.reason}</p>
+                      {(c.requestedClockIn || c.requestedClockOut) && (
+                        <p className="text-[10px] text-gray-400 mt-1">
+                          {c.requestedClockIn ? `In: ${fmtTime(c.requestedClockIn)}` : ""}
+                          {c.requestedClockIn && c.requestedClockOut ? " · " : ""}
+                          {c.requestedClockOut ? `Out: ${fmtTime(c.requestedClockOut)}` : ""}
+                        </p>
+                      )}
+                    </div>
+                    <span className={`shrink-0 text-[10px] px-2.5 py-1 rounded-full font-semibold capitalize ${c.status === "approved" ? "bg-green-100 text-green-700" : c.status === "rejected" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
+                      {c.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
 const TABS = [
-  { key: "overview", label: "Overview", icon: TrendingUp },
-  { key: "leads", label: "My Leads", icon: Users },
-  { key: "followups", label: "Follow-ups", icon: RefreshCw },
-  { key: "chat", label: "Chat", icon: MessageSquare },
-  { key: "email", label: "Email", icon: Mail },
+  { key: "overview",    label: "Overview",    icon: TrendingUp },
+  { key: "leads",       label: "My Leads",    icon: Users },
+  { key: "followups",   label: "Follow-ups",  icon: RefreshCw },
+  { key: "chat",        label: "Chat",        icon: MessageSquare },
+  { key: "email",       label: "Email",       icon: Mail },
+  { key: "attendance",  label: "Attendance",  icon: Clock },
 ] as const;
 
 type TabKey = typeof TABS[number]["key"];
@@ -992,11 +1414,12 @@ export default function EmployeeDashboard() {
         ))}
       </div>
 
-      {activeTab === "overview" && <OverviewTab />}
-      {activeTab === "leads" && <LeadsTab />}
-      {activeTab === "followups" && <FollowUpsTab />}
-      {activeTab === "chat" && <ChatTab />}
-      {activeTab === "email" && <EmailTab />}
+      {activeTab === "overview"    && <OverviewTab />}
+      {activeTab === "leads"       && <LeadsTab />}
+      {activeTab === "followups"   && <FollowUpsTab />}
+      {activeTab === "chat"        && <ChatTab />}
+      {activeTab === "email"       && <EmailTab />}
+      {activeTab === "attendance"  && <AttendanceTab />}
     </AdminLayout>
   );
 }

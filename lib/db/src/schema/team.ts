@@ -61,6 +61,8 @@ export const workingHoursTable = pgTable("working_hours", {
   clockOut: timestamp("clock_out", { withTimezone: true }),
   totalMinutes: integer("total_minutes"),
   breakMinutes: integer("break_minutes").default(0),
+  breakStartAt: timestamp("break_start_at", { withTimezone: true }),
+  breakEndAt: timestamp("break_end_at", { withTimezone: true }),
   notes: text("notes"),
   status: text("status").notNull().default("present"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -69,7 +71,21 @@ export const workingHoursTable = pgTable("working_hours", {
   empDateUniq: unique("wh_emp_date_uniq").on(t.employeeId, t.date),
 }));
 
-export type TeamMember = typeof teamMembersTable.$inferSelect;
-export type Attendance = typeof attendanceTable.$inferSelect;
-export type LeaveRequest = typeof leaveRequestsTable.$inferSelect;
-export type WorkingHours = typeof workingHoursTable.$inferSelect;
+export const attendanceCorrectionsTable = pgTable("attendance_corrections", {
+  id:               serial("id").primaryKey(),
+  employeeId:       integer("employee_id").notNull(),
+  date:             text("date").notNull(),
+  requestedClockIn: timestamp("requested_clock_in",  { withTimezone: true }),
+  requestedClockOut:timestamp("requested_clock_out", { withTimezone: true }),
+  reason:           text("reason"),
+  status:           text("status").notNull().default("pending"),
+  reviewedBy:       text("reviewed_by"),
+  createdAt:        timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:        timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+});
+
+export type TeamMember       = typeof teamMembersTable.$inferSelect;
+export type Attendance       = typeof attendanceTable.$inferSelect;
+export type LeaveRequest     = typeof leaveRequestsTable.$inferSelect;
+export type WorkingHours     = typeof workingHoursTable.$inferSelect;
+export type AttendanceCorrection = typeof attendanceCorrectionsTable.$inferSelect;
