@@ -6,6 +6,7 @@ import { CheckCircle2, ChevronRight, MapPin, Clock, IndianRupee, Phone, Shield, 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { getServiceBySlug, getServicesByCategory, ALL_SERVICES } from "@/data/service-index";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 import {
   generatePageContent,
   generatePageSeo,
@@ -110,6 +111,7 @@ function FaqItem({ q, a }: { q: string; a: string }) {
 
 export default function ServiceLocation() {
   const params = useParams<{ serviceSlug: string; locationSlug: string }>();
+  const settings = useSiteSettings();
   const serviceSlug = params.serviceSlug ?? "";
   const locationSlug = params.locationSlug ?? "";
 
@@ -236,9 +238,9 @@ export default function ServiceLocation() {
               >
                 Get Started Now
               </Button>
-              <a href="tel:+911800123456" className="flex items-center justify-center gap-2 text-sm text-[#0f2044] font-medium hover:text-[#c9a227] transition-colors">
+              <a href={`tel:${settings.phone_primary.replace(/[^\d+]/g, "")}`} className="flex items-center justify-center gap-2 text-sm text-[#0f2044] font-medium hover:text-[#c9a227] transition-colors">
                 <Phone size={14} />
-                1800-123-4567 (Free)
+                {settings.phone_primary}
               </a>
             </div>
           </div>

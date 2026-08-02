@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SERVICES_DATA } from "@/data/services";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { getServiceDetail } from "@/data/service-details";
 import { toSlug } from "@/lib/slug";
 import NotFound from "./not-found";
@@ -29,6 +30,7 @@ export default function ServiceDetail() {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [formData, setFormData] = useState({ name: "", phone: "", email: "" });
   const [submitted, setSubmitted] = useState(false);
+  const settings = useSiteSettings();
 
   if (!match) return <NotFound />;
 
@@ -79,7 +81,7 @@ export default function ServiceDetail() {
           "@type": "LegalService",
           "name": "Vakil & Co. Legal Associates",
           "url": "https://vakil.co.in",
-          "telephone": "+91-1800-123-4567"
+          "telephone": settings.phone_primary
         },
         "offers": {
           "@type": "Offer",
@@ -498,13 +500,13 @@ export default function ServiceDetail() {
             {/* Contact strip */}
             <div className="bg-white rounded-2xl p-5 shadow-sm border border-border">
               <div className="text-xs text-gray-500 mb-3 font-medium">Need help? Talk to us directly</div>
-              <a href="tel:18001234567" className="flex items-center gap-3 p-3 bg-primary/5 rounded-xl hover:bg-primary/10 transition-colors mb-2">
+              <a href={`tel:${settings.phone_primary.replace(/[^\d+]/g, "")}`} className="flex items-center gap-3 p-3 bg-primary/5 rounded-xl hover:bg-primary/10 transition-colors mb-2">
                 <Phone size={16} className="text-secondary" />
-                <span className="text-sm font-medium text-primary">1800-123-4567</span>
+                <span className="text-sm font-medium text-primary">{settings.phone_primary}</span>
               </a>
-              <a href="mailto:consult@vakilco.in" className="flex items-center gap-3 p-3 bg-primary/5 rounded-xl hover:bg-primary/10 transition-colors">
+              <a href={`mailto:${settings.email_primary}`} className="flex items-center gap-3 p-3 bg-primary/5 rounded-xl hover:bg-primary/10 transition-colors">
                 <Mail size={16} className="text-secondary" />
-                <span className="text-sm font-medium text-primary">consult@vakilco.in</span>
+                <span className="text-sm font-medium text-primary">{settings.email_primary}</span>
               </a>
             </div>
           </div>

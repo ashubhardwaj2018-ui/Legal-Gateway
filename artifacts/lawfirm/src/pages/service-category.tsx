@@ -3,12 +3,14 @@ import { motion } from "framer-motion";
 import { ArrowRight, CheckCircle2, IndianRupee, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SERVICES_DATA, CATEGORIES } from "@/data/services";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { toSlug } from "@/lib/slug";
 import NotFound from "./not-found";
 import { Helmet } from "react-helmet-async";
 
 export default function ServiceCategory() {
   const [match, params] = useRoute("/services/:id");
+  const settings = useSiteSettings();
   const categoryId = params?.id as string;
   
   if (!match || !SERVICES_DATA[categoryId as keyof typeof SERVICES_DATA]) {
@@ -139,7 +141,7 @@ export default function ServiceCategory() {
                 Book Free Consultation
               </Button>
               <div className="text-center text-white/50 text-xs font-medium relative z-10">
-                Or call us at <span className="text-white">1800-123-4567</span>
+                Or call us at <a href={`tel:${settings.phone_primary.replace(/[^\d+]/g, "")}`} className="text-white hover:underline">{settings.phone_primary}</a>
               </div>
             </div>
 

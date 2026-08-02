@@ -10,6 +10,7 @@ import { CATEGORIES } from "@/data/services";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useListBlogs } from "@workspace/api-client-react";
 import { usePageContent } from "@/hooks/usePageContent";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 const CATEGORY_LABELS: Record<string, string> = {
   "legal-advice": "Legal Advice", "business-setup": "Business Setup",
@@ -120,6 +121,7 @@ function LatestBlogSection() {
 
 export default function Home() {
   const get = usePageContent("home");
+  const settings = useSiteSettings();
   const [form, setForm] = useState({ name: "", email: "", phone: "", serviceCategory: "", message: "" });
   const [consultStatus, setConsultStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
 
@@ -279,7 +281,7 @@ export default function Home() {
                   <Button type="submit" disabled={consultStatus === "loading"} className="w-full bg-secondary text-primary hover:bg-secondary/90 font-bold h-11">
                     {consultStatus === "loading" ? "Sending…" : "Book Free Consultation →"}
                   </Button>
-                  <p className="text-center text-xs text-gray-400">Or call us: <a href="tel:18001234567" className="text-primary font-medium hover:text-secondary">1800-123-4567</a></p>
+                  <p className="text-center text-xs text-gray-400">Or call us: <a href={`tel:${settings.phone_primary.replace(/[^\d+]/g, "")}`} className="text-primary font-medium hover:text-secondary">{settings.phone_primary}</a></p>
                 </form>
               )}
             </motion.div>
@@ -595,8 +597,8 @@ export default function Home() {
               <Button size="lg" className="w-full bg-secondary text-primary hover:bg-secondary/90 h-14 text-lg font-bold">
                 Book Free Consultation
               </Button>
-              <Button size="lg" variant="outline" className="w-full bg-transparent border-white/20 text-white hover:bg-white/10 h-14 text-lg">
-                <Phone className="mr-2 h-5 w-5" /> 1800-123-4567
+              <Button size="lg" variant="outline" className="w-full bg-transparent border-white/20 text-white hover:bg-white/10 h-14 text-lg" onClick={() => window.location.href = `tel:${settings.phone_primary.replace(/[^\d+]/g, "")}`}>
+                <Phone className="mr-2 h-5 w-5" /> {settings.phone_primary}
               </Button>
             </div>
           </div>

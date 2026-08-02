@@ -51,6 +51,7 @@ import ApiManagerPage from "@/pages/admin/api-manager";
 import PortalLogin from "@/pages/portal/login";
 import PortalDashboard from "@/pages/portal/dashboard";
 import DocView from "@/pages/public/DocView";
+import Contact from "@/pages/contact";
 import IndianCompanies from "@/pages/indian-companies";
 import CompanyDetail from "@/pages/company-detail";
 import BlogList from "@/pages/blog-list";
@@ -132,6 +133,7 @@ function Router() {
         <Layout>
           <Switch>
             <Route path="/" component={Home} />
+            <Route path="/contact" component={Contact} />
             <Route path="/about" component={AboutUs} />
             <Route path="/careers" component={Careers} />
             <Route path="/privacy-policy" component={PrivacyPolicy} />
