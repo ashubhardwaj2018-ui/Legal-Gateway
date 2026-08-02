@@ -238,11 +238,17 @@ export default function AdminDbManager() {
   const [showImport, setShowImport]     = useState(false);
 
   // Fetch table registry
+  const [tablesError, setTablesError] = useState<{ status: number; message: string } | null>(null);
   const { data: tables = [], isLoading: tablesLoading } = useQuery<TableInfo[]>({
     queryKey: ["db-manager-tables"],
     queryFn: async () => {
+      setTablesError(null);
       const r = await fetch("/api/admin/db-manager/tables", { credentials: "include" });
-      if (!r.ok) return [];
+      if (!r.ok) {
+        const body = await r.json().catch(() => ({}));
+        setTablesError({ status: r.status, message: body.error ?? "Failed to load tables" });
+        return [];
+      }
       return r.json();
     },
   });
@@ -419,6 +425,18 @@ export default function AdminDbManager() {
             {tablesLoading ? (
               <div className="flex items-center gap-2 text-gray-400 text-xs px-4 py-4">
                 <Loader2 size={13} className="animate-spin" /> Loading…
+              </div>
+            ) : tablesError ? (
+              <div className="px-4 py-5 text-center">
+                <Lock size={22} className="mx-auto mb-2 text-gray-300" />
+                <p className="text-xs font-semibold text-gray-500 mb-1">
+                  {tablesError.status === 403 ? "Access Denied" : "Failed to Load"}
+                </p>
+                <p className="text-[11px] text-gray-400 leading-snug">
+                  {tablesError.status === 403
+                    ? "Database Manager is restricted to Super Admin accounts only."
+                    : tablesError.message}
+                </p>
               </div>
             ) : Object.entries(grouped).map(([cat, items]) => (
               <div key={cat}>
