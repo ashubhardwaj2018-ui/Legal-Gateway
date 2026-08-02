@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Save, Building2, Phone, Clock, Share2, Briefcase, MessageCircle, Wifi, WifiOff, Loader2, Info, Globe } from "lucide-react";
+import { Save, Building2, Phone, Clock, Share2, Briefcase, MessageCircle, Wifi, WifiOff, Loader2, Info, Globe, CreditCard } from "lucide-react";
 import { SITE_SETTINGS_QUERY_KEY } from "@/hooks/useSiteSettings";
 
 const SETTING_GROUPS = [
@@ -47,6 +47,12 @@ const SETTING_GROUPS = [
     icon: Globe,
     keys: ["logo_url", "website_whatsapp", "support_email", "footer_text", "copyright_text"],
   },
+  {
+    id: "firm_pdf",
+    label: "Firm Details (PDF)",
+    icon: CreditCard,
+    keys: ["firm_name", "firm_tagline", "firm_address", "firm_phone", "firm_email", "firm_gstin", "firm_pan", "bank_name", "bank_account_no", "bank_ifsc", "bank_upi"],
+  },
 ];
 
 const KEY_LABELS: Record<string, { label: string; placeholder: string; multiline?: boolean; type?: "select"; options?: string[] }> = {
@@ -77,6 +83,18 @@ const KEY_LABELS: Record<string, { label: string; placeholder: string; multiline
   support_email:   { label: "Support Email", placeholder: "support@vakilco.in — shown in footer & contact section" },
   footer_text:     { label: "Footer Description Text", placeholder: "Short description shown under your logo in the footer", multiline: true },
   copyright_text:  { label: "Copyright Text", placeholder: `© ${new Date().getFullYear()} Vakil & Co. All rights reserved.` },
+  // Firm details for PDFs
+  firm_name:       { label: "Firm Name (PDF header)", placeholder: "Vakil & Co." },
+  firm_tagline:    { label: "Tagline / Designation (PDF)", placeholder: "Advocates & Legal Consultants" },
+  firm_address:    { label: "Registered Address (PDF)", placeholder: "123, Legal Complex, Connaught Place, New Delhi — 110001", multiline: true },
+  firm_phone:      { label: "Phone (PDF)", placeholder: "+91 98765 43210" },
+  firm_email:      { label: "Email (PDF)", placeholder: "info@vakilco.in" },
+  firm_gstin:      { label: "GSTIN (PDF)", placeholder: "07AABCV1234P1Z5" },
+  firm_pan:        { label: "PAN (PDF)", placeholder: "AABCV1234P" },
+  bank_name:       { label: "Bank Name & Branch", placeholder: "HDFC Bank, New Delhi" },
+  bank_account_no: { label: "Account Number", placeholder: "12345678901234" },
+  bank_ifsc:       { label: "IFSC Code", placeholder: "HDFC0001234" },
+  bank_upi:        { label: "UPI ID", placeholder: "vakilco@hdfcbank" },
 };
 
 const PROVIDER_HINTS: Record<string, { name: string; hint: string; needsKey: boolean; needsPhoneId: boolean }> = {

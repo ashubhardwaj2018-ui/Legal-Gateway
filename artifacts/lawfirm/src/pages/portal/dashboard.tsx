@@ -69,7 +69,48 @@ function timeSince(d: string) {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-function printInvoice(inv: Invoice, clientName: string) {
+// ── Firm details helper ───────────────────────────────────────────────────────
+
+interface FirmDetails {
+  firmName: string; firmTagline: string; firmAddress: string;
+  firmPhone: string; firmEmail: string; firmGstin: string; firmPan: string;
+  bankName: string; bankAccountNo: string; bankIfsc: string; bankUpi: string;
+}
+
+const FIRM_DEFAULTS: FirmDetails = {
+  firmName: "Vakil & Co.", firmTagline: "Advocates & Legal Consultants",
+  firmAddress: "123, Legal Complex, Connaught Place, New Delhi — 110001",
+  firmPhone: "+91 98765 43210", firmEmail: "info@vakilco.in",
+  firmGstin: "07AABCV1234P1Z5", firmPan: "AABCV1234P",
+  bankName: "HDFC Bank, New Delhi", bankAccountNo: "12345678901234",
+  bankIfsc: "HDFC0001234", bankUpi: "vakilco@hdfcbank",
+};
+
+async function fetchFirmDetails(): Promise<FirmDetails> {
+  try {
+    const r = await fetch("/api/settings");
+    if (!r.ok) return FIRM_DEFAULTS;
+    const s: Record<string, string> = await r.json();
+    return {
+      firmName:      s.firm_name       || FIRM_DEFAULTS.firmName,
+      firmTagline:   s.firm_tagline    || FIRM_DEFAULTS.firmTagline,
+      firmAddress:   s.firm_address    || FIRM_DEFAULTS.firmAddress,
+      firmPhone:     s.firm_phone      || FIRM_DEFAULTS.firmPhone,
+      firmEmail:     s.firm_email      || FIRM_DEFAULTS.firmEmail,
+      firmGstin:     s.firm_gstin      || FIRM_DEFAULTS.firmGstin,
+      firmPan:       s.firm_pan        || FIRM_DEFAULTS.firmPan,
+      bankName:      s.bank_name       || FIRM_DEFAULTS.bankName,
+      bankAccountNo: s.bank_account_no || FIRM_DEFAULTS.bankAccountNo,
+      bankIfsc:      s.bank_ifsc       || FIRM_DEFAULTS.bankIfsc,
+      bankUpi:       s.bank_upi        || FIRM_DEFAULTS.bankUpi,
+    };
+  } catch {
+    return FIRM_DEFAULTS;
+  }
+}
+
+async function printInvoice(inv: Invoice, clientName: string) {
+  const firm = await fetchFirmDetails();
   const items = Array.isArray(inv.items) ? inv.items as Array<{ description: string; qty: number; rate: number; gstRate: number; amount: number }> : [];
   const w = window.open("", "_blank");
   if (!w) return;
@@ -77,7 +118,13 @@ function printInvoice(inv: Invoice, clientName: string) {
 <style>body{font-family:sans-serif;padding:32px;max-width:700px;margin:0 auto;color:#333}h1{color:#0f2044}table{width:100%;border-collapse:collapse;margin:16px 0}th{background:#0f2044;color:#c9a227;padding:8px 12px;text-align:left;font-size:12px}td{padding:8px 12px;border-bottom:1px solid #f0f0f0;font-size:13px}.total{text-align:right;font-size:15px;margin-top:16px}.badge{display:inline-block;padding:3px 10px;border-radius:99px;font-size:11px;background:#e0fce7;color:#166534}</style>
 </head><body>
 <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px">
-  <div><h1 style="margin:0">Vakil & Co.</h1><p style="margin:4px 0;color:#888;font-size:13px">Legal Services</p></div>
+  <div>
+    <h1 style="margin:0">${firm.firmName}</h1>
+    <p style="margin:4px 0;color:#888;font-size:13px">${firm.firmTagline}</p>
+    <p style="margin:2px 0;color:#999;font-size:11px">${firm.firmAddress}</p>
+    <p style="margin:2px 0;color:#999;font-size:11px">📞 ${firm.firmPhone} | ✉ ${firm.firmEmail}</p>
+    ${firm.firmGstin ? `<p style="margin:2px 0;color:#999;font-size:11px">GSTIN: ${firm.firmGstin}${firm.firmPan ? " | PAN: " + firm.firmPan : ""}</p>` : ""}
+  </div>
   <div style="text-align:right"><div style="font-size:22px;font-weight:bold;color:#0f2044">INVOICE</div><div style="font-size:14px;color:#888">${inv.number}</div></div>
 </div>
 <div style="margin-bottom:16px"><strong>Billed To:</strong><br>${clientName}</div>
@@ -89,6 +136,7 @@ function printInvoice(inv: Invoice, clientName: string) {
 <table><thead><tr><th>Description</th><th>Qty</th><th>Rate</th><th>GST</th><th>Amount</th></tr></thead><tbody>
 ${items.map(it => `<tr><td>${it.description}</td><td>${it.qty}</td><td>₹${(+it.rate).toLocaleString("en-IN")}</td><td>${it.gstRate ?? 0}%</td><td>₹${(+it.amount).toLocaleString("en-IN")}</td></tr>`).join("")}
 </tbody></table>
+${(firm.bankName || firm.bankAccountNo || firm.bankIfsc || firm.bankUpi) ? `<div style="margin:16px 0;padding:12px;background:#f7f7f7;border-left:3px solid #0f2044;border-radius:4px;font-size:12px"><strong style="display:block;margin-bottom:6px;color:#0f2044;font-size:10px;text-transform:uppercase;letter-spacing:1px">Payment Information</strong>${firm.bankName ? `Bank: ${firm.bankName}<br>` : ""}${firm.bankAccountNo ? `A/C No: ${firm.bankAccountNo}<br>` : ""}${firm.bankIfsc ? `IFSC: ${firm.bankIfsc}<br>` : ""}${firm.bankUpi ? `UPI: ${firm.bankUpi}` : ""}</div>` : ""}
 <div class="total">
   <div>Subtotal: ${fmt(inv.subtotal)}</div>
   <div>GST: ${fmt(inv.gstAmount)}</div>
@@ -99,7 +147,9 @@ ${inv.notes ? `<div style="margin-top:24px;padding:12px;background:#f9f9f9;borde
 <script>window.print();window.close()</script></body></html>`);
 }
 
-function printPortalQuotation(q: Quotation) {
+async function printPortalQuotation(q: Quotation) {
+  const firm = await fetchFirmDetails();
+
   // Items may be stored as { serviceName, description, quantity, unitPrice, total } or similar
   const rawItems = Array.isArray(q.items) ? q.items as Array<Record<string, unknown>> : [];
   const rows = rawItems.map((it, i) => {
@@ -152,9 +202,13 @@ function printPortalQuotation(q: Quotation) {
 </style></head><body>
 <div class="header">
   <div>
-    <div class="firm-name">Vakil &amp; Co.</div>
-    <div class="firm-sub">Advocates &amp; Legal Consultants</div>
-    <div class="firm-addr">123, Legal Complex, Connaught Place, New Delhi — 110001<br>📞 +91 98765 43210 &nbsp;|&nbsp; ✉ info@vakilco.in</div>
+    <div class="firm-name">${firm.firmName}</div>
+    <div class="firm-sub">${firm.firmTagline}</div>
+    <div class="firm-addr">
+      ${firm.firmAddress}<br>
+      📞 ${firm.firmPhone} &nbsp;|&nbsp; ✉ ${firm.firmEmail}
+      ${firm.firmGstin ? `<br>GSTIN: ${firm.firmGstin}${firm.firmPan ? " &nbsp;|&nbsp; PAN: " + firm.firmPan : ""}` : ""}
+    </div>
   </div>
   <div class="doc-box">
     <div class="doc-type">Quotation</div>
@@ -195,7 +249,7 @@ function printPortalQuotation(q: Quotation) {
   <div class="sign">
     <div class="sign-line"></div>
     <p>Authorised Signatory</p>
-    <p>Vakil &amp; Co.</p>
+    <p>${firm.firmName}</p>
   </div>
 </div>
 <script>window.onload = function(){ window.print(); }</script>

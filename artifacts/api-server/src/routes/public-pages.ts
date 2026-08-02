@@ -18,6 +18,10 @@ const PUBLIC_SETTING_KEYS = [
   "company_whatsapp",
   // Branding
   "logo_url", "website_whatsapp", "support_email", "footer_text", "copyright_text",
+  // Firm details for PDFs
+  "firm_name", "firm_tagline", "firm_address", "firm_phone", "firm_email",
+  "firm_gstin", "firm_pan",
+  "bank_name", "bank_account_no", "bank_ifsc", "bank_upi",
 ];
 
 const DEFAULT_PUBLIC: Record<string, string> = {
@@ -33,6 +37,18 @@ const DEFAULT_PUBLIC: Record<string, string> = {
   hours_sunday:    "Closed",
   gst_number:      "27AABCV1234F1Z5",
   footer_text:     "Premium legal services made accessible. We combine decades of expertise with modern technology to deliver exceptional legal solutions across India.",
+  // Firm details for PDFs
+  firm_name:       "Vakil & Co.",
+  firm_tagline:    "Advocates & Legal Consultants",
+  firm_address:    "123, Legal Complex, Connaught Place, New Delhi — 110001",
+  firm_phone:      "+91 98765 43210",
+  firm_email:      "info@vakilco.in",
+  firm_gstin:      "07AABCV1234P1Z5",
+  firm_pan:        "AABCV1234P",
+  bank_name:       "HDFC Bank, New Delhi",
+  bank_account_no: "12345678901234",
+  bank_ifsc:       "HDFC0001234",
+  bank_upi:        "vakilco@hdfcbank",
 };
 
 // GET /api/settings — public endpoint; returns only safe display fields

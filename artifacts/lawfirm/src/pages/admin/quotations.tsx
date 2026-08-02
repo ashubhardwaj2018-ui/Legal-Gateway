@@ -14,9 +14,51 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Trash2, Send, Eye, FileText, PlusCircle, Printer, MessageCircle, Download, Link2, Check } from "lucide-react";
 
+// ─── Firm details helper ─────────────────────────────────────────────────────
+
+interface FirmDetails {
+  firmName: string; firmTagline: string; firmAddress: string;
+  firmPhone: string; firmEmail: string; firmGstin: string; firmPan: string;
+  bankName: string; bankAccountNo: string; bankIfsc: string; bankUpi: string;
+}
+
+const FIRM_DEFAULTS: FirmDetails = {
+  firmName: "Vakil & Co.", firmTagline: "Advocates & Legal Consultants",
+  firmAddress: "123, Legal Complex, Connaught Place, New Delhi — 110001",
+  firmPhone: "+91 98765 43210", firmEmail: "info@vakilco.in",
+  firmGstin: "07AABCV1234P1Z5", firmPan: "AABCV1234P",
+  bankName: "HDFC Bank, New Delhi", bankAccountNo: "12345678901234",
+  bankIfsc: "HDFC0001234", bankUpi: "vakilco@hdfcbank",
+};
+
+async function fetchFirmDetails(): Promise<FirmDetails> {
+  try {
+    const r = await fetch("/api/settings");
+    if (!r.ok) return FIRM_DEFAULTS;
+    const s: Record<string, string> = await r.json();
+    return {
+      firmName:      s.firm_name       || FIRM_DEFAULTS.firmName,
+      firmTagline:   s.firm_tagline    || FIRM_DEFAULTS.firmTagline,
+      firmAddress:   s.firm_address    || FIRM_DEFAULTS.firmAddress,
+      firmPhone:     s.firm_phone      || FIRM_DEFAULTS.firmPhone,
+      firmEmail:     s.firm_email      || FIRM_DEFAULTS.firmEmail,
+      firmGstin:     s.firm_gstin      || FIRM_DEFAULTS.firmGstin,
+      firmPan:       s.firm_pan        || FIRM_DEFAULTS.firmPan,
+      bankName:      s.bank_name       || FIRM_DEFAULTS.bankName,
+      bankAccountNo: s.bank_account_no || FIRM_DEFAULTS.bankAccountNo,
+      bankIfsc:      s.bank_ifsc       || FIRM_DEFAULTS.bankIfsc,
+      bankUpi:       s.bank_upi        || FIRM_DEFAULTS.bankUpi,
+    };
+  } catch {
+    return FIRM_DEFAULTS;
+  }
+}
+
 // ─── Quotation Print / Download PDF ─────────────────────────────────────────
 
-function printQuotation(q: Quotation) {
+async function printQuotation(q: Quotation) {
+  const firm = await fetchFirmDetails();
+
   const items = (q.items ?? []) as Array<{ serviceName: string; description: string; quantity: number; unitPrice: number; total: number }>;
   const subtotal = q.subtotal ?? 0;
   const taxAmt = q.taxAmount ?? 0;
@@ -68,12 +110,12 @@ function printQuotation(q: Quotation) {
 </style></head><body>
 <div class="header">
   <div>
-    <div class="firm-name">Vakil &amp; Co.</div>
-    <div class="firm-sub">Advocates &amp; Legal Consultants</div>
+    <div class="firm-name">${firm.firmName}</div>
+    <div class="firm-sub">${firm.firmTagline}</div>
     <div class="firm-addr">
-      123, Legal Complex, Connaught Place, New Delhi — 110001<br>
-      📞 +91 98765 43210 &nbsp;|&nbsp; ✉ info@vakilco.in<br>
-      GSTIN: 07AABCV1234P1Z5 &nbsp;|&nbsp; PAN: AABCV1234P
+      ${firm.firmAddress}<br>
+      📞 ${firm.firmPhone} &nbsp;|&nbsp; ✉ ${firm.firmEmail}<br>
+      ${firm.firmGstin ? `GSTIN: ${firm.firmGstin}` : ""}${firm.firmGstin && firm.firmPan ? " &nbsp;|&nbsp; " : ""}${firm.firmPan ? `PAN: ${firm.firmPan}` : ""}
     </div>
   </div>
   <div class="doc-box">
@@ -99,7 +141,7 @@ function printQuotation(q: Quotation) {
     <h4>Quotation Details</h4>
     <p>
       This quotation is valid for <strong>${q.validityDays} days</strong> from the date of issue.<br>
-      For queries, contact us at info@vakilco.in
+      For queries, contact us at ${firm.firmEmail}
     </p>
   </div>
 </div>
@@ -131,7 +173,7 @@ function printQuotation(q: Quotation) {
   <div class="sign">
     <div class="sign-line"></div>
     <p>Authorised Signatory</p>
-    <p>Vakil &amp; Co.</p>
+    <p>${firm.firmName}</p>
   </div>
 </div>
 <script>window.onload = function(){ window.print(); }</script>
