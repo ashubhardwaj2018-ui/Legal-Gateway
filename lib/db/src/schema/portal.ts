@@ -52,7 +52,24 @@ export const portalChatMessagesTable = pgTable("portal_chat_messages", {
   leadIdx: index("portal_chat_lead_idx").on(t.leadId),
 }));
 
+// Access requests: clients submit email → admin approves/rejects → magic link sent on approval
+export const portalAccessRequestsTable = pgTable("portal_access_requests", {
+  id: serial("id").primaryKey(),
+  email: text("email").notNull(),
+  name: text("name"),
+  phone: text("phone"),
+  message: text("message"),
+  status: text("status").notNull().default("pending"), // "pending" | "approved" | "rejected"
+  reviewedBy: text("reviewed_by"),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  emailIdx: index("portal_access_requests_email_idx").on(t.email),
+  statusIdx: index("portal_access_requests_status_idx").on(t.status),
+}));
+
 export type PortalToken = typeof portalTokensTable.$inferSelect;
 export type PortalMessage = typeof portalMessagesTable.$inferSelect;
 export type PortalDocument = typeof portalDocumentsTable.$inferSelect;
 export type PortalChatMessage = typeof portalChatMessagesTable.$inferSelect;
+export type PortalAccessRequest = typeof portalAccessRequestsTable.$inferSelect;

@@ -10,7 +10,7 @@ import {
   quotationsTable, invoicePaymentsTable,
   portalDocumentsTable, portalChatMessagesTable,
   leadAssignmentsTable, leadTimelineTable, leadActivitiesTable,
-  adminUsersTable,
+  adminUsersTable, portalAccessRequestsTable,
 } from "@workspace/db";
 import { createNotification } from "./admin/notifications";
 
@@ -98,68 +98,47 @@ function broadcastChatMessage(leadId: number, data: object) {
 const UPLOAD_DIR = path.join(process.cwd(), "uploads", "portal");
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
-// ── Request Access (sends magic link) ────────────────────────────────────────
+// ── Request Access (creates a pending request for admin approval) ─────────────
 
 router.post("/portal/request-access", async (req, res): Promise<void> => {
-  const { email } = req.body as { email?: string };
+  const { email, name, phone, message } = req.body as {
+    email?: string; name?: string; phone?: string; message?: string;
+  };
   if (!email) { res.status(400).json({ error: "Email required" }); return; }
 
+  const normalised = email.toLowerCase().trim();
+
+  // Check the email exists as a lead/consultation
   const leads = await db.select().from(consultationsTable)
-    .where(ilike(consultationsTable.email, email.trim())).limit(1);
+    .where(ilike(consultationsTable.email, normalised)).limit(1);
   if (leads.length === 0) {
-    res.json({ ok: true, hint: "If your email is registered, you will receive an access link." });
+    // Return the same generic message to avoid email enumeration
+    res.json({ ok: true, requested: true, hint: "Your request has been submitted. We'll review it and send you access if approved." });
     return;
   }
 
-  await db.delete(portalTokensTable).where(eq(portalTokensTable.email, email.toLowerCase().trim()));
+  // If there's already a pending request for this email, don't duplicate
+  const existing = await db.select({ id: portalAccessRequestsTable.id, status: portalAccessRequestsTable.status })
+    .from(portalAccessRequestsTable)
+    .where(and(
+      ilike(portalAccessRequestsTable.email, normalised),
+      eq(portalAccessRequestsTable.status, "pending"),
+    )).limit(1);
 
-  const token = generateToken();
-  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-  await db.insert(portalTokensTable).values({ email: email.toLowerCase().trim(), token, expiresAt });
-
-  const cfg = await getSettings();
-  const appUrl = process.env.APP_URL ?? `https://${process.env.REPLIT_DOMAINS?.split(",")[0] ?? "localhost"}`;
-  const link = `${appUrl}/portal/dashboard?token=${token}`;
-
-  let emailSent = false;
-  if (cfg.email_smtp_host) {
-    try {
-      const transporter = nodemailer.createTransport({
-        host: cfg.email_smtp_host,
-        port: parseInt(cfg.email_smtp_port ?? "587", 10),
-        secure: cfg.email_smtp_secure === "true",
-        auth: { user: cfg.email_smtp_user, pass: cfg.email_smtp_pass },
-      });
-      const firmName = cfg.firm_name ?? "Vakil & Co.";
-      await transporter.sendMail({
-        from: `"${cfg.email_from_name ?? firmName}" <${cfg.email_from_email ?? cfg.email_smtp_user}>`,
-        to: email,
-        subject: `Your Secure Portal Access — ${firmName}`,
-        html: `<div style="font-family:sans-serif;max-width:560px;margin:0 auto">
-<div style="background:#0f2044;padding:28px 32px;border-radius:12px 12px 0 0">
-  <h1 style="color:#c9a227;margin:0;font-size:20px">${firmName}</h1>
-  <p style="color:#ffffff99;margin:4px 0 0;font-size:13px">Client Portal Access</p>
-</div>
-<div style="background:#fff;padding:32px;border:1px solid #e5e7eb;border-top:0;border-radius:0 0 12px 12px">
-  <p style="font-size:16px;color:#333">Hello,</p>
-  <p style="color:#555">Here is your secure login link for the ${firmName} client portal. Valid for <strong>24 hours</strong>.</p>
-  <div style="text-align:center;margin:28px 0">
-    <a href="${link}" style="display:inline-block;background:#0f2044;color:#c9a227;text-decoration:none;padding:14px 32px;border-radius:10px;font-weight:bold;font-size:15px">Access My Portal →</a>
-  </div>
-  <p style="font-size:12px;color:#aaa">Or paste: <a href="${link}" style="color:#0f2044;word-break:break-all">${link}</a></p>
-  <p style="font-size:12px;color:#ccc;margin-top:24px">If you did not request this, ignore this email.</p>
-</div></div>`,
-      });
-      emailSent = true;
-    } catch { /* SMTP error */ }
+  if (existing.length === 0) {
+    await db.insert(portalAccessRequestsTable).values({
+      email: normalised,
+      name: name?.trim() || leads[0]?.name || null,
+      phone: phone?.trim() || leads[0]?.phone || null,
+      message: message?.trim() || null,
+      status: "pending",
+    });
   }
 
   res.json({
-    ok: true, emailSent,
-    ...(!emailSent ? { devToken: token, devLink: link } : {}),
-    hint: emailSent
-      ? "Access link sent to your email. Check your inbox (and spam folder)."
-      : "Email sending is not configured. Use the link below to access your portal.",
+    ok: true,
+    requested: true,
+    hint: "Your request has been submitted. Our team will review it and send you an access link shortly.",
   });
 });
 

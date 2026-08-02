@@ -1,12 +1,10 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
-import { Scale, Mail, ArrowRight, CheckCircle, AlertCircle, Loader2, ExternalLink } from "lucide-react";
+import { Scale, Mail, ArrowRight, CheckCircle, AlertCircle, Loader2, ExternalLink, Clock } from "lucide-react";
 
 export default function PortalLogin() {
-  const [, navigate] = useLocation();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<{ ok: boolean; emailSent?: boolean; hint?: string; devLink?: string; error?: string } | null>(null);
+  const [result, setResult] = useState<{ ok: boolean; requested?: boolean; hint?: string; error?: string } | null>(null);
 
   const requestAccess = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,7 +54,9 @@ export default function PortalLogin() {
                 <Mail size={28} className="text-[#c9a227]" />
               </div>
               <h1 className="text-2xl font-bold text-white">Access Your Portal</h1>
-              <p className="text-white/50 text-sm mt-2">Enter the email address you used when contacting us. We'll send you a secure access link.</p>
+              <p className="text-white/50 text-sm mt-2">
+                Enter the email address you used when contacting us. We'll review your request and send you a secure access link.
+              </p>
             </div>
 
             {!result?.ok ? (
@@ -85,38 +85,40 @@ export default function PortalLogin() {
                   disabled={loading || !email.trim()}
                   className="w-full flex items-center justify-center gap-2 bg-[#c9a227] text-[#0f2044] font-bold py-3.5 rounded-xl hover:bg-[#e0b83a] transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                 >
-                  {loading ? <><Loader2 size={16} className="animate-spin" />Sending…</> : <><ArrowRight size={16} />Request Access Link</>}
+                  {loading ? <><Loader2 size={16} className="animate-spin" />Submitting…</> : <><ArrowRight size={16} />Request Portal Access</>}
                 </button>
               </form>
             ) : (
               <div className="space-y-5">
                 <div className="flex flex-col items-center text-center gap-3 py-2">
-                  <div className="w-14 h-14 bg-green-500/20 rounded-2xl flex items-center justify-center">
-                    <CheckCircle size={28} className="text-green-400" />
+                  <div className="w-14 h-14 bg-[#c9a227]/20 rounded-2xl flex items-center justify-center">
+                    <Clock size={28} className="text-[#c9a227]" />
                   </div>
                   <div>
-                    <div className="text-white font-bold text-lg">
-                      {result.emailSent ? "Check your inbox!" : "Your access link is ready"}
-                    </div>
-                    <div className="text-white/50 text-sm mt-1">{result.hint}</div>
+                    <div className="text-white font-bold text-lg">Request Submitted!</div>
+                    <div className="text-white/50 text-sm mt-1 leading-relaxed">{result.hint}</div>
                   </div>
                 </div>
 
-                {/* Dev / no-SMTP mode — show direct link */}
-                {result.devLink && (
-                  <div className="bg-[#c9a227]/10 border border-[#c9a227]/30 rounded-xl p-4">
-                    <div className="text-[#c9a227] text-xs font-semibold uppercase tracking-wider mb-2">⚡ Direct Access Link</div>
-                    <button
-                      onClick={() => navigate(`/portal/dashboard?token=${result.devLink!.split("token=")[1]}`)}
-                      className="w-full bg-[#c9a227] text-[#0f2044] font-bold py-3 rounded-xl hover:bg-[#e0b83a] transition-all text-sm flex items-center justify-center gap-2"
-                    >
-                      <ArrowRight size={15} />Open Client Portal
-                    </button>
-                    <p className="text-white/30 text-[10px] text-center mt-2">Configure SMTP in Admin → Email to send real access emails</p>
-                  </div>
-                )}
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-2.5">
+                  {[
+                    { icon: "✉️", text: "We'll email you a secure access link once approved" },
+                    { icon: "⏱️", text: "Approvals usually happen within 1 business day" },
+                    { icon: "📂", text: "You'll be able to view cases, invoices & documents" },
+                  ].map(item => (
+                    <div key={item.text} className="flex items-start gap-2.5 text-sm text-white/60">
+                      <span className="text-base leading-snug">{item.icon}</span>
+                      <span>{item.text}</span>
+                    </div>
+                  ))}
+                </div>
 
-                <button onClick={() => { setResult(null); setEmail(""); }} className="w-full text-white/40 hover:text-white/60 text-sm transition-colors py-1">← Try a different email</button>
+                <button
+                  onClick={() => { setResult(null); setEmail(""); }}
+                  className="w-full text-white/40 hover:text-white/60 text-sm transition-colors py-1"
+                >
+                  ← Try a different email
+                </button>
               </div>
             )}
           </div>
@@ -124,7 +126,7 @@ export default function PortalLogin() {
           {/* Info strip */}
           <div className="mt-6 grid grid-cols-3 gap-3 text-center">
             {[
-              { icon: "🔒", text: "Secure 24-hour link" },
+              { icon: "🔒", text: "Secure access" },
               { icon: "📋", text: "View your cases" },
               { icon: "🧾", text: "Download invoices" },
             ].map(item => (

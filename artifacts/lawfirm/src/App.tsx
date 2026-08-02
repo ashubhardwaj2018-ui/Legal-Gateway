@@ -44,6 +44,7 @@ import AdminActivityLog from "@/pages/admin/activity-log";
 import AdminWhatsApp from "@/pages/admin/whatsapp";
 import EmployeeDashboard from "@/pages/admin/employee-dashboard";
 import TeamPerformance from "@/pages/admin/team-performance";
+import PortalAccessPage from "@/pages/admin/portal-access";
 import PortalLogin from "@/pages/portal/login";
 import PortalDashboard from "@/pages/portal/dashboard";
 import IndianCompanies from "@/pages/indian-companies";
@@ -103,6 +104,7 @@ function Router() {
       <Route path="/admin/bulk-service-upload" component={BulkServiceUpload} />
       <Route path="/admin/my-dashboard" component={EmployeeDashboard} />
       <Route path="/admin/team-performance" component={TeamPerformance} />
+      <Route path="/admin/portal-access" component={PortalAccessPage} />
 
       {/* Customer Portal */}
       <Route path="/portal" component={PortalLogin} />
