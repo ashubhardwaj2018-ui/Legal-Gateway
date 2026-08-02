@@ -17,7 +17,7 @@ import {
 interface WaTemplate { id: number; name: string; category: string; body: string; isActive: boolean; createdBy?: string; createdAt: string; }
 interface WaMessage { id: number; leadId?: number; toNumber: string; message: string; templateName?: string; senderName?: string; senderType: string; status: string; provider: string; isBulk: boolean; createdAt: string; }
 interface WaTrigger { id: number; event: string; templateId?: number; isEnabled: boolean; }
-interface WaDashboard { sentToday: number; totalMessages: number; failedMessages: number; activeTemplates: number; activeTriggers: number; recentMessages: WaMessage[]; }
+interface WaDashboard { sentToday: number; totalMessages: number; failedMessages: number; activeTemplates: number; activeTriggers: number; recentMessages: WaMessage[]; provider?: string; }
 interface Lead { id: number; name: string; phone: string; whatsapp?: string; serviceInterest: string; status: string; city?: string; state?: string; }
 
 type Tab = "dashboard" | "templates" | "bulk" | "triggers" | "history" | "settings";
@@ -281,6 +281,25 @@ export default function AdminWhatsApp() {
     m.toNumber.includes(histSearch) || m.senderName?.toLowerCase().includes(histSearch.toLowerCase())
   );
 
+  // ── Dashboard inline connection test ─────────────────────────────────────────
+  const [dashTesting, setDashTesting] = useState(false);
+  const [dashConnResult, setDashConnResult] = useState<{ ok: boolean; message: string } | null>(null);
+
+  const handleDashTestConn = async () => {
+    setDashTesting(true);
+    setDashConnResult(null);
+    try {
+      const r = await api("/admin/whatsapp/test-connection", { method: "POST" }) as Record<string, unknown>;
+      setDashConnResult({
+        ok:      Boolean(r.success ?? r.ok ?? true),
+        message: String(r.message ?? "Connection successful"),
+      });
+    } catch (e: unknown) {
+      setDashConnResult({ ok: false, message: e instanceof Error ? e.message : "Test failed" });
+    }
+    setDashTesting(false);
+  };
+
   // ── Settings state ────────────────────────────────────────────────────────────
   const [sf, setSf] = useState<Record<string, string>>({});
   const [showSecret, setShowSecret] = useState<Record<string, boolean>>({});
@@ -362,6 +381,54 @@ export default function AdminWhatsApp() {
       ════════════════════════════════════════════ */}
       {tab === "dashboard" && (
         <div className="space-y-6">
+
+          {/* ── Provider Status Card ── */}
+          {dashboard?.provider === "web" ? (
+            <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4">
+              <AlertCircle size={18} className="text-amber-500 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-amber-800">Web fallback — configure a provider in Settings</p>
+                <p className="text-xs text-amber-600 mt-0.5">Messages open WhatsApp Web (wa.me links). To send via API, go to the <button onClick={() => setTab("settings")} className="underline hover:text-amber-800 transition-colors">Settings tab</button> and choose a provider.</p>
+              </div>
+            </div>
+          ) : dashboard?.provider ? (
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={handleDashTestConn}
+              onKeyDown={e => e.key === "Enter" && handleDashTestConn()}
+              className="flex items-center gap-4 bg-white border border-gray-100 rounded-2xl px-5 py-4 shadow-sm cursor-pointer hover:border-[#0f2044]/20 hover:shadow transition-all select-none"
+              title="Click to test connection"
+            >
+              <div className="w-9 h-9 rounded-xl bg-[#0f2044]/5 flex items-center justify-center shrink-0">
+                <Phone size={16} className="text-[#0f2044]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-0.5">Active Provider</p>
+                <p className="text-sm font-semibold text-[#0f2044] capitalize">{PROVIDERS.find(p => p.value === dashboard.provider)?.label ?? dashboard.provider}</p>
+                {dashConnResult && (
+                  <p className={`text-xs mt-1 ${dashConnResult.ok ? "text-green-600" : "text-red-500"}`}>
+                    {dashConnResult.message}
+                  </p>
+                )}
+              </div>
+              <div className="shrink-0 flex items-center gap-2">
+                {dashTesting ? (
+                  <Loader2 size={15} className="animate-spin text-gray-400" />
+                ) : dashConnResult ? (
+                  dashConnResult.ok
+                    ? <CheckCircle2 size={16} className="text-green-500" />
+                    : <AlertCircle size={16} className="text-red-500" />
+                ) : (
+                  <RefreshCw size={14} className="text-gray-300" />
+                )}
+                <span className="text-[11px] text-gray-400 whitespace-nowrap">
+                  {dashTesting ? "Testing…" : dashConnResult ? (dashConnResult.ok ? "Connected ✓" : "Error") : "Test connection"}
+                </span>
+              </div>
+            </div>
+          ) : null}
+
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <StatCard label="Sent Today" value={dashboard?.sentToday ?? 0} color="text-green-600" />
             <StatCard label="Total Messages" value={dashboard?.totalMessages ?? 0} />

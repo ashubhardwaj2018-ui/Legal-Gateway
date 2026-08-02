@@ -356,6 +356,9 @@ router.get("/admin/whatsapp/dashboard", async (_req, res): Promise<void> => {
   const recentMessages = await db.select().from(whatsappMessagesTable)
     .orderBy(desc(whatsappMessagesTable.createdAt)).limit(10);
 
+  const settings = await getSettings();
+  const provider = settings.whatsapp_provider ?? "web";
+
   res.json({
     sentToday:       sentToday[0]?.count ?? 0,
     totalMessages:   totalMessages[0]?.count ?? 0,
@@ -363,6 +366,7 @@ router.get("/admin/whatsapp/dashboard", async (_req, res): Promise<void> => {
     activeTemplates: templates[0]?.count ?? 0,
     activeTriggers:  triggers[0]?.count ?? 0,
     recentMessages,
+    provider,
   });
 });
 
