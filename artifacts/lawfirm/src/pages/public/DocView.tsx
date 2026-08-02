@@ -5,18 +5,22 @@ import { Scale, Printer, AlertCircle, Loader2 } from "lucide-react";
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 interface DocSettings {
-  site_name: string;
-  site_tagline: string;
-  phone_primary: string;
-  email_primary: string;
-  address: string;
-  gst_number: string;
-  logo_url: string;
+  // Firm identity keys (task #40)
+  firm_name: string;
+  firm_tagline: string;
+  firm_address: string;
+  firm_phone: string;
+  firm_email: string;
+  firm_gstin: string;
+  firm_pan: string;
+  // Bank details (task #40)
   bank_name: string;
   bank_account_no: string;
   bank_ifsc: string;
   bank_upi: string;
-  pan_number: string;
+  // Legacy / fallback
+  site_name: string;
+  logo_url: string;
 }
 
 interface DocPayload {
@@ -81,8 +85,8 @@ export default function DocView() {
   }
 
   const { doc, settings, docType } = payload;
-  const items = (doc.items ?? doc.items ?? []) as Array<{ description?: string; qty?: number; rate?: number; gstRate?: number; quantity?: number; unitPrice?: number }>;
-  const firmName   = settings.site_name || "Vakil & Co.";
+  const items = (Array.isArray(doc.items) ? doc.items : []) as Array<{ description?: string; qty?: number; rate?: number; gstRate?: number; quantity?: number; unitPrice?: number }>;
+  const firmName   = settings.firm_name || settings.site_name || "Vakil & Co.";
   const isInvoice  = docType === "invoice";
 
   // Invoice-style doc
@@ -121,12 +125,12 @@ export default function DocView() {
                   <span className="font-bold text-lg">{firmName}</span>
                 </div>
               )}
-              <p className="text-white/60 text-xs">{settings.site_tagline}</p>
-              {settings.address    && <p className="text-white/50 text-xs mt-1">{settings.address}</p>}
-              {settings.phone_primary && <p className="text-white/50 text-xs">📞 {settings.phone_primary}</p>}
-              {settings.email_primary && <p className="text-white/50 text-xs">✉ {settings.email_primary}</p>}
-              {settings.gst_number && <p className="text-white/50 text-xs">GSTIN: {settings.gst_number}</p>}
-              {settings.pan_number && <p className="text-white/50 text-xs">PAN: {settings.pan_number}</p>}
+              <p className="text-white/60 text-xs">{settings.firm_tagline}</p>
+              {settings.firm_address && <p className="text-white/50 text-xs mt-1">{settings.firm_address}</p>}
+              {settings.firm_phone   && <p className="text-white/50 text-xs">📞 {settings.firm_phone}</p>}
+              {settings.firm_email   && <p className="text-white/50 text-xs">✉ {settings.firm_email}</p>}
+              {settings.firm_gstin   && <p className="text-white/50 text-xs">GSTIN: {settings.firm_gstin}</p>}
+              {settings.firm_pan     && <p className="text-white/50 text-xs">PAN: {settings.firm_pan}</p>}
             </div>
             <div className="text-right">
               <div className="text-[#c9a227] font-bold text-xs uppercase tracking-widest mb-1">
@@ -218,7 +222,7 @@ export default function DocView() {
             </div>
 
             {/* Notes / Terms */}
-            {(doc.notes || doc.terms) && (
+            {(!!doc.notes || !!doc.terms) && (
               <div className="border-t border-gray-100 pt-4 text-xs text-gray-500 space-y-2">
                 {!!doc.notes && <p><span className="font-semibold text-gray-700">Notes: </span>{String(doc.notes)}</p>}
                 {!!doc.terms && <p><span className="font-semibold text-gray-700">Terms & Conditions: </span>{String(doc.terms)}</p>}
@@ -245,7 +249,7 @@ export default function DocView() {
   }
 
   // Quotation-style doc
-  const quotItems = items as Array<{ description?: string; quantity?: number; unitPrice?: number }>;
+  const quotItems = items as Array<{ serviceName?: string; description?: string; quantity?: number; unitPrice?: number; total?: number }>;
   const subtotal  = Number(doc.subtotal ?? 0);
   const taxAmt    = Number(doc.taxAmount ?? 0);
   const total     = Number(doc.total ?? 0);
@@ -272,8 +276,8 @@ export default function DocView() {
                 <span className="font-bold text-lg">{firmName}</span>
               </div>
             )}
-            {settings.address       && <p className="text-white/50 text-xs">{settings.address}</p>}
-            {settings.phone_primary && <p className="text-white/50 text-xs">📞 {settings.phone_primary}</p>}
+            {settings.firm_address && <p className="text-white/50 text-xs">{settings.firm_address}</p>}
+            {settings.firm_phone   && <p className="text-white/50 text-xs">📞 {settings.firm_phone}</p>}
           </div>
           <div className="text-right">
             <div className="text-[#c9a227] font-bold text-xs uppercase tracking-widest mb-1">Quotation</div>
@@ -296,22 +300,30 @@ export default function DocView() {
             <thead>
               <tr className="bg-[#0f2044]/5 text-[#0f2044]">
                 <th className="px-3 py-2 text-left text-xs font-semibold">#</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold">Description</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold">Service</th>
                 <th className="px-3 py-2 text-right text-xs font-semibold">Qty</th>
                 <th className="px-3 py-2 text-right text-xs font-semibold">Unit Price</th>
                 <th className="px-3 py-2 text-right text-xs font-semibold">Amount</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {quotItems.map((it, i) => (
+              {quotItems.map((it, i) => {
+                const lineTotal = it.total ?? (it.quantity ?? 1) * (it.unitPrice ?? 0);
+                return (
                 <tr key={i}>
                   <td className="px-3 py-2.5 text-xs text-gray-400">{i + 1}</td>
-                  <td className="px-3 py-2.5 text-sm text-gray-700">{it.description || "—"}</td>
+                  <td className="px-3 py-2.5 text-sm text-gray-700">
+                    <div className="font-medium">{it.serviceName || it.description || "—"}</div>
+                    {it.serviceName && it.description && (
+                      <div className="text-xs text-gray-400">{it.description}</div>
+                    )}
+                  </td>
                   <td className="px-3 py-2.5 text-xs text-right">{it.quantity ?? 1}</td>
                   <td className="px-3 py-2.5 text-xs text-right">₹{fmt(it.unitPrice ?? 0)}</td>
-                  <td className="px-3 py-2.5 text-sm text-right font-medium">₹{fmt((it.quantity ?? 1) * (it.unitPrice ?? 0))}</td>
+                  <td className="px-3 py-2.5 text-sm text-right font-medium">₹{fmt(lineTotal)}</td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
 

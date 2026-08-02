@@ -5,9 +5,13 @@ import { db, sharedDocumentTokensTable, invoicesTable, quotationsTable, siteSett
 const publicDocRouter = Router();
 
 const PUBLIC_DOC_SETTING_KEYS = [
-  "site_name", "site_tagline", "phone_primary", "email_primary",
-  "address", "gst_number", "logo_url",
-  "bank_name", "bank_account_no", "bank_ifsc", "bank_upi", "pan_number",
+  // Firm identity (added by task #40)
+  "firm_name", "firm_tagline", "firm_address", "firm_phone", "firm_email",
+  "firm_gstin", "firm_pan",
+  // Bank details (added by task #40)
+  "bank_name", "bank_account_no", "bank_ifsc", "bank_upi",
+  // Legacy keys kept for backwards compatibility
+  "site_name", "logo_url",
 ];
 
 // ── GET /public/doc/:token ────────────────────────────────────────────────────

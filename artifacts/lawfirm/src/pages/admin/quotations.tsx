@@ -577,6 +577,11 @@ function QuotationDetail({ quotation, onClose, onSend, onCopyLink, copied }: {
               <Button variant="outline" onClick={() => printQuotation(quotation)} className="gap-2 bg-[#0f2044] text-white hover:bg-[#c9a227] hover:text-[#0f2044] border-0">
                 <Download size={14} /> Download PDF
               </Button>
+              {onCopyLink && (
+                <Button variant="outline" onClick={onCopyLink} className="gap-2 border-purple-200 text-purple-700 hover:bg-purple-50">
+                  {copied ? <><Check size={14} />Copied!</> : <><Link2 size={14} />Copy Link</>}
+                </Button>
+              )}
               <Button variant="outline" onClick={onClose}>Close</Button>
             </div>
             {quotation.clientPhone && (
@@ -607,6 +612,23 @@ export default function AdminQuotations() {
   const sendMutation = useSendQuotation();
   const [showForm, setShowForm] = useState(false);
   const [selected, setSelected] = useState<Quotation | null>(null);
+  const [copiedId, setCopiedId] = useState<number | null>(null);
+
+  const handleCopyLink = async (id: number) => {
+    try {
+      const r = await fetch(`/api/admin/quotations/${id}/share-link`, {
+        method: "POST", credentials: "include",
+      });
+      if (!r.ok) throw new Error("Failed");
+      const { token } = await r.json() as { token: string };
+      const url = `${window.location.origin}${import.meta.env.BASE_URL}public/doc/${token}`;
+      await navigator.clipboard.writeText(url);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(c => c === id ? null : c), 3000);
+    } catch {
+      alert("Could not generate link. Please try again.");
+    }
+  };
 
   const handleSend = (id: number) => {
     sendMutation.mutate(
@@ -648,6 +670,8 @@ export default function AdminQuotations() {
           quotation={selected}
           onClose={() => setSelected(null)}
           onSend={() => handleSend(selected.id)}
+          onCopyLink={() => handleCopyLink(selected.id)}
+          copied={copiedId === selected.id}
         />
       )}
 
@@ -712,6 +736,9 @@ export default function AdminQuotations() {
                       )}
                       <Button size="sm" variant="ghost" onClick={() => printQuotation(q)} className="h-7 px-2 text-xs gap-1 text-gray-600 hover:text-[#0f2044] hover:bg-gray-100">
                         <Download size={12} /> PDF
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => handleCopyLink(q.id)} className="h-7 px-2 text-xs gap-1 text-purple-600 hover:bg-purple-50" title="Copy share link">
+                        {copiedId === q.id ? <><Check size={12} />Copied</> : <><Link2 size={12} />Link</>}
                       </Button>
                       {q.clientPhone && (
                         <Button size="sm" variant="ghost"

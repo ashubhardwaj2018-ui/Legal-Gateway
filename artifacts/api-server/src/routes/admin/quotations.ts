@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto";
 import { eq, desc } from "drizzle-orm";
 import { db, quotationsTable, sharedDocumentTokensTable } from "@workspace/db";
 import { requirePermission } from "./auth";
+import type { AuthenticatedRequest } from "./auth";
 import { fireWhatsAppTrigger } from "./whatsapp";
 import {
   CreateQuotationBody,
@@ -141,7 +142,13 @@ router.post("/admin/quotations/:id/send", requirePermission("quotations", "send"
 
 // ── POST /admin/quotations/:id/share-link ────────────────────────────────────
 // Generate a 30-day public token for this quotation.
+// Restricted to admin accounts — employees cannot mint bearer URLs.
 router.post("/admin/quotations/:id/share-link", async (req, res): Promise<void> => {
+  const authReq = req as AuthenticatedRequest;
+  if (authReq.adminUser?.userType !== "admin") {
+    res.status(403).json({ error: "Only administrators can generate share links" });
+    return;
+  }
   const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(rawId, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }

@@ -179,8 +179,14 @@ router.delete("/admin/invoices/:id", async (req, res): Promise<void> => {
 });
 
 // ── POST /admin/invoices/:id/share-link ──────────────────────────────────────
-// Generate (or reuse) a 30-day public token for this invoice.
+// Generate a 30-day public token for this invoice.
+// Restricted to admin accounts — employees cannot mint bearer URLs.
 router.post("/admin/invoices/:id/share-link", async (req, res): Promise<void> => {
+  const authReq = req as AuthenticatedRequest;
+  if (authReq.adminUser?.userType !== "admin") {
+    res.status(403).json({ error: "Only administrators can generate share links" });
+    return;
+  }
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
   const [inv] = await db.select({ id: invoicesTable.id }).from(invoicesTable).where(eq(invoicesTable.id, id));
