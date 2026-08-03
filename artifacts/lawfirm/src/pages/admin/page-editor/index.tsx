@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   DndContext, closestCenter, PointerSensor, KeyboardSensor,
@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { AdminLayout } from "../AdminLayout";
 import { PAGES, type Section, type Block } from "./config";
-import RichTextEditor from "./RichTextEditor";
+const RichTextEditor = lazy(() => import("./RichTextEditor"));
 import AIPanel from "./AIPanel";
 import VersionHistoryDrawer from "./VersionHistoryDrawer";
 
@@ -144,11 +144,13 @@ function BlockField({
       )}
 
       {block.type === "richtext" && (
-        <RichTextEditor
-          value={value}
-          onChange={onChange}
-          placeholder={block.placeholder ?? `Start typing…`}
-        />
+        <Suspense fallback={<div className="border border-gray-200 rounded-xl min-h-[180px] bg-gray-50 animate-pulse" />}>
+          <RichTextEditor
+            value={value}
+            onChange={onChange}
+            placeholder={block.placeholder ?? `Start typing…`}
+          />
+        </Suspense>
       )}
 
       {block.type === "image" && (
