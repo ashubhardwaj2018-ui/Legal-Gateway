@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useListSettings, useUpdateSettings, getListSettingsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { AdminLayout } from "./AdminLayout";
@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Save, Building2, Phone, Clock, Share2, Briefcase, MessageCircle, Wifi, WifiOff, Loader2, Info, Globe, CreditCard, Upload, Trash2, ImageIcon } from "lucide-react";
+import { Save, Building2, Phone, Clock, Share2, Briefcase, MessageCircle, Wifi, WifiOff, Loader2, Info, Globe, CreditCard, Upload, Trash2, ImageIcon, Activity } from "lucide-react";
 import { SITE_SETTINGS_QUERY_KEY } from "@/hooks/useSiteSettings";
 
 const SETTING_GROUPS = [
@@ -107,6 +107,7 @@ const PROVIDER_HINTS: Record<string, { name: string; hint: string; needsKey: boo
 };
 
 type TestStatus = { ok: boolean; message: string } | null;
+type HealthStatus = { ok: boolean; db: string; uptime: number } | null;
 
 export default function AdminSettings() {
   const queryClient = useQueryClient();
@@ -122,6 +123,27 @@ export default function AdminSettings() {
   const [logoUploading, setLogoUploading] = useState(false);
   const [logoRemoving, setLogoRemoving] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
+  const [health, setHealth] = useState<HealthStatus>(null);
+  const [healthLoading, setHealthLoading] = useState(true);
+
+  const checkHealth = useCallback(async () => {
+    try {
+      const r = await fetch("/api/health", { credentials: "include" });
+      const data = await r.json() as HealthStatus;
+      setHealth(data);
+    } catch {
+      setHealth({ ok: false, db: "unreachable", uptime: 0 });
+    } finally {
+      setHealthLoading(false);
+    }
+  }, []);
+
+  // Poll health every 30 s; also check immediately on mount
+  useEffect(() => {
+    void checkHealth();
+    const id = setInterval(() => void checkHealth(), 30_000);
+    return () => clearInterval(id);
+  }, [checkHealth]);
 
   useEffect(() => {
     if (settings) {
@@ -219,8 +241,43 @@ export default function AdminSettings() {
 
   const currentGroup = SETTING_GROUPS.find(g => g.id === activeGroup)!;
 
+  const healthBadge = () => {
+    if (healthLoading) return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
+        <Loader2 size={11} className="animate-spin" /> Checking…
+      </span>
+    );
+    if (!health || !health.ok) return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700 border border-red-200">
+        <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+        API {health?.db === "unreachable" ? "unreachable" : `DB ${health?.db ?? "error"}`}
+      </span>
+    );
+    const mins = Math.floor(health.uptime / 60);
+    const hrs  = Math.floor(mins / 60);
+    const uptimeStr = hrs > 0 ? `${hrs}h ${mins % 60}m` : `${mins}m`;
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 border border-green-200">
+        <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+        API &amp; DB healthy · up {uptimeStr}
+      </span>
+    );
+  };
+
   return (
     <AdminLayout title="Site Settings" subtitle="Manage firm contact information, hours and social links">
+      {/* Server health banner */}
+      <div className="flex items-center justify-between mb-4 px-1">
+        <div className="flex items-center gap-2 text-xs text-gray-500">
+          <Activity size={13} className="text-gray-400" />
+          <span>Server status</span>
+        </div>
+        <div className="flex items-center gap-2">
+          {healthBadge()}
+          <button onClick={() => { setHealthLoading(true); void checkHealth(); }} className="text-[11px] text-gray-400 hover:text-gray-600 underline-offset-2 hover:underline">refresh</button>
+        </div>
+      </div>
+
       <div className="flex flex-col lg:flex-row gap-5">
         {/* Group Selector */}
         <div className="lg:w-52 xl:w-64 shrink-0">

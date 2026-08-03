@@ -319,7 +319,54 @@ See `.env.example` for the full annotated list. **Minimum required** to start:
 
 ---
 
-## 14. Production Startup Command
+## 14. Health Monitoring
+
+### Health endpoint
+
+The API exposes `GET /api/health` for uptime checks:
+
+```bash
+curl http://localhost:8080/api/health
+# → {"ok":true,"db":"connected","uptime":3721}
+# → HTTP 200 when healthy, HTTP 503 when DB is unreachable
+```
+
+The admin **Settings** page shows a live status badge (green/red) that polls this endpoint every 30 seconds.
+
+### Cron-based alert (email on downtime)
+
+Create `/usr/local/bin/lfi-health-check.sh`:
+
+```bash
+#!/bin/bash
+HEALTH=$(curl -sf http://localhost:8080/api/health)
+if [ $? -ne 0 ]; then
+  echo "LFI API is DOWN at $(date)" | mail -s "⚠️ LFI Server Down" admin@legalfilingindia.com
+fi
+```
+
+```bash
+chmod +x /usr/local/bin/lfi-health-check.sh
+# Install mailx if needed:  sudo dnf install -y mailx
+```
+
+Add to `/etc/cron.d/lfi-monitor` (checks every minute):
+
+```
+* * * * * root /usr/local/bin/lfi-health-check.sh
+```
+
+### PM2 status
+
+```bash
+pm2 status          # list all processes and restart counts
+pm2 logs lfi-api --lines 50   # tail recent logs
+pm2 monit           # live CPU/memory dashboard
+```
+
+---
+
+## 15. Production Startup Command
 
 ```bash
 # Start (first time or after restart)

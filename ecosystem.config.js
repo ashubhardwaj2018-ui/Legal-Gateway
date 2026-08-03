@@ -30,6 +30,29 @@ module.exports = {
       // Graceful shutdown: give in-flight requests 10 s to complete
       kill_timeout: 10000,
       listen_timeout: 15000,
+      // Health check: PM2 will probe this URL after restarts to confirm the
+      // process is accepting connections before marking it "online".
+      // Adjust the port if you change PORT in .env
+      // health_check_url: "http://localhost:8080/api/health",
     },
   ],
 };
+
+/*
+ * ── External monitoring cron (recommended) ──────────────────────────────────
+ * Add this line to /etc/cron.d/lfi-monitor on the VPS to get email alerts
+ * whenever the API goes down (replace with your admin email):
+ *
+ *   * * * * * root /usr/local/bin/lfi-health-check.sh
+ *
+ * Contents of /usr/local/bin/lfi-health-check.sh:
+ *
+ *   #!/bin/bash
+ *   HEALTH=$(curl -sf http://localhost:8080/api/health)
+ *   if [ $? -ne 0 ]; then
+ *     echo "LFI API is DOWN at $(date)" | mail -s "⚠️ LFI Server Down" admin@legalfilingindia.com
+ *   fi
+ *
+ * Make it executable: chmod +x /usr/local/bin/lfi-health-check.sh
+ * ────────────────────────────────────────────────────────────────────────────
+ */
