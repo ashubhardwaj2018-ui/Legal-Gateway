@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { useState, useEffect, useRef } from "react";
-import { Menu, X, ChevronDown, ChevronRight, Scale, Phone, LogIn } from "lucide-react";
+import { Menu, X, ChevronDown, ChevronRight, Phone, LogIn } from "lucide-react";
 import { SERVICES_DATA } from "@/data/services";
 import { toSlug } from "@/lib/slug";
 import { cn } from "@/lib/utils";
@@ -61,9 +61,23 @@ export function Navbar() {
               />
             ) : (
               <>
-                <div className="bg-primary text-secondary p-1.5 rounded-lg group-hover:bg-secondary group-hover:text-primary transition-colors">
-                  <Scale size={20} />
-                </div>
+                {/* LFI logo mark */}
+                <svg width="38" height="38" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
+                  <rect width="180" height="180" rx="36" fill="#0f2044"/>
+                  <rect x="28" y="22" width="124" height="6" rx="3" fill="#c9a227"/>
+                  {/* L */}
+                  <rect x="24" y="58" width="13" height="72" rx="3" fill="#ffffff"/>
+                  <rect x="24" y="117" width="38" height="13" rx="3" fill="#ffffff"/>
+                  {/* F */}
+                  <rect x="74" y="58" width="13" height="72" rx="3" fill="#ffffff"/>
+                  <rect x="74" y="58" width="38" height="13" rx="3" fill="#ffffff"/>
+                  <rect x="74" y="86" width="30" height="11" rx="3" fill="#c9a227"/>
+                  {/* I */}
+                  <rect x="124" y="58" width="32" height="13" rx="3" fill="#ffffff"/>
+                  <rect x="131" y="71" width="13" height="46" rx="3" fill="#ffffff"/>
+                  <rect x="124" y="117" width="32" height="13" rx="3" fill="#ffffff"/>
+                  <circle cx="90" cy="156" r="6" fill="#c9a227"/>
+                </svg>
                 <div className="leading-none hidden sm:block">
                   <div className="font-serif font-bold text-base text-primary">LEGAL FILING INDIA</div>
                   <div className="text-[8px] uppercase tracking-widest text-muted-foreground font-semibold">India's Trusted Filing Platform</div>
