@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import multer from "multer";
 import { db, siteSettingsTable } from "@workspace/db";
 import { UpdateSettingsBody } from "@workspace/api-zod";
 
@@ -52,7 +53,36 @@ const DEFAULT_SETTINGS = [
   { key: "copyright_text",  value: "" },
 ];
 
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 2 * 1024 * 1024 }, // 2 MB
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith("image/")) cb(null, true);
+    else cb(new Error("Only image files are allowed"));
+  },
+});
+
 const router: IRouter = Router();
+
+// ── POST /admin/settings/logo — upload a logo image, stored as base64 data URL ─
+
+router.post("/admin/settings/logo", upload.single("logo"), async (req, res): Promise<void> => {
+  if (!req.file) { res.status(400).json({ error: "No image file provided" }); return; }
+  const dataUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
+  await db.insert(siteSettingsTable)
+    .values({ key: "logo_url", value: dataUrl })
+    .onConflictDoUpdate({ target: siteSettingsTable.key, set: { value: dataUrl, updatedAt: new Date() } });
+  res.json({ ok: true, logoUrl: dataUrl });
+});
+
+// ── DELETE /admin/settings/logo — remove the stored logo ──────────────────────
+
+router.delete("/admin/settings/logo", async (_req, res): Promise<void> => {
+  await db.insert(siteSettingsTable)
+    .values({ key: "logo_url", value: "" })
+    .onConflictDoUpdate({ target: siteSettingsTable.key, set: { value: "", updatedAt: new Date() } });
+  res.json({ ok: true });
+});
 
 router.get("/admin/settings", async (_req, res): Promise<void> => {
   const stored = await db.select().from(siteSettingsTable);

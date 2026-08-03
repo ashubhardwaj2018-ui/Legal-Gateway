@@ -20,6 +20,7 @@ interface FirmDetails {
   firmName: string; firmTagline: string; firmAddress: string;
   firmPhone: string; firmEmail: string; firmGstin: string; firmPan: string;
   bankName: string; bankAccountNo: string; bankIfsc: string; bankUpi: string;
+  logoUrl: string;
 }
 
 const FIRM_DEFAULTS: FirmDetails = {
@@ -29,6 +30,7 @@ const FIRM_DEFAULTS: FirmDetails = {
   firmGstin: "07AABCV1234P1Z5", firmPan: "AABCV1234P",
   bankName: "HDFC Bank, New Delhi", bankAccountNo: "12345678901234",
   bankIfsc: "HDFC0001234", bankUpi: "legalfilingindia@hdfcbank",
+  logoUrl: "",
 };
 
 async function fetchFirmDetails(): Promise<FirmDetails> {
@@ -48,6 +50,7 @@ async function fetchFirmDetails(): Promise<FirmDetails> {
       bankAccountNo: s.bank_account_no || FIRM_DEFAULTS.bankAccountNo,
       bankIfsc:      s.bank_ifsc       || FIRM_DEFAULTS.bankIfsc,
       bankUpi:       s.bank_upi        || FIRM_DEFAULTS.bankUpi,
+      logoUrl:       s.logo_url        || "",
     };
   } catch {
     return FIRM_DEFAULTS;
@@ -110,6 +113,7 @@ async function printQuotation(q: Quotation) {
 </style></head><body>
 <div class="header">
   <div>
+    ${firm.logoUrl ? `<img src="${firm.logoUrl}" alt="${firm.firmName}" style="max-height:52px;max-width:180px;object-fit:contain;margin-bottom:6px;display:block;">` : ""}
     <div class="firm-name">${firm.firmName}</div>
     <div class="firm-sub">${firm.firmTagline}</div>
     <div class="firm-addr">
