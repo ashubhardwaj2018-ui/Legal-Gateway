@@ -82,7 +82,7 @@ export default function RichTextEditor({ value, onChange, placeholder }: Props) 
 
   const applyLink = useCallback(() => {
     if (!editor || !linkUrl) return;
-    editor.chain().focus().extendMarkToNextWord().setLink({ href: linkUrl }).run();
+    editor.chain().focus().setLink({ href: linkUrl }).run();
     setLinkUrl("");
     setShowLinkInput(false);
   }, [editor, linkUrl]);

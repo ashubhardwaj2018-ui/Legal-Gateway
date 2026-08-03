@@ -69,7 +69,7 @@ export default function VersionHistoryDrawer({ page, onRestore, onClose }: Props
             <div className="divide-y divide-gray-100">
               {versions.map((v, idx) => {
                 const d = new Date(v.createdAt);
-                const label = v.snapshotLabel?.length === v.createdAt
+                const label = v.snapshotLabel !== v.createdAt
                   ? null
                   : v.snapshotLabel;
                 return (

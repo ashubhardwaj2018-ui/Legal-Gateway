@@ -1,0 +1,695 @@
+MASTER PRODUCTION READINESS, BUILD VERIFICATION & DEPLOYMENT PROMPT
+Objective
+
+Stop developing new features.
+
+Your task is to make the entire project 100% production ready for deployment on a Hostinger VPS running CentOS Stream 9.
+
+The project must compile successfully, start successfully, connect to the database, and run in production without requiring manual code modifications.
+
+Assume this is the final production release.
+
+Do not mark the task complete until every item below has been verified.
+
+1. Project Audit
+
+Analyze the complete workspace.
+
+Review:
+
+Workspace structure
+Packages
+Frontend
+Backend
+Shared libraries
+Build scripts
+pnpm workspace
+Dependencies
+Environment variables
+Database configuration
+API configuration
+Authentication
+Routing
+Static assets
+Upload directories
+Cron jobs
+Background jobs
+
+Verify that every dependency is correctly installed.
+
+Remove unused dependencies.
+
+Remove duplicate dependencies.
+
+Verify dependency compatibility.
+
+2. TypeScript Verification
+
+Run:
+
+pnpm run typecheck
+
+Fix every TypeScript error.
+
+Do not:
+
+disable TypeScript
+use any
+use // @ts-ignore
+modify tsconfig to hide errors
+
+Fix the underlying code.
+
+Run repeatedly until zero errors remain.
+
+3. Build Verification
+
+Run:
+
+pnpm build
+
+The build must complete successfully.
+
+No warnings that break production.
+
+No compilation errors.
+
+No missing assets.
+
+No missing imports.
+
+No missing exports.
+
+4. Environment Variable Audit
+
+Create a complete production-ready .env.example.
+
+Include every required variable.
+
+Examples:
+
+NODE_ENV=production
+
+PORT=
+
+APP_URL=
+
+FRONTEND_URL=
+
+API_URL=
+
+DB_HOST=
+
+DB_PORT=
+
+DB_NAME=
+
+DB_USER=
+
+DB_PASSWORD=
+
+JWT_SECRET=
+
+SESSION_SECRET=
+
+COOKIE_SECRET=
+
+OPENAI_API_KEY=
+
+OPENAI_MODEL=
+
+GOOGLE_MAPS_API_KEY=
+
+GOOGLE_GEOCODING_API_KEY=
+
+GOOGLE_ANALYTICS_ID=
+
+GOOGLE_SEARCH_CONSOLE=
+
+RECAPTCHA_SITE_KEY=
+
+RECAPTCHA_SECRET=
+
+SMTP_HOST=
+
+SMTP_PORT=
+
+SMTP_USER=
+
+SMTP_PASSWORD=
+
+SMTP_FROM_EMAIL=
+
+SMTP_FROM_NAME=
+
+WHATSAPP_PROVIDER=
+
+WHATSAPP_API_KEY=
+
+WHATSAPP_SECRET=
+
+WHATSAPP_PHONE_NUMBER=
+
+META_APP_ID=
+
+META_APP_SECRET=
+
+TWILIO_ACCOUNT_SID=
+
+TWILIO_AUTH_TOKEN=
+
+RAZORPAY_KEY_ID=
+
+RAZORPAY_KEY_SECRET=
+
+CASHFREE_APP_ID=
+
+CASHFREE_SECRET=
+
+PAYTM_MERCHANT_ID=
+
+STRIPE_SECRET_KEY=
+
+AWS_ACCESS_KEY=
+
+AWS_SECRET_KEY=
+
+AWS_BUCKET=
+
+CLOUDINARY_CLOUD_NAME=
+
+CLOUDINARY_API_KEY=
+
+CLOUDINARY_API_SECRET=
+
+FIREBASE_PROJECT_ID=
+
+ONESIGNAL_APP_ID=
+
+Document every variable.
+
+Explain its purpose.
+
+Specify whether it is required or optional.
+
+Verify that the application starts with only these variables configured.
+
+5. Startup Verification
+
+Identify the correct production startup command.
+
+Verify it works.
+
+Examples:
+
+pnpm start
+
+or
+
+node server.js
+
+or
+
+pnpm --filter api-server start
+
+Determine the correct command automatically.
+
+Do not guess.
+
+6. PM2 Deployment
+
+Create a production PM2 configuration.
+
+Example:
+
+ecosystem.config.js
+
+Include:
+
+App Name
+Working Directory
+Environment
+Restart Policy
+Memory Limit
+Log Files
+
+Verify:
+
+pm2 start ecosystem.config.js
+
+pm2 save
+
+pm2 startup
+
+works correctly.
+
+7. Database Verification
+
+Verify:
+
+Database connection.
+
+Migrations.
+
+Schema.
+
+Indexes.
+
+Foreign Keys.
+
+Seed Data.
+
+No missing tables.
+
+No orphan relationships.
+
+No duplicate indexes.
+
+If migrations exist, verify:
+
+pnpm migrate
+
+or equivalent.
+
+Document the exact command.
+
+8. API Verification
+
+Test every API endpoint.
+
+Verify:
+
+Authentication
+
+Authorization
+
+Validation
+
+Error Handling
+
+Rate Limiting
+
+Response Format
+
+HTTP Status Codes
+
+CORS
+
+Uploads
+
+Downloads
+
+9. Frontend Verification
+
+Verify:
+
+Every React route loads.
+
+No blank pages.
+
+No console errors.
+
+No missing imports.
+
+No broken images.
+
+No broken CSS.
+
+No hydration issues.
+
+No missing environment variables.
+
+10. Authentication
+
+Verify:
+
+Admin Login
+
+Employee Login
+
+Customer Login
+
+Forgot Password
+
+Reset Password
+
+Session Expiry
+
+Permission Middleware
+
+JWT
+
+Cookies
+
+Logout
+
+11. Feature Verification
+
+Verify every module works.
+
+Including:
+
+CRM
+
+Leads
+
+Customers
+
+Employee Dashboard
+
+HR
+
+Attendance
+
+Payroll
+
+WhatsApp
+
+Email
+
+Invoices
+
+Quotations
+
+Finance
+
+SEO
+
+Programmatic SEO
+
+Blogs
+
+Company Database
+
+Page Builder
+
+AI Content
+
+Notifications
+
+Internal Chat
+
+Tasks
+
+Calendar
+
+Documents
+
+Reports
+
+Settings
+
+Audit Logs
+
+User Management
+
+Role Management
+
+API Manager
+
+Website Editor
+
+Database Manager
+
+Workflow Automation
+
+12. Security Audit
+
+Check:
+
+SQL Injection
+
+XSS
+
+CSRF
+
+Broken Authentication
+
+Broken Authorization
+
+File Upload Security
+
+Session Security
+
+JWT Security
+
+Password Hashing
+
+Rate Limiting
+
+Input Validation
+
+Secret Exposure
+
+Directory Traversal
+
+Fix every issue.
+
+13. Performance Audit
+
+Verify:
+
+Database Queries
+
+Indexes
+
+Caching
+
+Lazy Loading
+
+Image Optimization
+
+Bundle Size
+
+React Performance
+
+API Response Time
+
+Memory Usage
+
+CPU Usage
+
+14. Production Configuration
+
+Ensure:
+
+NODE_ENV=production
+
+Debug disabled.
+
+Source maps disabled where appropriate.
+
+Development logging removed.
+
+Unused console logs removed.
+
+15. Logging
+
+Create:
+
+Application Logs
+
+Error Logs
+
+PM2 Logs
+
+Audit Logs
+
+API Logs
+
+Security Logs
+
+Rotation Policy
+
+16. Reverse Proxy Readiness
+
+Ensure the application works correctly behind Nginx.
+
+Support:
+
+https://domain.com
+
+Reverse proxy to Node.js.
+
+Correct headers.
+
+WebSocket support if chat uses it.
+
+17. File Upload Verification
+
+Verify:
+
+Images
+
+PDF
+
+Word
+
+Excel
+
+ZIP
+
+Large Files
+
+Storage Path
+
+Permissions
+
+Download
+
+Deletion
+
+18. Email Verification
+
+Verify SMTP.
+
+Test:
+
+Forgot Password
+
+Lead Notification
+
+Invoice
+
+Quotation
+
+Reminder
+
+Welcome Email
+
+19. WhatsApp Verification
+
+Verify:
+
+API Configuration
+
+Templates
+
+WhatsApp Button
+
+Lead Integration
+
+Customer Integration
+
+Fallback to WhatsApp Web
+
+Logs
+
+History
+
+20. SEO Verification
+
+Verify:
+
+Meta Titles
+
+Descriptions
+
+Canonical
+
+Schema
+
+Breadcrumb
+
+Robots
+
+Sitemap
+
+Dynamic Pages
+
+Programmatic SEO
+
+Company Pages
+
+Blog Pages
+
+Service Pages
+
+Location Pages
+
+21. Deployment Documentation
+
+Create:
+
+README.md
+
+Include:
+
+Server Requirements
+
+Node Version
+
+pnpm Version
+
+PM2 Version
+
+Build Commands
+
+Startup Commands
+
+Database Import
+
+Environment Variables
+
+Deployment Steps
+
+Update Steps
+
+Rollback Steps
+
+Backup Steps
+
+22. Production Checklist
+
+Verify:
+
+✓ TypeScript passes
+
+✓ Build passes
+
+✓ No missing environment variables
+
+✓ No missing routes
+
+✓ No broken APIs
+
+✓ No console errors
+
+✓ No React errors
+
+✓ No server errors
+
+✓ Database connects
+
+✓ PM2 starts correctly
+
+✓ Application restarts automatically
+
+✓ Works behind Nginx
+
+✓ HTTPS compatible
+
+✓ No security issues
+
+✓ Production ready
+
+23. Final Report
+
+Do not simply say "Completed."
+
+Provide:
+
+TypeScript status.
+Build status.
+Production startup command.
+PM2 configuration created.
+Required .env variables.
+Database migration status.
+APIs verified.
+Security issues fixed.
+Performance improvements.
+Files modified.
+Dependencies updated.
+Remaining recommendations (if any).
+
+Finally, confirm that a fresh clone of the repository on a new CentOS Stream 9 VPS can be deployed by following the generated README and .env.example, without requiring any additional code changes or hidden configuration.

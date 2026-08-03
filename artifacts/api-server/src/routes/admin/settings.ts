@@ -2,9 +2,6 @@ import { Router, type IRouter } from "express";
 import multer from "multer";
 import { db, siteSettingsTable } from "@workspace/db";
 import { UpdateSettingsBody } from "@workspace/api-zod";
-import path from "path";
-import fs from "fs";
-import crypto from "crypto";
 
 const DEFAULT_SETTINGS = [
   { key: "site_name", value: "Legal Filing India Legal Associates" },
@@ -56,8 +53,6 @@ const DEFAULT_SETTINGS = [
   { key: "copyright_text",  value: "" },
 ];
 
-const LOGOS_DIR = path.join(process.cwd(), "uploads", "logos");
-
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 2 * 1024 * 1024 }, // 2 MB
@@ -68,8 +63,6 @@ const upload = multer({
 });
 
 const router: IRouter = Router();
-
-  const logoUrl = `/uploads/logos/${req.file.filename}`;
 
 // ── POST /admin/settings/logo — upload a logo image, stored as base64 data URL ─
 
@@ -126,25 +119,3 @@ router.put("/admin/settings", async (req, res): Promise<void> => {
 });
 
 export default router;
-
-const logoUpload = multer({
-  storage: logoStorage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB max
-  fileFilter: (_req, file, cb) => {
-    const allowed = ["image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp", "image/svg+xml"];
-    if (allowed.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error("Only image files are allowed (PNG, JPG, GIF, WebP, SVG)"));
-    }
-  },
-});
-
-const logoStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, LOGOS_DIR),
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase() || ".png";
-    const name = `logo-${crypto.randomBytes(8).toString("hex")}${ext}`;
-    cb(null, name);
-  },
-});

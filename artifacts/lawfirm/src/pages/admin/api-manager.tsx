@@ -480,7 +480,7 @@ export default function ApiManagerPage() {
   const errorCount    = integrations.filter(i => i.enabled && i.status === "error").length;
 
   return (
-    <AdminLayout>
+    <AdminLayout title="API Manager">
       <div className="flex flex-col h-full min-h-0">
         {/* Page header */}
         <div className="px-6 pt-6 pb-4 border-b shrink-0">
