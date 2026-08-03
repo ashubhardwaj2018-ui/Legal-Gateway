@@ -24,21 +24,81 @@ app.use(
 );
 
 // ── CORS ──────────────────────────────────────────────────────────────────────
-const allowedOrigins = [
-  /\.replit\.dev$/,
-  /\.replit\.app$/,   // production deployments
-  /\.repl\.co$/,
-  /localhost/,
-  "https://legalfilingindia.com",
-];
+// In production (NODE_ENV=production) only APP_URL (and its www. variant) are
+// accepted. Replit preview domains are intentionally excluded so no Replit-hosted
+// page can call the production API with user credentials.
+// In development all Replit preview domains are added automatically.
+//
+// To permit additional origins (e.g. a staging subdomain) set CORS_EXTRA_ORIGINS
+// as a comma-separated list of exact origin URLs:
+//   CORS_EXTRA_ORIGINS=https://staging.legalfilingindia.com,https://preview.example.com
+const isProduction = process.env.NODE_ENV === "production";
+const appUrl = process.env.APP_URL?.replace(/\/$/, ""); // strip trailing slash
+
+// Build an explicit Set of allowed origin strings (no regexes — exact match only)
+const explicitOrigins = new Set<string>();
+
+if (appUrl) {
+  explicitOrigins.add(appUrl);
+  // Also allow the www. variant when APP_URL has no www prefix
+  try {
+    const parsed = new URL(appUrl);
+    if (!parsed.hostname.startsWith("www.")) {
+      explicitOrigins.add(`${parsed.protocol}//www.${parsed.hostname}`);
+    }
+  } catch { /* invalid APP_URL — skip www variant */ }
+} else if (isProduction) {
+  logger.warn("APP_URL is not set — CORS will only permit loopback origins in production");
+}
+
+// Additional origins from env (comma-separated exact origin URLs)
+(process.env.CORS_EXTRA_ORIGINS ?? "")
+  .split(",")
+  .map((s) => s.trim().replace(/\/$/, ""))
+  .filter(Boolean)
+  .forEach((o) => explicitOrigins.add(o));
+
+/** True only for exact localhost / loopback hostnames. Prevents bypass via
+ *  `https://localhost.attacker.example` (substring match would allow that). */
+function isLoopback(origin: string): boolean {
+  try {
+    const { hostname } = new URL(origin);
+    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+  } catch {
+    return false;
+  }
+}
+
+/** True for Replit preview domains (allowed in development only). */
+function isReplitPreview(origin: string): boolean {
+  try {
+    const { hostname } = new URL(origin);
+    return (
+      hostname.endsWith(".replit.dev") ||
+      hostname.endsWith(".replit.app") ||
+      hostname.endsWith(".repl.co")
+    );
+  } catch {
+    return false;
+  }
+}
+
 app.use(
   cors({
     origin: (origin, cb) => {
-      if (!origin) return cb(null, true); // server-to-server / curl
-      const allowed = allowedOrigins.some((p) =>
-        typeof p === "string" ? p === origin : p.test(origin),
-      );
-      cb(allowed ? null : new Error("CORS policy"), allowed);
+      // No origin = same-origin request, server-to-server, or curl — always allow
+      if (!origin) return cb(null, true);
+
+      // Loopback: exact hostname check (guards against localhost.attacker.example)
+      if (isLoopback(origin)) return cb(null, true);
+
+      // Explicit allowlist: APP_URL, www variant, CORS_EXTRA_ORIGINS
+      if (explicitOrigins.has(origin)) return cb(null, true);
+
+      // Development only: permit Replit preview domains
+      if (!isProduction && isReplitPreview(origin)) return cb(null, true);
+
+      cb(new Error("CORS policy"), false);
     },
     credentials: true,
   }),

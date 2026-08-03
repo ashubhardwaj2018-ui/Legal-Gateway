@@ -234,7 +234,33 @@ echo "0 3 * * * root certbot renew --quiet" | sudo tee /etc/cron.d/certbot
 
 ---
 
-## 9. Uploads Directory
+## 9. CORS Security
+
+The API enforces CORS based on `NODE_ENV` and `APP_URL`:
+
+| Environment | Allowed origins |
+|-------------|----------------|
+| `production` | `APP_URL` and `www.APP_URL` only (+ localhost for health checks) |
+| `development` | `APP_URL` + any `*.replit.dev`, `*.replit.app`, `*.repl.co` domain |
+
+This means once deployed with `NODE_ENV=production` and `APP_URL=https://legalfilingindia.com`, **no Replit-hosted page can call the production API** — only your own domain is accepted.
+
+**Nothing extra to configure** — just make sure `.env` has:
+```
+NODE_ENV=production
+APP_URL=https://legalfilingindia.com
+```
+
+To permit additional origins (e.g. a staging subdomain), use `CORS_EXTRA_ORIGINS` — a comma-separated list of exact origin URLs:
+```
+CORS_EXTRA_ORIGINS=https://staging.legalfilingindia.com,https://preview.example.com
+```
+
+Never set `NODE_ENV=development` in production to work around CORS — use `CORS_EXTRA_ORIGINS` instead.
+
+---
+
+## 10. Uploads Directory
 
 The API server writes uploaded files (logos, chat attachments, etc.) to `./uploads/` relative to its working directory. On the VPS this resolves to `/var/www/legalfilingindia/uploads/`.
 
