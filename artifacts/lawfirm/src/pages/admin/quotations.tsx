@@ -113,7 +113,10 @@ async function printQuotation(q: Quotation) {
 </style></head><body>
 <div class="header">
   <div>
-    ${firm.logoUrl ? `<img src="${firm.logoUrl}" alt="${firm.firmName}" style="max-height:52px;max-width:180px;object-fit:contain;margin-bottom:6px;display:block;">` : ""}
+    ${firm.logoUrl
+      ? `<img src="${firm.logoUrl}" alt="${firm.firmName}" style="max-height:52px;max-width:180px;object-fit:contain;margin-bottom:6px;display:block;">`
+      : `<svg width="52" height="52" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-bottom:6px;display:block;border-radius:10px"><rect width="180" height="180" rx="36" fill="#0f2044"/><rect x="28" y="22" width="124" height="6" rx="3" fill="#c9a227"/><rect x="24" y="58" width="13" height="72" rx="3" fill="#fff"/><rect x="24" y="117" width="38" height="13" rx="3" fill="#fff"/><rect x="74" y="58" width="13" height="72" rx="3" fill="#fff"/><rect x="74" y="58" width="38" height="13" rx="3" fill="#fff"/><rect x="74" y="86" width="30" height="11" rx="3" fill="#c9a227"/><rect x="124" y="58" width="32" height="13" rx="3" fill="#fff"/><rect x="131" y="71" width="13" height="46" rx="3" fill="#fff"/><rect x="124" y="117" width="32" height="13" rx="3" fill="#fff"/><circle cx="90" cy="156" r="6" fill="#c9a227"/></svg>`
+    }
     <div class="firm-name">${firm.firmName}</div>
     <div class="firm-sub">${firm.firmTagline}</div>
     <div class="firm-addr">
