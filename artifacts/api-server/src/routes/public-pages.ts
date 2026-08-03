@@ -25,12 +25,12 @@ const PUBLIC_SETTING_KEYS = [
 ];
 
 const DEFAULT_PUBLIC: Record<string, string> = {
-  site_name:       "Vakil & Co. Legal Associates",
+  site_name:       "Legal Filing India Legal Associates",
   site_tagline:    "India's Premium Legal Network",
   phone_primary:   "1800-123-4567",
   phone_secondary: "+91 22 6789 0123",
-  email_primary:   "consult@vakilco.in",
-  email_secondary: "info@vakilco.in",
+  email_primary:   "consult@legalfilingindia.com",
+  email_secondary: "info@legalfilingindia.com",
   address:         "Level 7, Capital Building, BKC, Bandra East, Mumbai - 400051",
   hours_weekdays:  "9:00 AM – 7:00 PM",
   hours_saturday:  "10:00 AM – 4:00 PM",
@@ -38,17 +38,17 @@ const DEFAULT_PUBLIC: Record<string, string> = {
   gst_number:      "27AABCV1234F1Z5",
   footer_text:     "Premium legal services made accessible. We combine decades of expertise with modern technology to deliver exceptional legal solutions across India.",
   // Firm details for PDFs
-  firm_name:       "Vakil & Co.",
+  firm_name:       "Legal Filing India",
   firm_tagline:    "Advocates & Legal Consultants",
   firm_address:    "123, Legal Complex, Connaught Place, New Delhi — 110001",
   firm_phone:      "+91 98765 43210",
-  firm_email:      "info@vakilco.in",
+  firm_email:      "info@legalfilingindia.com",
   firm_gstin:      "07AABCV1234P1Z5",
   firm_pan:        "AABCV1234P",
   bank_name:       "HDFC Bank, New Delhi",
   bank_account_no: "12345678901234",
   bank_ifsc:       "HDFC0001234",
-  bank_upi:        "vakilco@hdfcbank",
+  bank_upi:        "legalfilingindia@hdfcbank",
 };
 
 // GET /api/settings — public endpoint; returns only safe display fields

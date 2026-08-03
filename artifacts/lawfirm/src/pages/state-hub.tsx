@@ -7,7 +7,7 @@ import { ALL_SERVICES, getServicesByCategory } from "@/data/service-index";
 import { Button } from "@/components/ui/button";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
-const SITE_URL = "https://vakil.co.in";
+const SITE_URL = "https://legalfilingindia.com";
 
 // Convert state name to URL-friendly slug
 function slugify(s: string): string {
@@ -97,8 +97,8 @@ export default function StateHub() {
     );
   });
 
-  const pageTitle = `Legal Services in ${stateName} | Vakil & Co.`;
-  const pageDesc = `Find expert legal, tax, and compliance services across all cities in ${stateName}. GST registration, trademark, company registration, and more — Vakil & Co.`;
+  const pageTitle = `Legal Services in ${stateName} | Legal Filing India`;
+  const pageDesc = `Find expert legal, tax, and compliance services across all cities in ${stateName}. GST registration, trademark, company registration, and more — Legal Filing India`;
   const canonicalUrl = `${SITE_URL}/state/${stateSlug}`;
 
   if (isError) {
@@ -153,7 +153,7 @@ export default function StateHub() {
             Legal & Compliance Services in {stateName}
           </h1>
           <p className="text-white/70 text-base max-w-2xl leading-relaxed mb-6">
-            Vakil & Co. provides expert CA, legal, and compliance services across all cities and towns in {stateName}. 
+            Legal Filing India provides expert CA, legal, and compliance services across all cities and towns in {stateName}. 
             Choose your city below to find services near you.
           </p>
           <div className="flex flex-wrap gap-3 text-sm">

@@ -295,7 +295,7 @@ export default function AdminChat() {
         {/* Workspace header */}
         <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
           <div>
-            <div className="font-bold text-white text-sm tracking-wide">Vakil & Co.</div>
+            <div className="font-bold text-white text-sm tracking-wide">Legal Filing India</div>
             <div className="text-white/40 text-[10px] flex items-center gap-1"><span className="w-1.5 h-1.5 bg-green-400 rounded-full inline-block" /> Active</div>
           </div>
           <Link href="/admin" className="text-white/40 hover:text-white/70 p-1 rounded transition-colors" title="Back to Admin">

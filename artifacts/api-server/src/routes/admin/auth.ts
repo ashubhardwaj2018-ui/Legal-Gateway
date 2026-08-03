@@ -54,7 +54,7 @@ export async function seedDefaultAdmin() {
   if (existing.length > 0) return;
   await db.insert(adminUsersTable).values({
     username: "admin",
-    email: "admin@vakilco.in",
+    email: "admin@legalfilingindia.com",
     passwordHash: hashPassword("Admin@2026"),
     role: "admin",
   });
@@ -483,7 +483,7 @@ async function sendTransactionalEmail(opts: { to: string; subject: string; html:
     auth: { user: cfg["email_smtp_user"], pass: cfg["email_smtp_pass"] },
   });
 
-  const fromName = cfg["email_from_name"] ?? "Vakil & Co.";
+  const fromName = cfg["email_from_name"] ?? "Legal Filing India";
   const fromAddr = cfg["email_from_address"] ?? cfg["email_smtp_user"];
 
   await transporter.sendMail({
@@ -543,7 +543,7 @@ authRouter.post("/admin/auth/forgot-password", async (req, res): Promise<void> =
   const appOrigin = (() => {
     if (process.env["APP_URL"]) return process.env["APP_URL"].replace(/\/$/, "");
     if (process.env["REPLIT_DEV_DOMAIN"]) return `https://${process.env["REPLIT_DEV_DOMAIN"]}`;
-    return "https://vakilco.in";
+    return "https://legalfilingindia.com";
   })();
   const resetUrl = `${appOrigin}/admin/reset-password?token=${token}`;
 
@@ -551,11 +551,11 @@ authRouter.post("/admin/auth/forgot-password", async (req, res): Promise<void> =
     <div style="font-family: Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px; background: #f9fafb; border-radius: 12px;">
       <div style="text-align: center; margin-bottom: 24px;">
         <div style="display: inline-block; background: #0f2044; padding: 16px 24px; border-radius: 8px;">
-          <span style="color: #c9a227; font-size: 20px; font-weight: bold;">⚖ VAKIL & CO.</span>
+          <span style="color: #c9a227; font-size: 20px; font-weight: bold;">⚖ LEGAL FILING INDIA</span>
         </div>
       </div>
       <h2 style="color: #0f2044; margin-bottom: 8px;">Reset Your Password</h2>
-      <p style="color: #555; line-height: 1.6;">You requested a password reset for your Vakil & Co. admin account.</p>
+      <p style="color: #555; line-height: 1.6;">You requested a password reset for your Legal Filing India admin account.</p>
       <p style="color: #555; line-height: 1.6;">Click the button below to set a new password. This link is valid for <strong>1 hour</strong>.</p>
       <div style="text-align: center; margin: 32px 0;">
         <a href="${resetUrl}" style="background: #c9a227; color: #0f2044; font-weight: bold; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-size: 15px; display: inline-block;">
@@ -570,7 +570,7 @@ authRouter.post("/admin/auth/forgot-password", async (req, res): Promise<void> =
   `;
 
   try {
-    await sendTransactionalEmail({ to: email, subject: "Reset your Vakil & Co. password", html });
+    await sendTransactionalEmail({ to: email, subject: "Reset your Legal Filing India password", html });
   } catch {
     // Don't reveal email/SMTP config errors to the client
     // The token is already stored — user could retry after SMTP is configured

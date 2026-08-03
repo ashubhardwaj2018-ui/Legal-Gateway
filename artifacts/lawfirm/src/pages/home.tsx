@@ -495,7 +495,7 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
             {[
               {
-                quote: "Vakil & Co made our startup's incorporation and trademark registration completely seamless. Their clear communication and fast turnaround let us focus on building our product.",
+                quote: "Legal Filing India made our startup's incorporation and trademark registration completely seamless. Their clear communication and fast turnaround let us focus on building our product.",
                 name: "Rahul Verma",
                 role: "Founder, TechFlow AI"
               },

@@ -66,7 +66,7 @@ function DetailModal({ contact, onClose, onMarkRead }: { contact: Contact; onClo
           </div>
           {contact.phone && (
             <a
-              href={`https://wa.me/${contact.phone.replace(/[^\d+]/g, "")}?text=${encodeURIComponent(`Hi ${contact.name}, thank you for reaching out to Vakil & Co. regarding "${contact.subject}". We'll get back to you shortly.`)}`}
+              href={`https://wa.me/${contact.phone.replace(/[^\d+]/g, "")}?text=${encodeURIComponent(`Hi ${contact.name}, thank you for reaching out to Legal Filing India regarding "${contact.subject}". We'll get back to you shortly.`)}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex w-full items-center justify-center gap-2 text-xs font-medium text-green-700 border border-green-300 hover:bg-green-50 hover:border-green-400 rounded-lg px-3 py-2 transition-colors"

@@ -45,13 +45,13 @@ const ROBOTS_OPTIONS = [
 
 const DEFAULT_SEO: Record<string, { title: string; description: string; keywords: string; robots: string }> = {
   home: {
-    title: "Vakil & Co. Legal Associates | India's Premium Legal Network",
+    title: "Legal Filing India India's Trusted Filing Platform | India's Premium Legal Network",
     description: "Expert legal services including trademark registration, company incorporation, NGO setup, property matters and more. Trusted by 50,000+ clients across India.",
     keywords: "law firm india, trademark registration, company registration, legal services india, vakil",
     robots: "index, follow",
   },
   "trademark-ip": {
-    title: "Trademark & IP Services | Vakil & Co.",
+    title: "Trademark & IP Services | Legal Filing India",
     description: "Professional trademark registration and intellectual property services in India. Protect your brand with expert legal assistance.",
     keywords: "trademark registration india, ip protection, copyright registration, patent filing",
     robots: "index, follow",
@@ -178,7 +178,7 @@ function MetaTagsTab() {
           <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
             <h3 className="font-semibold text-[#0f2044] text-sm border-b pb-2">Google Search Preview</h3>
             <div className="border border-gray-200 rounded-lg p-4 max-w-[600px]">
-              <div className="text-[13px] text-gray-500 truncate">vakilco.in &gt; {selectedPage}</div>
+              <div className="text-[13px] text-gray-500 truncate">legalfilingindia.com &gt; {selectedPage}</div>
               <div className="text-blue-700 text-lg hover:underline cursor-pointer mt-0.5 line-clamp-2">{form.title || "Page Title"}</div>
               <div className="text-sm text-gray-600 mt-1 line-clamp-2">{form.description || "Page description will appear here..."}</div>
             </div>
@@ -188,7 +188,7 @@ function MetaTagsTab() {
                 <div className="border border-gray-200 rounded-xl overflow-hidden max-w-[500px]">
                   {form.ogImage && <img src={form.ogImage} alt="OG" className="w-full h-40 object-cover" />}
                   <div className="p-4 bg-gray-50">
-                    <div className="text-xs text-gray-400 uppercase">vakilco.in</div>
+                    <div className="text-xs text-gray-400 uppercase">legalfilingindia.com</div>
                     <div className="font-semibold mt-1">{form.ogTitle || form.title}</div>
                     <div className="text-sm text-gray-600 mt-1 line-clamp-2">{form.ogDescription || form.description}</div>
                   </div>
@@ -252,7 +252,7 @@ function MetaTagsTab() {
               </div>
               <div>
                 <Label className="text-xs mb-1 block">OG Image URL</Label>
-                <Input className="text-sm h-9" value={form.ogImage} onChange={e => setForm(f => ({ ...f, ogImage: e.target.value }))} placeholder="https://vakilco.in/og-image.png" />
+                <Input className="text-sm h-9" value={form.ogImage} onChange={e => setForm(f => ({ ...f, ogImage: e.target.value }))} placeholder="https://legalfilingindia.com/og-image.png" />
               </div>
             </div>
             <Button onClick={handleSave} disabled={saving} className="w-full bg-[#0f2044] hover:bg-[#0f2044]/90 text-white gap-2">
@@ -452,8 +452,8 @@ Disallow: /admin/
 Disallow: /portal/
 
 # Sitemaps
-Sitemap: https://vakilco.in/api/sitemap-index.xml
-Sitemap: https://vakilco.in/api/sitemap.xml`;
+Sitemap: https://legalfilingindia.com/api/sitemap-index.xml
+Sitemap: https://legalfilingindia.com/api/sitemap.xml`;
 
 function RobotsTab() {
   const { toast } = useToast();

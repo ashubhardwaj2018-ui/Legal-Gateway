@@ -68,7 +68,7 @@ export default function AdminPage() {
       <div className="bg-primary text-white px-6 py-5 flex items-center gap-3">
         <Scale size={24} className="text-secondary" />
         <div>
-          <h1 className="text-xl font-serif font-bold">Vakil & Co. — Admin Panel</h1>
+          <h1 className="text-xl font-serif font-bold">Legal Filing India — Admin Panel</h1>
           <p className="text-white/60 text-xs">Consultation & inquiry management</p>
         </div>
       </div>

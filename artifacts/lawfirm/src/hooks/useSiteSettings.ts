@@ -27,12 +27,12 @@ export interface SiteSettings {
 }
 
 const DEFAULTS: SiteSettings = {
-  site_name:        "Vakil & Co. Legal Associates",
+  site_name:        "Legal Filing India India's Trusted Filing Platform",
   site_tagline:     "India's Premium Legal Network",
   phone_primary:    "1800-123-4567",
   phone_secondary:  "+91 22 6789 0123",
-  email_primary:    "consult@vakilco.in",
-  email_secondary:  "info@vakilco.in",
+  email_primary:    "consult@legalfilingindia.com",
+  email_secondary:  "info@legalfilingindia.com",
   address:          "Level 7, Capital Building, BKC, Bandra East, Mumbai - 400051",
   hours_weekdays:   "9:00 AM – 7:00 PM",
   hours_saturday:   "10:00 AM – 4:00 PM",

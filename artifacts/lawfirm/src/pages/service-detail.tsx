@@ -52,10 +52,10 @@ export default function ServiceDetail() {
     .filter(s => toSlug(s.name) !== slug)
     .slice(0, 4);
 
-  const metaTitle = `${service.name} in India | ${service.price} | Vakil & Co. Legal Associates`;
+  const metaTitle = `${service.name} in India | ${service.price} | Legal Filing India India's Trusted Filing Platform`;
   const metaDescription = `${service.description} Get ${service.name} done online with India's trusted legal platform. Expert ${cat.title} lawyers, fast processing. Starting at ${service.price}. Book free consultation.`;
-  const canonicalUrl = `https://vakil.co.in/services/${catId}/${slug}`;
-  const metaKeywords = `${service.name}, ${service.name} India, ${service.name} online, ${cat.title}, legal services India, Vakil and Co`;
+  const canonicalUrl = `https://legalfilingindia.com/services/${catId}/${slug}`;
+  const metaKeywords = `${service.name}, ${service.name} India, ${service.name} online, ${cat.title}, legal services India, Legal Filing India`;
 
   return (
     <>
@@ -68,7 +68,7 @@ export default function ServiceDetail() {
       <meta property="og:description" content={metaDescription} />
       <meta property="og:url" content={canonicalUrl} />
       <meta property="og:type" content="website" />
-      <meta property="og:site_name" content="Vakil & Co. Legal Associates" />
+      <meta property="og:site_name" content="Legal Filing India India's Trusted Filing Platform" />
       <meta name="twitter:card" content="summary_large_image" />
       <meta name="twitter:title" content={metaTitle} />
       <meta name="twitter:description" content={metaDescription} />
@@ -79,8 +79,8 @@ export default function ServiceDetail() {
         "description": service.description,
         "provider": {
           "@type": "LegalService",
-          "name": "Vakil & Co. Legal Associates",
-          "url": "https://vakil.co.in",
+          "name": "Legal Filing India India's Trusted Filing Platform",
+          "url": "https://legalfilingindia.com",
           "telephone": settings.phone_primary
         },
         "offers": {

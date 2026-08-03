@@ -225,7 +225,7 @@ export function AdminLayout({ children, title, subtitle, actions }: Props) {
           <Scale size={18} />
         </div>
         <div>
-          <div className="font-serif font-bold text-white text-sm leading-tight">VAKIL & CO.</div>
+          <div className="font-serif font-bold text-white text-sm leading-tight">LEGAL FILING INDIA</div>
           <div className="text-[10px] text-[#c9a227] uppercase tracking-widest font-medium">Admin Panel</div>
         </div>
       </div>

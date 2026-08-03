@@ -74,7 +74,7 @@ export default function IndianCompanies() {
   return (
     <>
       <Helmet>
-        <title>Indian Companies Database — Search by CIN, Name, State | Vakil & Co.</title>
+        <title>Indian Companies Database — Search by CIN, Name, State | Legal Filing India</title>
         <meta name="description" content="Search the Indian Companies Database. Find company details, CIN, incorporation date, status, capital information and more for all MCA registered companies." />
         <meta name="keywords" content="Indian companies database, CIN search, MCA company search, company registration India" />
       </Helmet>

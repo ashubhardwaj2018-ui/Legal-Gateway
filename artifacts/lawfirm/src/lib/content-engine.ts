@@ -48,7 +48,7 @@ export interface PageSeo {
   canonicalPath: string;
 }
 
-const FIRM_NAME = "Vakil & Co.";
+const FIRM_NAME = "Legal Filing India";
 
 export function primaryPlace(loc: LocationData | NearbyLocation): string {
   return loc.city || loc.town || loc.village || loc.district || loc.state;
@@ -141,7 +141,7 @@ export function generatePageSeo(service: ServiceInfo, loc: LocationData): PageSe
 
   const titles = [
     `${service.name} in ${city} | Expert Legal Services | ${FIRM_NAME}`,
-    `${service.name} in ${city}, ${state} | Vakil & Co. Legal Associates`,
+    `${service.name} in ${city}, ${state} | Legal Filing India India's Trusted Filing Platform`,
     `Best ${service.name} in ${city} | Affordable CA & Legal Services`,
   ];
 
@@ -173,7 +173,7 @@ export function generateJsonLd(
   faqs: { q: string; a: string }[],
 ): object[] {
   const city = primaryPlace(loc);
-  const baseUrl = "https://vakil.co.in";
+  const baseUrl = "https://legalfilingindia.com";
   const pageUrl = `${baseUrl}/${service.slug}/${loc.slug}`;
 
   const org = {

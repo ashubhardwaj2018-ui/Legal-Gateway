@@ -37,7 +37,7 @@ const DETAILS: Record<string, Partial<ServiceDetail>> = {
     charges: [
       { item: "Government filing fee (MCA)", amount: "₹0–₹2,000", note: "Based on authorized capital" },
       { item: "Stamp duty on MOA & AOA", amount: "₹200–₹2,000", note: "Varies by state" },
-      { item: "Professional/Service fee", amount: "₹4,999", note: "Vakil & Co. all-inclusive" },
+      { item: "Professional/Service fee", amount: "₹4,999", note: "Legal Filing India all-inclusive" },
       { item: "DSC (per director)", amount: "₹1,299 each", note: "If not already available" },
     ],
     faq: [
@@ -46,7 +46,7 @@ const DETAILS: Record<string, Partial<ServiceDetail>> = {
       { q: "Can an NRI or foreign national be a director?", a: "Yes. An NRI or foreign national can be a director; however, at least one director must be a resident Indian." },
       { q: "Can I register a Pvt Ltd company from home address?", a: "Yes. You can use your residential address as the registered office. You'll need a NOC from the property owner and a utility bill as proof." },
       { q: "What is the annual compliance cost?", a: "Typically ₹8,000–₹15,000/year including ROC filings (AOC-4, MGT-7), board meeting minutes, and annual audited financial statements." },
-      { q: "How long does the process take?", a: "Usually 7–10 working days after submission of all complete documents to Vakil & Co." },
+      { q: "How long does the process take?", a: "Usually 7–10 working days after submission of all complete documents to Legal Filing India" },
     ],
   },
 
@@ -71,7 +71,7 @@ const DETAILS: Record<string, Partial<ServiceDetail>> = {
     charges: [
       { item: "Government filing fee", amount: "₹500–₹1,000", note: "Based on contribution amount" },
       { item: "Stamp duty on LLP Agreement", amount: "₹200–₹5,000", note: "Varies by state" },
-      { item: "Professional/Service fee", amount: "₹5,999", note: "Vakil & Co. inclusive" },
+      { item: "Professional/Service fee", amount: "₹5,999", note: "Legal Filing India inclusive" },
     ],
     faq: [
       { q: "What is the difference between LLP and Partnership Firm?", a: "In a LLP, partners have limited liability (personal assets are protected). In a regular partnership, partners have unlimited liability. LLP is a separate legal entity; a partnership firm is not." },
@@ -102,7 +102,7 @@ const DETAILS: Record<string, Partial<ServiceDetail>> = {
     charges: [
       { item: "Government fee", amount: "₹0–₹1,000", note: "Nominal for small capital" },
       { item: "Stamp duty", amount: "₹200–₹1,000" },
-      { item: "Professional fee", amount: "₹6,499", note: "Vakil & Co. inclusive" },
+      { item: "Professional fee", amount: "₹6,499", note: "Legal Filing India inclusive" },
     ],
     faq: [
       { q: "Can an OPC have employees?", a: "Yes. An OPC can have any number of employees. Only the ownership/directorship is limited to one person." },
@@ -130,7 +130,7 @@ const DETAILS: Record<string, Partial<ServiceDetail>> = {
     validity: "Perpetual (until cancelled or surrendered)",
     charges: [
       { item: "Government fee", amount: "₹0", note: "GST registration is free of charge" },
-      { item: "Professional fee", amount: "₹1,499", note: "Vakil & Co. service charge" },
+      { item: "Professional fee", amount: "₹1,499", note: "Legal Filing India service charge" },
     ],
     faq: [
       { q: "Is GST registration mandatory for all businesses?", a: "No. It is mandatory only if your annual turnover exceeds the prescribed threshold (₹40 lakh for goods, ₹20 lakh for services in most states) or if you engage in inter-state supply, e-commerce, etc." },
@@ -159,7 +159,7 @@ const DETAILS: Record<string, Partial<ServiceDetail>> = {
     validity: "Recognition is valid for 10 years from incorporation or until annual turnover exceeds ₹100 crore",
     charges: [
       { item: "Government fee", amount: "₹0", note: "DPIIT recognition is free" },
-      { item: "Professional fee", amount: "₹3,999", note: "Vakil & Co. application assistance" },
+      { item: "Professional fee", amount: "₹3,999", note: "Legal Filing India application assistance" },
     ],
     faq: [
       { q: "Is DPIIT recognition the same as Startup India registration?", a: "Yes. DPIIT (Department for Promotion of Industry and Internal Trade) recognition is the official government registration for startups under the Startup India initiative." },
@@ -307,7 +307,7 @@ const DETAILS: Record<string, Partial<ServiceDetail>> = {
     charges: [
       { item: "Government filing fee (per class) — Individuals, Startups, SMEs", amount: "₹4,500" },
       { item: "Government filing fee (per class) — Companies", amount: "₹9,000" },
-      { item: "Professional fee", amount: "₹1,999 onwards", note: "Vakil & Co. base fee" },
+      { item: "Professional fee", amount: "₹1,999 onwards", note: "Legal Filing India base fee" },
       { item: "Objection reply / Hearing", amount: "₹2,499 additional", note: "If examination objection raised" },
     ],
     faq: [
@@ -368,7 +368,7 @@ const DETAILS: Record<string, Partial<ServiceDetail>> = {
       { item: "Government fee — natural person (Form 1 + Form 2)", amount: "₹1,600", note: "Reduced fee for individuals/small entities" },
       { item: "Government fee — startups/small entity", amount: "₹4,000" },
       { item: "Government fee — large entity/company", amount: "₹8,000" },
-      { item: "Professional/drafting fee", amount: "₹14,999", note: "Vakil & Co. (includes prior art search + drafting)" },
+      { item: "Professional/drafting fee", amount: "₹14,999", note: "Legal Filing India (includes prior art search + drafting)" },
     ],
     faq: [
       { q: "What happens after the 12-month period?", a: "You must file a complete specification (non-provisional application with claims) within 12 months of the provisional filing date. If you miss this deadline, the provisional application lapses and you lose your priority date." },
@@ -487,7 +487,7 @@ const DETAILS: Record<string, Partial<ServiceDetail>> = {
     charges: [
       { item: "Stamp duty", amount: "4–7% of property value", note: "Varies by state and gender of buyer" },
       { item: "Registration fee", amount: "0.5–1% of property value", note: "Usually capped at ₹30,000–₹1,00,000 in most states" },
-      { item: "Legal / professional fee", amount: "₹5,999", note: "Vakil & Co. (title verification + deed drafting + registration)" },
+      { item: "Legal / professional fee", amount: "₹5,999", note: "Legal Filing India (title verification + deed drafting + registration)" },
     ],
     faq: [
       { q: "Is stamp duty the same across all states?", a: "No. Stamp duty varies significantly: Maharashtra charges 5–6%, Karnataka 3–5.6%, Delhi 4–6%, UP 7%, Tamil Nadu 7%, Rajasthan 5–6%. Many states offer concessions for women buyers (0.5–2% reduction)." },
@@ -516,7 +516,7 @@ const DETAILS: Record<string, Partial<ServiceDetail>> = {
     validity: "Permanent — a Marriage Certificate is a lifetime document",
     charges: [
       { item: "Government fee", amount: "₹100–₹1,000", note: "Varies by state" },
-      { item: "Professional fee", amount: "₹2,999", note: "Vakil & Co. (documentation + coordination)" },
+      { item: "Professional fee", amount: "₹2,999", note: "Legal Filing India (documentation + coordination)" },
     ],
     faq: [
       { q: "Is it mandatory to register a marriage in India?", a: "The Supreme Court of India (Seema vs Ashwani Kumar, 2006) directed that marriage registration should be made compulsory. Several states have made it mandatory. Even where not mandatory, registration is strongly advisable for practical and legal purposes." },
@@ -549,7 +549,7 @@ const DETAILS: Record<string, Partial<ServiceDetail>> = {
       { item: "Trial retainer", amount: "₹25,000–₹2,00,000+", note: "Based on nature of charges and court" },
     ],
     faq: [
-      { q: "What should I do immediately after being arrested?", a: "Stay calm. Do not make any statements to the police without your lawyer present. You have the right to consult a lawyer (Article 22 of the Constitution). Call Vakil & Co. immediately on our 24×7 helpline." },
+      { q: "What should I do immediately after being arrested?", a: "Stay calm. Do not make any statements to the police without your lawyer present. You have the right to consult a lawyer (Article 22 of the Constitution). Call Legal Filing India immediately on our 24×7 helpline." },
       { q: "What is the difference between bail and anticipatory bail?", a: "Bail is applied for after arrest. Anticipatory bail (under Section 438 CrPC/Bhartiya Nagarik Suraksha Sanhita) is applied for before arrest, when a person apprehends arrest. It is granted by Sessions Court or High Court." },
     ],
   },
@@ -564,7 +564,7 @@ const DETAILS: Record<string, Partial<ServiceDetail>> = {
       { title: "Mutual Consent vs Contested Assessment", description: "If both parties agree on all terms, mutual consent divorce is pursued (faster, 6–18 months). If contested, prepare grounds under Section 13 Hindu Marriage Act / applicable law." },
       { title: "File Divorce Petition", description: "File the petition in the Family Court having jurisdiction (usually where parties last resided together)." },
       { title: "Interim Applications", description: "File applications for interim maintenance, child custody, and injunction against disposal of assets if needed." },
-      { title: "Mediation (if ordered)", description: "Courts often refer parties to mediation. Vakil & Co. lawyers represent you in mediation proceedings." },
+      { title: "Mediation (if ordered)", description: "Courts often refer parties to mediation. Legal Filing India lawyers represent you in mediation proceedings." },
       { title: "Trial / Decree", description: "In mutual consent: two motions heard; decree after 6-month cooling period (can be waived). In contested: full trial, evidence, witnesses, followed by decree." },
     ],
     documentsRequired: ["Marriage Certificate","Aadhaar / Passport (identity proof)","Photographs from marriage ceremony","Income/salary details of both parties","Children's birth certificates (if applicable)","Property documents (for asset division)","Bank statements","Evidence of grounds for divorce (for contested divorce)"],
@@ -597,7 +597,7 @@ const DETAILS: Record<string, Partial<ServiceDetail>> = {
       { title: "Post-Consultation Summary", description: "Receive a written summary of the advice and recommended next steps via email." },
     ],
     documentsRequired: ["Any relevant legal documents, notices, or contracts you want reviewed","Identity proof (for in-person consultation)"],
-    formsToFill: ["Online booking form on Vakil & Co. platform"],
+    formsToFill: ["Online booking form on Legal Filing India platform"],
     timeRequired: "Consultation: 30–60 minutes. Available within same day or next day.",
     validity: "Single session (follow-up sessions can be booked separately)",
     charges: [
@@ -718,7 +718,7 @@ function generateFallback(categoryId: string, serviceName: string, price: string
 
   return {
     tagline: description,
-    overview: `${serviceName} is a key service offered by Vakil & Co. Legal Associates. ${description} Our experienced team handles every aspect of the process — from document collection and preparation to filing, follow-up, and final delivery — ensuring full compliance with applicable laws and regulations.`,
+    overview: `${serviceName} is a key service offered by Legal Filing India India's Trusted Filing Platform. ${description} Our experienced team handles every aspect of the process — from document collection and preparation to filing, follow-up, and final delivery — ensuring full compliance with applicable laws and regulations.`,
     benefits: [
       `Complete end-to-end handling by experienced ${isLawyer ? "advocates" : "professionals"}`,
       "Real-time status updates via WhatsApp and email",
@@ -735,14 +735,14 @@ function generateFallback(categoryId: string, serviceName: string, price: string
     validity: "As applicable to the specific service",
     charges: [
       { item: "Government / statutory fee", amount: "At actuals", note: "Passed through at cost" },
-      { item: "Professional service fee", amount: price, note: "Vakil & Co. service charge" },
+      { item: "Professional service fee", amount: price, note: "Legal Filing India service charge" },
     ],
     faq: [
       { q: `What documents do I need for ${serviceName}?`, a: "Our team will send you a complete document checklist based on your specific situation after the initial briefing call." },
       { q: "How do I get started?", a: "Click 'Get Started' or 'Consult Now' on this page to fill a brief form. Our team will contact you within 2 hours during business hours." },
       { q: "What is the turnaround time?", a: `${timeMap[categoryId] || "Timelines depend on government processing"}. We will give you an accurate estimate based on your specific case.` },
       { q: "What if my application is rejected or questioned?", a: "We handle all queries, deficiency notices, and objections from government authorities as part of our service at no extra charge for standard queries." },
-      { q: "Is my information kept confidential?", a: "Yes. All information you share with Vakil & Co. is strictly confidential and protected by attorney-client privilege. We never share your information with any third party." },
+      { q: "Is my information kept confidential?", a: "Yes. All information you share with Legal Filing India is strictly confidential and protected by attorney-client privilege. We never share your information with any third party." },
     ],
   };
 }

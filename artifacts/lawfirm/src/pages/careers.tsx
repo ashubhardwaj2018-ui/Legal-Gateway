@@ -26,8 +26,8 @@ export default function Careers() {
   return (
     <>
       <Helmet>
-        <title>Careers at Vakil & Co. — Join India's Top Legal Team</title>
-        <meta name="description" content="Build your legal career at Vakil & Co. We're hiring lawyers, consultants, and legal professionals across India. View current openings." />
+        <title>Careers at Legal Filing India — Join India's Top Legal Team</title>
+        <meta name="description" content="Build your legal career at Legal Filing India We're hiring lawyers, consultants, and legal professionals across India. View current openings." />
       </Helmet>
 
       {/* Hero */}
@@ -48,7 +48,7 @@ export default function Careers() {
       <section className="py-20 bg-white">
         <div className="container mx-auto max-w-6xl px-4">
           <div className="text-center mb-14">
-            <h2 className="font-serif text-3xl md:text-4xl font-bold text-[#0f2044] mb-4">Why Vakil & Co.?</h2>
+            <h2 className="font-serif text-3xl md:text-4xl font-bold text-[#0f2044] mb-4">Why Legal Filing India?</h2>
             <p className="text-gray-500 max-w-xl mx-auto">We invest in our people as much as we invest in our clients.</p>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -128,10 +128,10 @@ export default function Careers() {
               </div>
               <div>
                 <label className="text-xs font-semibold text-white/50 uppercase tracking-wider block mb-2">Cover Note</label>
-                <textarea rows={4} placeholder="Tell us about yourself and why you'd like to join Vakil & Co." className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-[#c9a227]/60 text-sm resize-none" />
+                <textarea rows={4} placeholder="Tell us about yourself and why you'd like to join Legal Filing India" className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-[#c9a227]/60 text-sm resize-none" />
               </div>
               <div className="text-white/40 text-xs bg-white/5 rounded-xl px-4 py-3 border border-white/10">
-                📎 Email your resume to <span className="text-[#c9a227]">careers@vakilco.in</span> with the subject line: <em>Application — [Role Name]</em>
+                📎 Email your resume to <span className="text-[#c9a227]">careers@legalfilingindia.com</span> with the subject line: <em>Application — [Role Name]</em>
               </div>
               <button type="submit" className="w-full bg-[#c9a227] text-[#0f2044] font-bold py-3.5 rounded-xl hover:bg-[#e0b83a] transition-all text-sm">Submit Application</button>
             </form>

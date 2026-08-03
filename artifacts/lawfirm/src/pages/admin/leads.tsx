@@ -508,7 +508,7 @@ function LeadDetailDrawer({ leadId, onClose, onUpdated }: { leadId: number; onCl
             {/* WhatsApp quick button — always visible in the action bar */}
             {(lead.whatsapp || lead.phone) && (
               <a
-                href={`https://wa.me/${(lead.whatsapp || lead.phone).replace(/[^\d+]/g, "")}?text=${encodeURIComponent(`Hi ${lead.name}, this is from Vakil & Co. regarding your enquiry on ${lead.serviceInterest}. How can we assist you today?`)}`}
+                href={`https://wa.me/${(lead.whatsapp || lead.phone).replace(/[^\d+]/g, "")}?text=${encodeURIComponent(`Hi ${lead.name}, this is from Legal Filing India regarding your enquiry on ${lead.serviceInterest}. How can we assist you today?`)}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="ml-auto flex items-center gap-1.5 text-xs font-medium text-green-700 border border-green-300 bg-white hover:bg-green-50 hover:border-green-400 rounded-full px-3 py-1 transition-colors shrink-0"

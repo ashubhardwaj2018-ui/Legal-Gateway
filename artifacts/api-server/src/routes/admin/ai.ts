@@ -20,7 +20,7 @@ const AI_ACTIONS: Record<string, string> = {
 };
 
 const SYSTEM_PROMPT =
-  "You are an expert legal-services content writer for Vakil & Co., a premium Indian law firm. Follow the instruction exactly and completely. Return ONLY the requested content — no preamble, no label, no suffix.";
+  "You are an expert legal-services content writer for Legal Filing India, a premium Indian law firm. Follow the instruction exactly and completely. Return ONLY the requested content — no preamble, no label, no suffix.";
 
 const router = Router();
 

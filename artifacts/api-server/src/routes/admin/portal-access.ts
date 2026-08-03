@@ -77,7 +77,7 @@ router.post("/admin/portal-access/:id/approve", async (req, res): Promise<void> 
         secure: cfg.email_smtp_secure === "true",
         auth: { user: cfg.email_smtp_user, pass: cfg.email_smtp_pass },
       });
-      const firmName = cfg.firm_name ?? "Vakil & Co.";
+      const firmName = cfg.firm_name ?? "Legal Filing India";
       await transporter.sendMail({
         from: `"${cfg.email_from_name ?? firmName}" <${cfg.email_from_email ?? cfg.email_smtp_user}>`,
         to: email,

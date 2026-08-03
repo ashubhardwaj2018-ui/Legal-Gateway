@@ -2,7 +2,7 @@ import { useState } from "react";
 import { X, MessageCircle, Send } from "lucide-react";
 
 const WHATSAPP_NUMBER = "919876543210";
-const BUSINESS_NAME = "Vakil & Co.";
+const BUSINESS_NAME = "Legal Filing India";
 
 const QUICK_MESSAGES = [
   "I need help with Company Registration",

@@ -56,21 +56,21 @@ const SETTING_GROUPS = [
 ];
 
 const KEY_LABELS: Record<string, { label: string; placeholder: string; multiline?: boolean; type?: "select"; options?: string[] }> = {
-  site_name: { label: "Firm Name", placeholder: "Vakil & Co. Legal Associates" },
+  site_name: { label: "Firm Name", placeholder: "Legal Filing India India's Trusted Filing Platform" },
   site_tagline: { label: "Tagline", placeholder: "India's Premium Legal Network" },
   gst_number: { label: "GST Number", placeholder: "27AABCV1234F1Z5" },
   phone_primary: { label: "Primary Phone", placeholder: "1800-123-4567" },
   phone_secondary: { label: "Secondary Phone", placeholder: "+91 22 6789 0123" },
-  email_primary: { label: "Primary Email", placeholder: "consult@vakilco.in" },
-  email_secondary: { label: "Secondary Email", placeholder: "info@vakilco.in" },
+  email_primary: { label: "Primary Email", placeholder: "consult@legalfilingindia.com" },
+  email_secondary: { label: "Secondary Email", placeholder: "info@legalfilingindia.com" },
   address: { label: "Office Address", placeholder: "Level 7, Capital Building...", multiline: true },
   hours_weekdays: { label: "Monday – Friday", placeholder: "9:00 AM – 7:00 PM" },
   hours_saturday: { label: "Saturday", placeholder: "10:00 AM – 4:00 PM" },
   hours_sunday: { label: "Sunday", placeholder: "Closed" },
-  linkedin_url: { label: "LinkedIn URL", placeholder: "https://linkedin.com/company/vakilco" },
-  twitter_url: { label: "Twitter/X URL", placeholder: "https://twitter.com/vakilco" },
-  facebook_url: { label: "Facebook URL", placeholder: "https://facebook.com/vakilco" },
-  instagram_url: { label: "Instagram URL", placeholder: "https://instagram.com/vakilco" },
+  linkedin_url: { label: "LinkedIn URL", placeholder: "https://linkedin.com/company/legalfilingindia" },
+  twitter_url: { label: "Twitter/X URL", placeholder: "https://twitter.com/legalfilingindia" },
+  facebook_url: { label: "Facebook URL", placeholder: "https://facebook.com/legalfilingindia" },
+  instagram_url: { label: "Instagram URL", placeholder: "https://instagram.com/legalfilingindia" },
   // WhatsApp
   company_whatsapp:            { label: "Company WhatsApp Number (CRM)", placeholder: "+91 98765 43210" },
   whatsapp_provider:           { label: "Provider", placeholder: "web", type: "select" as const, options: ["web", "waba", "twilio", "360dialog", "gupshup", "interakt"] },
@@ -80,21 +80,21 @@ const KEY_LABELS: Record<string, { label: string; placeholder: string; multiline
   // Branding
   logo_url:        { label: "Logo URL", placeholder: "https://yoursite.com/logo.png" },
   website_whatsapp:{ label: "WhatsApp Number (Website Link)", placeholder: "+91 98765 43210 — shown as click-to-chat on website" },
-  support_email:   { label: "Support Email", placeholder: "support@vakilco.in — shown in footer & contact section" },
+  support_email:   { label: "Support Email", placeholder: "support@legalfilingindia.com — shown in footer & contact section" },
   footer_text:     { label: "Footer Description Text", placeholder: "Short description shown under your logo in the footer", multiline: true },
-  copyright_text:  { label: "Copyright Text", placeholder: `© ${new Date().getFullYear()} Vakil & Co. All rights reserved.` },
+  copyright_text:  { label: "Copyright Text", placeholder: `© ${new Date().getFullYear()} Legal Filing India All rights reserved.` },
   // Firm details for PDFs
-  firm_name:       { label: "Firm Name (PDF header)", placeholder: "Vakil & Co." },
+  firm_name:       { label: "Firm Name (PDF header)", placeholder: "Legal Filing India" },
   firm_tagline:    { label: "Tagline / Designation (PDF)", placeholder: "Advocates & Legal Consultants" },
   firm_address:    { label: "Registered Address (PDF)", placeholder: "123, Legal Complex, Connaught Place, New Delhi — 110001", multiline: true },
   firm_phone:      { label: "Phone (PDF)", placeholder: "+91 98765 43210" },
-  firm_email:      { label: "Email (PDF)", placeholder: "info@vakilco.in" },
+  firm_email:      { label: "Email (PDF)", placeholder: "info@legalfilingindia.com" },
   firm_gstin:      { label: "GSTIN (PDF)", placeholder: "07AABCV1234P1Z5" },
   firm_pan:        { label: "PAN (PDF)", placeholder: "AABCV1234P" },
   bank_name:       { label: "Bank Name & Branch", placeholder: "HDFC Bank, New Delhi" },
   bank_account_no: { label: "Account Number", placeholder: "12345678901234" },
   bank_ifsc:       { label: "IFSC Code", placeholder: "HDFC0001234" },
-  bank_upi:        { label: "UPI ID", placeholder: "vakilco@hdfcbank" },
+  bank_upi:        { label: "UPI ID", placeholder: "legalfilingindia@hdfcbank" },
 };
 
 const PROVIDER_HINTS: Record<string, { name: string; hint: string; needsKey: boolean; needsPhoneId: boolean }> = {

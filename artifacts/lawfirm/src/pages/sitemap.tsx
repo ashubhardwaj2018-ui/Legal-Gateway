@@ -9,7 +9,7 @@ import { SERVICES_DATA } from "@/data/services";
 import { toSlug } from "@/lib/slug";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
-const SITE_URL = "https://vakil.co.in";
+const SITE_URL = "https://legalfilingindia.com";
 
 // State name → URL slug (consistent with state-hub.tsx)
 function slugifyState(s: string): string {
@@ -228,8 +228,8 @@ export default function Sitemap() {
   return (
     <>
       <Helmet>
-        <title>Sitemap — Vakil & Co. Legal Associates</title>
-        <meta name="description" content="Browse all legal services, states, cities, and blog posts available on Vakil & Co. — India's premier online legal services platform." />
+        <title>Sitemap — Legal Filing India India's Trusted Filing Platform</title>
+        <meta name="description" content="Browse all legal services, states, cities, and blog posts available on Legal Filing India — India's premier online legal services platform." />
         <link rel="canonical" href={`${SITE_URL}/sitemap`} />
         <meta name="robots" content="index, follow" />
       </Helmet>
@@ -244,7 +244,7 @@ export default function Sitemap() {
           </div>
           <h1 className="text-3xl md:text-4xl font-bold text-white font-serif mb-3">Site Map</h1>
           <p className="text-white/70 max-w-2xl text-sm leading-relaxed">
-            A complete directory of all pages, services, and locations on Vakil &amp; Co.
+            A complete directory of all pages, services, and locations on Legal Filing India
             — {totalServices} legal services across {states.length || "28+"} states and union territories.
           </p>
 

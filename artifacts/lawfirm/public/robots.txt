@@ -7,4 +7,4 @@ Disallow: /api/admin/
 Disallow: /portal/
 
 # Sitemap index
-Sitemap: https://vakil.co.in/api/sitemap.xml
+Sitemap: https://legalfilingindia.com/api/sitemap.xml

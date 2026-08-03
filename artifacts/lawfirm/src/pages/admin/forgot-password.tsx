@@ -39,7 +39,7 @@ export default function ForgotPassword() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-[#c9a227] rounded-2xl mb-4 shadow-xl">
             <Scale size={28} className="text-[#0f2044]" />
           </div>
-          <h1 className="text-2xl font-bold text-white">VAKIL & CO.</h1>
+          <h1 className="text-2xl font-bold text-white">LEGAL FILING INDIA</h1>
           <p className="text-white/40 text-sm mt-1">Admin Panel</p>
         </div>
 
@@ -75,7 +75,7 @@ export default function ForgotPassword() {
                     type="email"
                     value={email}
                     onChange={e => setEmail(e.target.value)}
-                    placeholder="you@vakilco.in"
+                    placeholder="you@legalfilingindia.com"
                     required
                     autoFocus
                     className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-[#c9a227]/60 focus:bg-white/15 transition-all text-sm"

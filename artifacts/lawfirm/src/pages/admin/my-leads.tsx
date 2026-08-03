@@ -197,7 +197,7 @@ function LeadDetailPanel({ leadId, onUpdated }: { leadId: number; onUpdated: () 
             <MessageSquare size={11} /> {lead.email}
           </a>
           <a
-            href={`https://wa.me/${((lead as Lead & { whatsapp?: string }).whatsapp || lead.phone).replace(/[^\d+]/g, "")}?text=${encodeURIComponent(`Hi ${lead.name}, this is from Vakil & Co. regarding your enquiry on ${lead.serviceInterest}. How can we assist you today?`)}`}
+            href={`https://wa.me/${((lead as Lead & { whatsapp?: string }).whatsapp || lead.phone).replace(/[^\d+]/g, "")}?text=${encodeURIComponent(`Hi ${lead.name}, this is from Legal Filing India regarding your enquiry on ${lead.serviceInterest}. How can we assist you today?`)}`}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 bg-green-600 hover:bg-green-500 text-white px-2.5 py-1 rounded-full transition-colors font-medium"

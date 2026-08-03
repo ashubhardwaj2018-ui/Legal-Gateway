@@ -139,7 +139,7 @@ export default function BlogPost() {
     datePublished: blog.publishedAt,
     dateModified: blog.updatedAt,
     author: { "@type": "Organization", name: blog.authorName },
-    publisher: { "@type": "Organization", name: "Vakil & Co. Legal Associates" },
+    publisher: { "@type": "Organization", name: "Legal Filing India India's Trusted Filing Platform" },
     ...(blog.featuredImage && { image: blog.featuredImage }),
     ...(faqs.length > 0 && {
       mainEntity: faqs.map(f => ({
@@ -153,7 +153,7 @@ export default function BlogPost() {
     <>
       <ReadingProgressBar />
       <Helmet>
-        <title>{blog.metaTitle || blog.title} | Vakil & Co.</title>
+        <title>{blog.metaTitle || blog.title} | Legal Filing India</title>
         <meta name="description" content={blog.metaDescription || blog.excerpt || ""} />
         {blog.metaKeywords && <meta name="keywords" content={blog.metaKeywords} />}
         <meta property="og:title" content={blog.metaTitle || blog.title} />

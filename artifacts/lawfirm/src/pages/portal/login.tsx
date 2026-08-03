@@ -35,7 +35,7 @@ export default function PortalLogin() {
             <Scale size={18} className="text-[#0f2044]" />
           </div>
           <div>
-            <div className="text-white font-bold text-sm leading-none">Vakil & Co.</div>
+            <div className="text-white font-bold text-sm leading-none">Legal Filing India</div>
             <div className="text-[#c9a227]/70 text-[10px] tracking-wider uppercase">Client Portal</div>
           </div>
         </div>
@@ -140,7 +140,7 @@ export default function PortalLogin() {
       </div>
 
       <footer className="text-center pb-6 text-white/20 text-xs">
-        © {new Date().getFullYear()} Vakil & Co. · All rights reserved
+        © {new Date().getFullYear()} Legal Filing India · All rights reserved
       </footer>
     </div>
   );

@@ -65,8 +65,8 @@ export function Navbar() {
                   <Scale size={20} />
                 </div>
                 <div className="leading-none hidden sm:block">
-                  <div className="font-serif font-bold text-base text-primary">VAKIL & CO.</div>
-                  <div className="text-[8px] uppercase tracking-widest text-muted-foreground font-semibold">Legal Associates</div>
+                  <div className="font-serif font-bold text-base text-primary">LEGAL FILING INDIA</div>
+                  <div className="text-[8px] uppercase tracking-widest text-muted-foreground font-semibold">India's Trusted Filing Platform</div>
                 </div>
               </>
             )}

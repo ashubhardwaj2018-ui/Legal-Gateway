@@ -38,7 +38,7 @@ const SERVICE_CATEGORY_IDS = [
 // Locations per pSEO sitemap file — ensures ≤ 50,000 URLs per file
 const LOC_PER_PSEO_FILE = Math.max(1, Math.floor(50_000 / ALL_UNIQUE_SERVICE_SLUGS.length));
 
-const BASE_URL = "https://vakil.co.in";
+const BASE_URL = "https://legalfilingindia.com";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function xmlUrl(loc: string, lastmod: string, freq: string, priority: string): string {
@@ -224,7 +224,7 @@ router.get("/pseo-stats", async (_req, res): Promise<void> => {
 // ── robots.txt ───────────────────────────────────────────────────────────────
 router.get("/robots.txt", (req, res): void => {
   const proto = req.headers["x-forwarded-proto"] ?? "https";
-  const host  = req.headers["x-forwarded-host"] ?? req.headers.host ?? "vakil.co.in";
+  const host  = req.headers["x-forwarded-host"] ?? req.headers.host ?? "legalfilingindia.com";
   const apiBase = `${proto}://${host}/api`;
 
   res.setHeader("Content-Type", "text/plain; charset=utf-8");
@@ -247,7 +247,7 @@ Sitemap: ${apiBase}/sitemap.xml
 router.get("/sitemap.xml", async (req, res): Promise<void> => {
   const now = new Date().toISOString().split("T")[0];
   const proto = req.headers["x-forwarded-proto"] ?? "https";
-  const host  = req.headers["x-forwarded-host"] ?? req.headers.host ?? "vakil.co.in";
+  const host  = req.headers["x-forwarded-host"] ?? req.headers.host ?? "legalfilingindia.com";
   const apiBase = `${proto}://${host}/api`;
 
   const [{ value: locCount }] = await db

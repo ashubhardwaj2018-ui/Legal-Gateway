@@ -47,8 +47,8 @@ export default function BlogList() {
   return (
     <>
       <Helmet>
-        <title>Legal Blog & Articles | Vakil & Co. Legal Associates</title>
-        <meta name="description" content="Expert legal advice, updates on Indian law, company registration guides, tax compliance tips and more from the team at Vakil & Co." />
+        <title>Legal Blog & Articles | Legal Filing India India's Trusted Filing Platform</title>
+        <meta name="description" content="Expert legal advice, updates on Indian law, company registration guides, tax compliance tips and more from the team at Legal Filing India" />
       </Helmet>
 
       {/* Hero */}

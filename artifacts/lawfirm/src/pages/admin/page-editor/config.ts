@@ -309,7 +309,7 @@ export const PAGES: PageDef[] = [
         id: "brand", title: "Brand Section",
         blocks: [
           { id: "footer_tagline",     label: "Tagline / About Text", type: "textarea" },
-          { id: "footer_copyright",   label: "Copyright Text",       type: "text", placeholder: "© 2025 Vakil & Co. All rights reserved." },
+          { id: "footer_copyright",   label: "Copyright Text",       type: "text", placeholder: "© 2025 Legal Filing India All rights reserved." },
           { id: "footer_bottom_note", label: "Bottom Legal Note",    type: "text" },
         ],
       },

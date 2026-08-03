@@ -14,7 +14,7 @@ export const blogsTable = pgTable(
     category: text("category").notNull().default("general"),
     tags: text("tags"),
     status: text("status").notNull().default("draft"),
-    authorName: text("author_name").notNull().default("Vakil & Co."),
+    authorName: text("author_name").notNull().default("Legal Filing India"),
     metaTitle: text("meta_title"),
     metaDescription: text("meta_description"),
     metaKeywords: text("meta_keywords"),

@@ -31,9 +31,9 @@ router.get("/admin/locations/template", (_req, res): void => {
   const wb = XLSX.utils.book_new();
   const headers = ["City", "State", "Country", "Slug", "Meta Title", "Meta Description", "Latitude", "Longitude"];
   const sampleData = [
-    { City: "Mumbai", State: "Maharashtra", Country: "India", Slug: "mumbai", "Meta Title": "Top Lawyers in Mumbai | Vakil & Co", "Meta Description": "Expert legal services in Mumbai. Contact Vakil & Co for trademark, property, and corporate law.", Latitude: 19.076, Longitude: 72.8777 },
-    { City: "Bangalore", State: "Karnataka", Country: "India", Slug: "bangalore", "Meta Title": "Legal Services in Bangalore | Vakil & Co", "Meta Description": "Trusted law firm in Bangalore for startups, IP, NGO registration and more.", Latitude: 12.9716, Longitude: 77.5946 },
-    { City: "Chennai", State: "Tamil Nadu", Country: "India", Slug: "chennai", "Meta Title": "Lawyers in Chennai | Vakil & Co", "Meta Description": "Professional legal assistance in Chennai. Trademark, property, and business law experts.", Latitude: 13.0827, Longitude: 80.2707 },
+    { City: "Mumbai", State: "Maharashtra", Country: "India", Slug: "mumbai", "Meta Title": "Top Lawyers in Mumbai | Legal Filing India", "Meta Description": "Expert legal services in Mumbai. Contact Legal Filing India for trademark, property, and corporate law.", Latitude: 19.076, Longitude: 72.8777 },
+    { City: "Bangalore", State: "Karnataka", Country: "India", Slug: "bangalore", "Meta Title": "Legal Services in Bangalore | Legal Filing India", "Meta Description": "Trusted law firm in Bangalore for startups, IP, NGO registration and more.", Latitude: 12.9716, Longitude: 77.5946 },
+    { City: "Chennai", State: "Tamil Nadu", Country: "India", Slug: "chennai", "Meta Title": "Lawyers in Chennai | Legal Filing India", "Meta Description": "Professional legal assistance in Chennai. Trademark, property, and business law experts.", Latitude: 13.0827, Longitude: 80.2707 },
   ];
   const ws = XLSX.utils.json_to_sheet(sampleData, { header: headers });
   ws["!cols"] = [16, 16, 12, 16, 40, 60, 10, 10].map((w) => ({ wch: w }));
@@ -699,7 +699,7 @@ function pingUrl(url: string): Promise<boolean> {
 
 router.post("/admin/sitemap/ping", async (req, res): Promise<void> => {
   const proto = req.headers["x-forwarded-proto"] ?? "https";
-  const host  = req.headers["x-forwarded-host"] ?? req.headers.host ?? "vakil.co.in";
+  const host  = req.headers["x-forwarded-host"] ?? req.headers.host ?? "legalfilingindia.com";
   const sitemapUrl = encodeURIComponent(`${proto}://${host}/api/sitemap.xml`);
 
   const [google, bing] = await Promise.all([

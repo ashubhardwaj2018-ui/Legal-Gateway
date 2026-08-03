@@ -39,7 +39,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 const BLANK_FORM = {
   title: "", slug: "", excerpt: "", content: "", featuredImage: "",
-  category: "general", tags: "", status: "draft", authorName: "Vakil & Co.",
+  category: "general", tags: "", status: "draft", authorName: "Legal Filing India",
   metaTitle: "", metaDescription: "", metaKeywords: "", faqs: "",
 };
 
@@ -150,7 +150,7 @@ export default function AdminBlogs() {
           title: result.title, slug: result.slug, excerpt: result.excerpt,
           content: result.content, featuredImage: "",
           category: result.category || "general", tags: result.tags,
-          status: "draft", authorName: "Vakil & Co.",
+          status: "draft", authorName: "Legal Filing India",
           metaTitle: result.metaTitle, metaDescription: result.metaDescription,
           metaKeywords: result.metaKeywords, faqs: result.faqs,
         });

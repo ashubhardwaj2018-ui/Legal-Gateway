@@ -164,7 +164,7 @@ export default function ServiceLocation() {
     .filter((s) => s.slug !== service.slug)
     .slice(0, 6);
 
-  const pageUrl = `https://vakil.co.in/${serviceSlug}/${locationSlug}`;
+  const pageUrl = `https://legalfilingindia.com/${serviceSlug}/${locationSlug}`;
 
   return (
     <>
@@ -254,7 +254,7 @@ export default function ServiceLocation() {
 
             {/* Why Choose Us */}
             <section>
-              <h2 className="text-2xl font-serif font-bold text-[#0f2044] mb-6">Why Choose Vakil & Co. in {city}?</h2>
+              <h2 className="text-2xl font-serif font-bold text-[#0f2044] mb-6">Why Choose Legal Filing India in {city}?</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {content.whyChooseUs.map((item) => (
                   <div key={item.title} className="flex gap-4 p-5 rounded-xl border border-gray-100 bg-gray-50">

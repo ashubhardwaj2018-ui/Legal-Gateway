@@ -86,7 +86,7 @@ export default function DocView() {
 
   const { doc, settings, docType } = payload;
   const items = (Array.isArray(doc.items) ? doc.items : []) as Array<{ description?: string; qty?: number; rate?: number; gstRate?: number; quantity?: number; unitPrice?: number }>;
-  const firmName   = settings.firm_name || settings.site_name || "Vakil & Co.";
+  const firmName   = settings.firm_name || settings.site_name || "Legal Filing India";
   const isInvoice  = docType === "invoice";
 
   // Invoice-style doc

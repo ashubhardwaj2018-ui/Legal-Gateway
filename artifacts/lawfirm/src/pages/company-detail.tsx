@@ -112,7 +112,7 @@ export default function CompanyDetail() {
   return (
     <>
       <Helmet>
-        <title>{company.companyName} — CIN {company.cin} | Indian Companies Database | Vakil & Co.</title>
+        <title>{company.companyName} — CIN {company.cin} | Indian Companies Database | Legal Filing India</title>
         <meta name="description" content={`${company.companyName} (CIN: ${company.cin}) — ${company.companyType ?? "Company"} registered in ${company.state ?? "India"}. Incorporation date: ${company.incorporationDate ?? "N/A"}. Status: ${company.companyStatus ?? "N/A"}.`} />
         <link rel="canonical" href={`/company/${company.slug}`} />
         <script type="application/ld+json">{JSON.stringify(schemaOrg)}</script>

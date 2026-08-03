@@ -101,7 +101,7 @@ const PROVIDER_FIELDS: Record<string, Array<{
   ],
   msg91: [
     { key: "whatsapp_api_key",    label: "Auth Key",  sensitive: true, required: true },
-    { key: "whatsapp_sender_id",  label: "Sender ID", placeholder: "e.g. VAKILCO" },
+    { key: "whatsapp_sender_id",  label: "Sender ID", placeholder: "e.g. LEGALFILING" },
   ],
   "360dialog": [
     { key: "whatsapp_api_key",     label: "Partner API Key", sensitive: true, required: true },
@@ -752,7 +752,7 @@ export default function AdminWhatsApp() {
               <label className="text-xs font-medium text-gray-600">Business Name</label>
               <input
                 className="mt-1 h-9 w-full border border-gray-200 rounded-lg px-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0f2044]/30"
-                placeholder="e.g. Vakil & Co. Legal Associates"
+                placeholder="e.g. Legal Filing India India's Trusted Filing Platform"
                 value={sf.whatsapp_business_name ?? ""}
                 onChange={e => setSf(p => ({ ...p, whatsapp_business_name: e.target.value }))}
               />

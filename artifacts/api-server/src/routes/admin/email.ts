@@ -21,7 +21,7 @@ function renderTemplate(html: string, vars: Record<string, string>): string {
 
 function buildVars(settings: Record<string, string>, lead?: Record<string, unknown>, inv?: Record<string, unknown>): Record<string, string> {
   return {
-    firm_name: settings.firm_name ?? "Vakil & Co.",
+    firm_name: settings.firm_name ?? "Legal Filing India",
     firm_email: settings.email ?? "",
     firm_phone: settings.phone ?? "",
     firm_address: settings.address ?? "",
@@ -174,7 +174,7 @@ router.get("/admin/email/settings", async (_req, res): Promise<void> => {
     secure: cfg.email_smtp_secure ?? "false",
     user: cfg.email_smtp_user ?? "",
     pass: cfg.email_smtp_pass ? "••••••••" : "",
-    fromName: cfg.email_from_name ?? cfg.firm_name ?? "Vakil & Co.",
+    fromName: cfg.email_from_name ?? cfg.firm_name ?? "Legal Filing India",
     fromEmail: cfg.email_from_email ?? cfg.email ?? "",
     replyTo: cfg.email_reply_to ?? "",
   });
@@ -213,10 +213,10 @@ router.post("/admin/email/settings/test", async (req, res): Promise<void> => {
     });
     await transporter.verify();
     await transporter.sendMail({
-      from: `"${cfg.email_from_name ?? "Vakil & Co."}" <${cfg.email_from_email ?? cfg.email_smtp_user}>`,
+      from: `"${cfg.email_from_name ?? "Legal Filing India"}" <${cfg.email_from_email ?? cfg.email_smtp_user}>`,
       to: toEmail,
       subject: "✅ Test Email — SMTP Working",
-      html: "<p>Your SMTP configuration is working correctly. This is a test email from <b>Vakil & Co. ERP</b>.</p>",
+      html: "<p>Your SMTP configuration is working correctly. This is a test email from <b>Legal Filing India ERP</b>.</p>",
     });
     res.json({ ok: true, message: "Test email sent successfully" });
   } catch (err: unknown) {
@@ -277,7 +277,7 @@ async function sendEmail(opts: { toEmail: string; toName?: string; subject: stri
       auth: { user: cfg.email_smtp_user, pass: cfg.email_smtp_pass },
     });
     const info = await transporter.sendMail({
-      from: `"${cfg.email_from_name ?? "Vakil & Co."}" <${cfg.email_from_email ?? cfg.email_smtp_user}>`,
+      from: `"${cfg.email_from_name ?? "Legal Filing India"}" <${cfg.email_from_email ?? cfg.email_smtp_user}>`,
       to: opts.toName ? `"${opts.toName}" <${opts.toEmail}>` : opts.toEmail,
       replyTo: cfg.email_reply_to || undefined,
       subject: opts.subject,

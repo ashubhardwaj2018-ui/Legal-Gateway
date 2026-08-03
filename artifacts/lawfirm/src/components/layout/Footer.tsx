@@ -55,8 +55,8 @@ export function Footer() {
                     <Scale size={24} />
                   </div>
                   <div className="flex flex-col">
-                    <span className="font-serif font-bold text-xl leading-none text-white">VAKIL & CO.</span>
-                    <span className="text-[10px] uppercase tracking-widest text-secondary font-semibold">Legal Associates</span>
+                    <span className="font-serif font-bold text-xl leading-none text-white">LEGAL FILING INDIA</span>
+                    <span className="text-[10px] uppercase tracking-widest text-secondary font-semibold">India's Trusted Filing Platform</span>
                   </div>
                 </>
               )}

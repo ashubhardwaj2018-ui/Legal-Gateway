@@ -217,7 +217,7 @@ function computeTotals(items: InvoiceItem[], discount: number, discountType: str
 }
 
 const BLANK_FORM = {
-  type: "invoice", dueDate: "", notes: "", terms: "Payment due within 30 days.\nCheques to be made in favour of Vakil & Co.",
+  type: "invoice", dueDate: "", notes: "", terms: "Payment due within 30 days.\nCheques to be made in favour of Legal Filing India",
   discount: "0", discountType: "fixed",
   clientName: "", clientEmail: "", clientPhone: "", clientAddress: "", clientGST: "", clientState: "",
 };
@@ -235,12 +235,12 @@ interface FirmDetails {
 }
 
 const FIRM_DEFAULTS: FirmDetails = {
-  firmName: "Vakil & Co.", firmTagline: "Advocates & Legal Consultants",
+  firmName: "Legal Filing India", firmTagline: "Advocates & Legal Consultants",
   firmAddress: "123, Legal Complex, Connaught Place, New Delhi — 110001",
-  firmPhone: "+91 98765 43210", firmEmail: "info@vakilco.in",
+  firmPhone: "+91 98765 43210", firmEmail: "info@legalfilingindia.com",
   firmGstin: "07AABCV1234P1Z5", firmPan: "AABCV1234P",
   bankName: "HDFC Bank, New Delhi", bankAccountNo: "12345678901234",
-  bankIfsc: "HDFC0001234", bankUpi: "vakilco@hdfcbank",
+  bankIfsc: "HDFC0001234", bankUpi: "legalfilingindia@hdfcbank",
 };
 
 async function fetchFirmDetails(): Promise<FirmDetails> {
@@ -661,7 +661,7 @@ export default function AdminInvoices() {
                             <button
                               onClick={() => {
                                 const num = inv.clientPhone!.replace(/[\s\-().]/g, "").replace(/[^\d+]/g, "");
-                                sendWaFromInvoice(num, `Dear ${inv.clientName}, your ${inv.type} ${inv.number} for ₹${Number(inv.total).toLocaleString("en-IN")} is ready. Balance due: ₹${(Number(inv.total) - Number(inv.paidAmount ?? 0)).toLocaleString("en-IN")}. Please contact us for any queries. — Vakil & Co.`);
+                                sendWaFromInvoice(num, `Dear ${inv.clientName}, your ${inv.type} ${inv.number} for ₹${Number(inv.total).toLocaleString("en-IN")} is ready. Balance due: ₹${(Number(inv.total) - Number(inv.paidAmount ?? 0)).toLocaleString("en-IN")}. Please contact us for any queries. — Legal Filing India`);
                               }}
                               className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
                               title="Send WhatsApp"
@@ -722,7 +722,7 @@ export default function AdminInvoices() {
                 {selected.clientPhone && (
                   <WaSendButton
                     phone={selected.clientPhone.replace(/[\s\-().]/g, "").replace(/[^\d+]/g, "")}
-                    defaultMessage={`Dear ${selected.clientName}, your ${TYPE_LABELS[selected.type] ?? selected.type} ${selected.number} for ₹${fmt(selected.total)} has been shared. ${selBalance > 0.01 ? `Balance due: ₹${fmt(String(selBalance))}. ` : ""}Please contact us for any queries. — Vakil & Co.`}
+                    defaultMessage={`Dear ${selected.clientName}, your ${TYPE_LABELS[selected.type] ?? selected.type} ${selected.number} for ₹${fmt(selected.total)} has been shared. ${selBalance > 0.01 ? `Balance due: ₹${fmt(String(selBalance))}. ` : ""}Please contact us for any queries. — Legal Filing India`}
                     categoryHint="invoice"
                     ctx={{
                       ClientName: selected.clientName,
@@ -730,8 +730,8 @@ export default function AdminInvoices() {
                       Amount: `₹${fmt(selected.total)}`,
                       Balance: selBalance > 0.01 ? `₹${fmt(String(selBalance))}` : "Nil",
                       Type: TYPE_LABELS[selected.type] ?? selected.type,
-                      CompanyName: "Vakil & Co.",
-                      SupportEmail: "info@vakilco.in",
+                      CompanyName: "Legal Filing India",
+                      SupportEmail: "info@legalfilingindia.com",
                     }}
                   />
                 )}

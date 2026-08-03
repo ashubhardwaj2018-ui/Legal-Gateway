@@ -16,7 +16,7 @@ import {
 function generateQuotationNumber(): string {
   const year = new Date().getFullYear();
   const random = Math.floor(10000 + Math.random() * 90000);
-  return `VAKIL-${year}-${random}`;
+  return `LFI-${year}-${random}`;
 }
 
 function calcTotals(items: Array<{ quantity: number; unitPrice: number }>, taxPercent: number) {

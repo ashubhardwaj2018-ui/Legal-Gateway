@@ -76,7 +76,7 @@ router.post("/admin/blogs", async (req, res): Promise<void> => {
     category: body.category ?? "general",
     tags: body.tags ?? null,
     status: body.status ?? "draft",
-    authorName: body.authorName ?? "Vakil & Co.",
+    authorName: body.authorName ?? "Legal Filing India",
     metaTitle: body.metaTitle ?? null,
     metaDescription: body.metaDescription ?? null,
     metaKeywords: body.metaKeywords ?? null,
@@ -152,7 +152,7 @@ router.post("/admin/blogs/ai-generate", async (req, res): Promise<void> => {
   if (targetCity) contextParts.push(`targeting clients in ${targetCity}`);
   const context = contextParts.length > 0 ? `Context: ${contextParts.join(", ")}.` : "";
 
-  const prompt = `You are an expert Indian legal content writer for Vakil & Co. Legal Associates.
+  const prompt = `You are an expert Indian legal content writer for Legal Filing India Legal Associates.
 
 Generate a complete, SEO-optimized blog post in ${tone} tone.
 Topic: "${topic}"
@@ -175,7 +175,7 @@ Respond ONLY with a valid JSON object (no markdown, no code blocks) with these e
 
 The content must be:
 - Specific to Indian law/regulations
-- Mention Vakil & Co. naturally once or twice
+- Mention Legal Filing India naturally once or twice
 - Include practical advice
 - Be engaging and informative`;
 

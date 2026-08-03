@@ -27,7 +27,7 @@ const allowedOrigins = [
   /\.replit\.app$/,   // production deployments
   /\.repl\.co$/,
   /localhost/,
-  "https://vakil.co.in",
+  "https://legalfilingindia.com",
 ];
 app.use(
   cors({

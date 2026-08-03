@@ -216,15 +216,15 @@ export default function AdminEmail() {
               </div>
               <div>
                 <label className="label-sm">From Name</label>
-                <input value={smtp.fromName} onChange={e => setSmtp(s => ({ ...s, fromName: e.target.value }))} placeholder="Vakil & Co." className="input-field" />
+                <input value={smtp.fromName} onChange={e => setSmtp(s => ({ ...s, fromName: e.target.value }))} placeholder="Legal Filing India" className="input-field" />
               </div>
               <div>
                 <label className="label-sm">From Email</label>
-                <input value={smtp.fromEmail} onChange={e => setSmtp(s => ({ ...s, fromEmail: e.target.value }))} placeholder="info@vakilco.com" className="input-field" />
+                <input value={smtp.fromEmail} onChange={e => setSmtp(s => ({ ...s, fromEmail: e.target.value }))} placeholder="info@legalfilingindia.com" className="input-field" />
               </div>
               <div className="col-span-2">
                 <label className="label-sm">Reply-To (optional)</label>
-                <input value={smtp.replyTo} onChange={e => setSmtp(s => ({ ...s, replyTo: e.target.value }))} placeholder="replies@vakilco.com" className="input-field" />
+                <input value={smtp.replyTo} onChange={e => setSmtp(s => ({ ...s, replyTo: e.target.value }))} placeholder="replies@legalfilingindia.com" className="input-field" />
               </div>
             </div>
             <div className="flex gap-3 mt-6 pt-5 border-t border-gray-100">

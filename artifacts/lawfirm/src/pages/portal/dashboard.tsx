@@ -78,12 +78,12 @@ interface FirmDetails {
 }
 
 const FIRM_DEFAULTS: FirmDetails = {
-  firmName: "Vakil & Co.", firmTagline: "Advocates & Legal Consultants",
+  firmName: "Legal Filing India", firmTagline: "Advocates & Legal Consultants",
   firmAddress: "123, Legal Complex, Connaught Place, New Delhi — 110001",
-  firmPhone: "+91 98765 43210", firmEmail: "info@vakilco.in",
+  firmPhone: "+91 98765 43210", firmEmail: "info@legalfilingindia.com",
   firmGstin: "07AABCV1234P1Z5", firmPan: "AABCV1234P",
   bankName: "HDFC Bank, New Delhi", bankAccountNo: "12345678901234",
-  bankIfsc: "HDFC0001234", bankUpi: "vakilco@hdfcbank",
+  bankIfsc: "HDFC0001234", bankUpi: "legalfilingindia@hdfcbank",
 };
 
 async function fetchFirmDetails(): Promise<FirmDetails> {
@@ -522,7 +522,7 @@ export default function PortalDashboard() {
             <Scale size={15} className="text-[#0f2044]" />
           </div>
           <div>
-            <div className="text-white font-bold text-sm leading-none">Vakil & Co.</div>
+            <div className="text-white font-bold text-sm leading-none">Legal Filing India</div>
             <div className="text-[#c9a227]/60 text-[9px] uppercase tracking-wider">Client Portal</div>
           </div>
         </div>
@@ -1232,7 +1232,7 @@ export default function PortalDashboard() {
       </div>
 
       <footer className="text-center py-4 text-gray-300 text-xs border-t border-gray-100">
-        Vakil & Co. Client Portal · Secure &amp; Confidential
+        Legal Filing India Client Portal · Secure &amp; Confidential
       </footer>
     </div>
   );

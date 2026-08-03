@@ -127,7 +127,7 @@ export default function AdminDashboard() {
   const S = stats;
 
   return (
-    <AdminLayout title="Dashboard" subtitle="Live overview — Vakil & Co. ERP">
+    <AdminLayout title="Dashboard" subtitle="Live overview — Legal Filing India ERP">
       {/* ── KPI CARDS ─────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-3 mb-6">
         <KpiCard label="Total Leads" value={S?.leads.total ?? "—"} icon={Users} bg="bg-blue-50" color="text-blue-600" href="/admin/leads" trend="up" />

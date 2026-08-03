@@ -19,22 +19,22 @@ export default function ServiceCategory() {
 
   const category = SERVICES_DATA[categoryId as keyof typeof SERVICES_DATA];
 
-  const metaTitle = `${category.title} Services in India | Vakil & Co. Legal Associates`;
-  const metaDescription = `${category.description} Expert legal professionals at Vakil & Co. help you with ${category.services.slice(0, 3).map(s => s.name).join(", ")} and more. Fast, affordable, online.`;
-  const canonicalUrl = `https://vakil.co.in/services/${category.id}`;
+  const metaTitle = `${category.title} Services in India | Legal Filing India India's Trusted Filing Platform`;
+  const metaDescription = `${category.description} Expert legal professionals at Legal Filing India help you with ${category.services.slice(0, 3).map(s => s.name).join(", ")} and more. Fast, affordable, online.`;
+  const canonicalUrl = `https://legalfilingindia.com/services/${category.id}`;
 
   return (
     <>
     <Helmet>
       <title>{metaTitle}</title>
       <meta name="description" content={metaDescription} />
-      <meta name="keywords" content={`${category.title}, ${category.services.slice(0, 5).map(s => s.name).join(", ")}, legal services India, Vakil & Co`} />
+      <meta name="keywords" content={`${category.title}, ${category.services.slice(0, 5).map(s => s.name).join(", ")}, legal services India, Legal Filing India`} />
       <link rel="canonical" href={canonicalUrl} />
       <meta property="og:title" content={metaTitle} />
       <meta property="og:description" content={metaDescription} />
       <meta property="og:url" content={canonicalUrl} />
       <meta property="og:type" content="website" />
-      <meta property="og:site_name" content="Vakil & Co. Legal Associates" />
+      <meta property="og:site_name" content="Legal Filing India India's Trusted Filing Platform" />
       <meta name="twitter:card" content="summary_large_image" />
       <meta name="twitter:title" content={metaTitle} />
       <meta name="twitter:description" content={metaDescription} />

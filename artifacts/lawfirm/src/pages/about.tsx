@@ -19,7 +19,7 @@ const milestones = [
   { year: "2016", event: "Reached 1,000 clients served milestone. Opened Bangalore and Hyderabad offices." },
   { year: "2019", event: "Launched digital-first legal services platform, reducing turnaround times by 60%." },
   { year: "2022", event: "Crossed 5,000+ clients. Ranked among India's top 50 boutique law firms." },
-  { year: "2024", event: "Launched Vakil Connect — India's first AI-powered legal case tracking portal for clients." },
+  { year: "2024", event: "Launched Legal Filing India Connect — India's first AI-powered legal case tracking portal for clients." },
 ];
 
 export default function AboutUs() {
@@ -27,8 +27,8 @@ export default function AboutUs() {
   return (
     <>
       <Helmet>
-        <title>About Us — Vakil & Co. Legal Associates</title>
-        <meta name="description" content="Learn about Vakil & Co. — India's trusted legal services firm with 15+ years of expertise in corporate law, intellectual property, tax compliance, and more." />
+        <title>About Us — Legal Filing India India's Trusted Filing Platform</title>
+        <meta name="description" content="Learn about Legal Filing India — India's trusted legal services firm with 15+ years of expertise in corporate law, intellectual property, tax compliance, and more." />
       </Helmet>
 
       {/* Hero */}
@@ -44,7 +44,7 @@ export default function AboutUs() {
             </div>
             <h1 className="font-serif text-4xl md:text-6xl font-bold mb-6">{get("hero_title", "India's Trusted")} <br /><span className="text-[#c9a227]">{get("hero_subtitle", "Legal Partner")}</span></h1>
             <p className="text-white/70 text-xl max-w-3xl mx-auto leading-relaxed">
-              {get("hero_description", "For over 15 years, Vakil & Co. has been at the forefront of making premium legal services accessible, transparent, and effective for businesses and individuals across India.")}
+              {get("hero_description", "For over 15 years, Legal Filing India has been at the forefront of making premium legal services accessible, transparent, and effective for businesses and individuals across India.")}
             </p>
           </motion.div>
         </div>
@@ -77,7 +77,7 @@ export default function AboutUs() {
               <div className="inline-flex items-center gap-2 text-[#c9a227] text-sm font-semibold mb-4"><Award size={14} />Our Story</div>
               <h2 className="font-serif text-3xl md:text-4xl font-bold text-[#0f2044] mb-6">Built on a Simple Belief — Legal Help Shouldn't Be a Luxury</h2>
               <div className="space-y-4 text-gray-600 leading-relaxed">
-                <p>Vakil & Co. was founded in 2009 by a group of senior advocates who had spent years watching small businesses and individuals struggle to access quality legal advice due to high costs, complex processes, and limited access.</p>
+                <p>Legal Filing India was founded in 2009 by a group of senior advocates who had spent years watching small businesses and individuals struggle to access quality legal advice due to high costs, complex processes, and limited access.</p>
                 <p>We set out to change that — by combining deep legal expertise with modern processes and technology to deliver outcomes that were once only available to large corporations.</p>
                 <p>Today, we are a 500+ member team operating across 12 cities, serving everyone from solo founders and families to Fortune 500 companies — with the same commitment to excellence, transparency, and results.</p>
               </div>

@@ -40,7 +40,7 @@ function resolvePlaceholders(body: string, ctx: Record<string, string>): string 
 /** Build a placeholder context from lead + settings. */
 async function buildContext(leadId: number | null, settings: Record<string, string>): Promise<Record<string, string>> {
   const base: Record<string, string> = {
-    CompanyName:     settings.firm_name ?? settings.site_name ?? "Vakil & Co.",
+    CompanyName:     settings.firm_name ?? settings.site_name ?? "Legal Filing India",
     Website:         settings.site_url ?? "",
     CompanyWhatsApp: settings.company_whatsapp ?? settings.phone_primary ?? "",
     SupportEmail:    settings.email_primary ?? "",
@@ -286,7 +286,7 @@ router.post("/admin/whatsapp/bulk", async (req, res): Promise<void> => {
       LeadID:           String(lead.id),
       ServiceName:      lead.serviceInterest ?? "",
       AssignedEmployee: lead.assignedTo ?? "",
-      CompanyName:      settings.firm_name ?? "Vakil & Co.",
+      CompanyName:      settings.firm_name ?? "Legal Filing India",
       Website:          settings.site_url ?? "",
       CompanyWhatsApp:  settings.company_whatsapp ?? "",
       SupportEmail:     settings.email_primary ?? "",

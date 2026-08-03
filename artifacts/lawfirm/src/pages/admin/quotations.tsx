@@ -23,12 +23,12 @@ interface FirmDetails {
 }
 
 const FIRM_DEFAULTS: FirmDetails = {
-  firmName: "Vakil & Co.", firmTagline: "Advocates & Legal Consultants",
+  firmName: "Legal Filing India", firmTagline: "Advocates & Legal Consultants",
   firmAddress: "123, Legal Complex, Connaught Place, New Delhi — 110001",
-  firmPhone: "+91 98765 43210", firmEmail: "info@vakilco.in",
+  firmPhone: "+91 98765 43210", firmEmail: "info@legalfilingindia.com",
   firmGstin: "07AABCV1234P1Z5", firmPan: "AABCV1234P",
   bankName: "HDFC Bank, New Delhi", bankAccountNo: "12345678901234",
-  bankIfsc: "HDFC0001234", bankUpi: "vakilco@hdfcbank",
+  bankIfsc: "HDFC0001234", bankUpi: "legalfilingindia@hdfcbank",
 };
 
 async function fetchFirmDetails(): Promise<FirmDetails> {
@@ -485,8 +485,8 @@ function QuotationDetail({ quotation, onClose, onSend, onCopyLink, copied }: {
           {/* Header */}
           <div className="bg-[#0f2044] text-white p-4 rounded-lg flex justify-between items-start">
             <div>
-              <div className="font-serif text-lg font-bold">VAKIL & CO.</div>
-              <div className="text-xs text-[#c9a227] mt-0.5">Legal Associates</div>
+              <div className="font-serif text-lg font-bold">LEGAL FILING INDIA</div>
+              <div className="text-xs text-[#c9a227] mt-0.5">India's Trusted Filing Platform</div>
             </div>
             <div className="text-right text-sm">
               <div className="font-bold">{quotation.quotationNumber}</div>
@@ -587,15 +587,15 @@ function QuotationDetail({ quotation, onClose, onSend, onCopyLink, copied }: {
             {quotation.clientPhone && (
               <WaSendButton
                 phone={quotation.clientPhone}
-                defaultMessage={`Dear ${quotation.clientName}, your quotation ${quotation.quotationNumber} for ₹${(quotation.total ?? 0).toLocaleString("en-IN")} is ready for your review. Valid for ${quotation.validityDays} days. Please contact us for any queries. — Vakil & Co.`}
+                defaultMessage={`Dear ${quotation.clientName}, your quotation ${quotation.quotationNumber} for ₹${(quotation.total ?? 0).toLocaleString("en-IN")} is ready for your review. Valid for ${quotation.validityDays} days. Please contact us for any queries. — Legal Filing India`}
                 categoryHint="quotation"
                 ctx={{
                   ClientName: quotation.clientName,
                   QuotationNo: quotation.quotationNumber,
                   Amount: `₹${(quotation.total ?? 0).toLocaleString("en-IN")}`,
                   ValidityDays: String(quotation.validityDays),
-                  CompanyName: "Vakil & Co.",
-                  SupportEmail: "info@vakilco.in",
+                  CompanyName: "Legal Filing India",
+                  SupportEmail: "info@legalfilingindia.com",
                 }}
               />
             )}
@@ -744,7 +744,7 @@ export default function AdminQuotations() {
                         <Button size="sm" variant="ghost"
                           onClick={() => {
                             const num = q.clientPhone!.replace(/[\s\-().]/g, "").replace(/[^\d+]/g, "");
-                            sendWaFromQuotation(num, `Dear ${q.clientName}, your quotation ${q.quotationNumber} for ₹${Number(q.total).toLocaleString("en-IN")} is ready for your review. Please let us know if you have any questions. — Vakil & Co.`);
+                            sendWaFromQuotation(num, `Dear ${q.clientName}, your quotation ${q.quotationNumber} for ₹${Number(q.total).toLocaleString("en-IN")} is ready for your review. Please let us know if you have any questions. — Legal Filing India`);
                           }}
                           className="h-7 px-2 text-xs gap-1 text-green-600 hover:text-green-700 hover:bg-green-50">
                           <MessageCircle size={12} /> WA
