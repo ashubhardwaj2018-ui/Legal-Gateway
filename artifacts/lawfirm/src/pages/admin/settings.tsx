@@ -120,6 +120,7 @@ export default function AdminSettings() {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<TestStatus>(null);
   const [logoUploading, setLogoUploading] = useState(false);
+  const [logoRemoving, setLogoRemoving] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -128,39 +129,6 @@ export default function AdminSettings() {
       setValues(map);
     }
   }, [settings]);
-
-  const handleLogoUpload = async (file: File) => {
-    setLogoUploading(true);
-    try {
-      const form = new FormData();
-      form.append("logo", file);
-      const r = await fetch("/api/admin/settings/logo", { method: "POST", body: form, credentials: "include" });
-      const d = await r.json();
-      if (r.ok && d.logoUrl) {
-        setValue("logo_url", d.logoUrl);
-        queryClient.invalidateQueries({ queryKey: SITE_SETTINGS_QUERY_KEY });
-        toast({ title: "Logo uploaded ✓", description: "Navbar and PDFs will now use your logo." });
-      } else {
-        toast({ title: "Upload failed", description: d.error ?? "Unknown error", variant: "destructive" });
-      }
-    } catch {
-      toast({ title: "Upload failed", description: "Could not reach the server.", variant: "destructive" });
-    } finally {
-      setLogoUploading(false);
-    }
-  };
-
-  const handleLogoClear = async () => {
-    setLogoUploading(true);
-    try {
-      await fetch("/api/admin/settings/logo", { method: "DELETE", credentials: "include" });
-      setValue("logo_url", "");
-      queryClient.invalidateQueries({ queryKey: SITE_SETTINGS_QUERY_KEY });
-      toast({ title: "Logo removed" });
-    } finally {
-      setLogoUploading(false);
-    }
-  };
 
   const setValue = (key: string, val: string) => {
     setValues(v => ({ ...v, [key]: val }));
@@ -201,6 +169,52 @@ export default function AdminSettings() {
         onError: () => setSaving(false),
       }
     );
+  };
+
+  const handleLogoUpload = async (file: File) => {
+    setLogoUploading(true);
+    const form = new FormData();
+    form.append("logo", file);
+    try {
+      const r = await fetch("/api/admin/settings/logo", {
+        method: "POST",
+        credentials: "include",
+        body: form,
+      });
+      if (!r.ok) {
+        const err = await r.json() as { error?: string };
+        throw new Error(err.error ?? "Upload failed");
+      }
+      const { logo_url } = await r.json() as { logo_url: string };
+      setValue("logo_url", logo_url);
+      queryClient.invalidateQueries({ queryKey: getListSettingsQueryKey() });
+      queryClient.invalidateQueries({ queryKey: SITE_SETTINGS_QUERY_KEY });
+      toast({ title: "Logo uploaded ✓", description: "Navbar and footer will now use your logo." });
+    } catch (err) {
+      toast({ title: "Upload failed", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" });
+    } finally {
+      setLogoUploading(false);
+      if (logoInputRef.current) logoInputRef.current.value = "";
+    }
+  };
+
+  const handleLogoRemove = async () => {
+    setLogoRemoving(true);
+    try {
+      const r = await fetch("/api/admin/settings/logo", {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!r.ok) throw new Error("Remove failed");
+      setValue("logo_url", "");
+      queryClient.invalidateQueries({ queryKey: getListSettingsQueryKey() });
+      queryClient.invalidateQueries({ queryKey: SITE_SETTINGS_QUERY_KEY });
+      toast({ title: "Logo removed", description: "Default LFI mark will be shown." });
+    } catch {
+      toast({ title: "Error", description: "Could not remove logo.", variant: "destructive" });
+    } finally {
+      setLogoRemoving(false);
+    }
   };
 
   const currentGroup = SETTING_GROUPS.find(g => g.id === activeGroup)!;
@@ -252,15 +266,15 @@ export default function AdminSettings() {
                 <p className="text-xs font-semibold text-gray-700 flex items-center gap-1.5"><ImageIcon size={13} /> Firm Logo</p>
                 {values["logo_url"] ? (
                   <div className="flex items-center gap-4">
-                    <div className="bg-white border border-gray-200 rounded-lg p-2">
+                    <div className="bg-white border border-gray-200 rounded-lg p-2 shrink-0">
                       <img src={values["logo_url"]} alt="Logo" className="h-12 max-w-[160px] object-contain" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
                     </div>
                     <div className="flex flex-col gap-2">
                       <Button size="sm" variant="outline" className="gap-1.5 text-xs h-8" onClick={() => logoInputRef.current?.click()} disabled={logoUploading}>
                         {logoUploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />} Replace
                       </Button>
-                      <Button size="sm" variant="outline" className="gap-1.5 text-xs h-8 text-red-600 border-red-200 hover:bg-red-50" onClick={handleLogoClear} disabled={logoUploading}>
-                        <Trash2 size={12} /> Remove
+                      <Button size="sm" variant="outline" className="gap-1.5 text-xs h-8 text-red-600 border-red-200 hover:bg-red-50" onClick={() => void handleLogoRemove()} disabled={logoRemoving}>
+                        {logoRemoving ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />} Remove
                       </Button>
                     </div>
                     <p className="text-[11px] text-gray-400 leading-snug">Shown in navbar,<br/>footer &amp; PDF prints</p>
@@ -270,11 +284,11 @@ export default function AdminSettings() {
                     className="w-full border-2 border-dashed border-gray-300 rounded-xl py-6 flex flex-col items-center gap-2 text-gray-400 hover:border-[#0f2044] hover:text-[#0f2044] transition-colors disabled:opacity-50">
                     {logoUploading ? <Loader2 size={20} className="animate-spin" /> : <Upload size={20} />}
                     <span className="text-xs font-medium">{logoUploading ? "Uploading…" : "Click to upload logo"}</span>
-                    <span className="text-[11px]">PNG, JPG, SVG · max 2 MB</span>
+                    <span className="text-[11px]">PNG, JPG, WebP, SVG · max 5 MB</span>
                   </button>
                 )}
-                <input ref={logoInputRef} type="file" accept="image/*" className="hidden"
-                  onChange={e => { const f = e.target.files?.[0]; if (f) handleLogoUpload(f); e.target.value = ""; }} />
+                <input ref={logoInputRef} type="file" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp,image/svg+xml" className="hidden"
+                  onChange={e => { const f = e.target.files?.[0]; if (f) void handleLogoUpload(f); }} />
               </div>
             )}
 
@@ -294,7 +308,10 @@ export default function AdminSettings() {
             })()}
 
             <div className="space-y-4">
-              {currentGroup.keys.filter(key => key !== "logo_url").map(key => {
+              {currentGroup.keys.map(key => {
+                // logo_url is rendered separately via the upload card above
+                if (key === "logo_url") return null;
+
                 const meta = KEY_LABELS[key] ?? { label: key, placeholder: "" };
                 // For WhatsApp group: dim API fields when provider is "web"
                 const isWebProvider = activeGroup === "whatsapp" && (values["whatsapp_provider"] ?? "web") === "web";

@@ -4,6 +4,8 @@ import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
+import path from "path";
+import fs from "fs";
 import router from "./routes";
 import { logger } from "./lib/logger";
 
@@ -98,5 +100,12 @@ const forgotPasswordLimiter = rateLimit({
 });
 app.use("/api/admin/auth/forgot-password", forgotPasswordLimiter);
 app.use("/api", router);
+
+// ── Static file serving for uploads ──────────────────────────────────────────
+// Serve uploaded files (logos, chat attachments, etc.) from the uploads directory.
+// This must come AFTER /api routes so API paths are not shadowed.
+const UPLOADS_DIR = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+app.use("/uploads", express.static(UPLOADS_DIR, { maxAge: "7d" }));
 
 export default app;
