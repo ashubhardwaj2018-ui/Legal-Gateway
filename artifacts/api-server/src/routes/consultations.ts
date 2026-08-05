@@ -27,7 +27,7 @@ router.post("/consultations", async (req, res): Promise<void> => {
       serviceInterest: parsed.data.serviceInterest,
       message: parsed.data.message ?? null,
       preferredDate: parsed.data.preferredDate ?? null,
-      status: "pending",
+      status: "new",
     })
     .returning();
 
