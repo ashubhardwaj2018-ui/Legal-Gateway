@@ -102,14 +102,16 @@ async function ensureDepartmentChannels() {
 router.get("/admin/chat/channels", async (req, res): Promise<void> => {
   await ensureDepartmentChannels();
 
-  const username = actorName(req);
+  const username = actorName(req).toLowerCase();
   const isAdmin = isAdminRole(req);
   const all = await db.select().from(chatChannelsTable).orderBy(asc(chatChannelsTable.name));
 
   const visible = all.filter(ch => {
     if (ch.type === "public" || ch.type === "department") return true;
     if (isAdmin) return true;
-    return parseMembersJson(ch.members).includes(username);
+    // DM / private channels: caller must appear in members (case-insensitive)
+    const members = parseMembersJson(ch.members).map(m => m.toLowerCase());
+    return members.includes(username);
   });
 
   res.json(visible);
@@ -118,26 +120,41 @@ router.get("/admin/chat/channels", async (req, res): Promise<void> => {
 // ─── DM channel — participant A always derived from auth ──────────────────────
 router.get("/admin/chat/channels/dm", async (req, res): Promise<void> => {
   // a is always the authenticated caller; never trust client-supplied 'a'
-  const a = actorName(req);
-  const b = String(req.query.b ?? "").trim();
+  const a = actorName(req).toLowerCase().trim();
+  const b = String(req.query.b ?? "").trim().toLowerCase();
   if (!b) { res.status(400).json({ error: "b (target username) required" }); return; }
   if (a === "anonymous") { res.status(401).json({ error: "Unauthenticated" }); return; }
 
-  // Find existing DM channel between the two
-  const all = await db.select().from(chatChannelsTable).where(eq(chatChannelsTable.type, "direct"));
+  console.log(`[DM] current user="${a}" target user="${b}"`);
+
+  // Search existing DM channels of both type "direct" (new) and "dm" (legacy)
+  const { inArray: _inArray } = await import("drizzle-orm");
+  const all = await db.select().from(chatChannelsTable)
+    .where(_inArray(chatChannelsTable.type, ["direct", "dm"]));
+
   for (const ch of all) {
-    const members = parseMembersJson(ch.members);
+    const members = parseMembersJson(ch.members).map(m => m.toLowerCase());
     if (members.includes(a) && members.includes(b)) {
+      console.log(`[DM] existing channel found id=${ch.id}`);
+      // Normalise the stored type to "direct" and members to lowercase on first match
+      if (ch.type !== "direct" || ch.members !== JSON.stringify([a, b].sort())) {
+        await db.update(chatChannelsTable)
+          .set({ type: "direct", members: JSON.stringify([a, b].sort()) })
+          .where(eq(chatChannelsTable.id, ch.id));
+        const [updated] = await db.select().from(chatChannelsTable).where(eq(chatChannelsTable.id, ch.id));
+        res.json(updated); return;
+      }
       res.json(ch); return;
     }
   }
 
-  // Create new DM channel — members identified by auth username, not display name
-  const slug = `dm-${[a, b].sort().map(n => n.replace(/[^a-z0-9]/gi, "").toLowerCase()).join("-")}-${Date.now()}`;
+  // No existing channel — create one
+  const slug = `dm-${[a, b].sort().join("-")}-${Date.now()}`;
   const name = `dm:${[a, b].sort().join(":")}`;
   const [ch] = await db.insert(chatChannelsTable)
-    .values({ name, slug, type: "direct", description: `Direct: ${a} ↔ ${b}`, members: JSON.stringify([a, b]) })
+    .values({ name, slug, type: "direct", description: `Direct: ${a} ↔ ${b}`, members: JSON.stringify([a, b].sort()) })
     .returning();
+  console.log(`[DM] new channel created id=${ch.id} returned`);
   res.status(201).json(ch);
 });
 

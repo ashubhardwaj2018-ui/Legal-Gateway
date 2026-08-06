@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 
-interface Channel { id: number; name: string; slug: string; type: string; description: string | null; createdAt: string; }
+interface Channel { id: number; name: string; slug: string; type: string; description: string | null; members: string | null; createdAt: string; }
 interface Msg {
   id: number; channelId: number; senderName: string; senderColor: string;
   content: string; msgType: string; fileName: string | null; fileUrl: string | null;
@@ -62,7 +62,8 @@ export default function AdminChat() {
   const [loadingOlder, setLoadingOlder] = useState(false);
 
   // Current user — derived from session, never from localStorage or manual picker
-  const [myName, setMyName] = useState("");
+  const [myName, setMyName] = useState("");       // display name (e.g. "Parul Shah")
+  const [myUsername, setMyUsername] = useState(""); // auth username (e.g. "parul")
   const [myColor, setMyColor] = useState("");
 
   // Input
@@ -118,13 +119,17 @@ export default function AdminChat() {
       if (!activeChannel) setActiveChannel(chs[0] ?? null);
     }
     setMembers(mbs);
-    // Always resolve name from session — no manual override allowed
+    // Always resolve name + username from session — no manual override allowed
     if (meR?.user?.username) {
-      const uname = meR.user.username as string;
-      const match = mbs.find((m: Member) => m.username === uname || m.name.toLowerCase().replace(/\s+/g, "") === uname.toLowerCase());
+      const uname = (meR.user.username as string).toLowerCase().trim();
+      const match = mbs.find((m: Member) =>
+        (m.username ?? "").toLowerCase() === uname ||
+        m.name.toLowerCase().replace(/\s+/g, "") === uname
+      );
       const resolvedName = match ? match.name : uname === "admin" ? "Admin" : uname;
       const color = nameColor(resolvedName);
       setMyName(resolvedName);
+      setMyUsername(uname);
       setMyColor(color);
     }
   }, [activeChannel]);
@@ -262,11 +267,19 @@ export default function AdminChat() {
   };
 
   const startDM = async (member: Member) => {
-    const dmName = `dm-${[myName || "you", member.name].sort().join("-").toLowerCase().replace(/\s+/g, "-")}`;
-    const existing = channels.find(c => c.slug === dmName);
-    if (existing) { setActiveChannel(existing); return; }
-    const ch = await fetch("/api/admin/chat/channels", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: `${member.name}`, description: `DM with ${member.name}`, type: "dm", slug: dmName }) }).then(r => r.json());
-    await loadChannels();
+    // Always use auth username (not display name) so the backend can match members[]
+    const targetUsername = (member.username ?? member.name).toLowerCase().trim();
+    if (!myUsername) return; // wait until session resolved
+
+    // GET endpoint finds existing channel OR creates exactly one new channel
+    const ch = await fetch(`/api/admin/chat/channels/dm?b=${encodeURIComponent(targetUsername)}`, {
+      credentials: "include",
+    }).then(r => r.json());
+
+    if (!ch?.id) return;
+
+    // Add to local channel list if not already there
+    setChannels(prev => prev.find(c => c.id === ch.id) ? prev : [...prev, ch]);
     setActiveChannel(ch);
   };
 
@@ -286,7 +299,18 @@ export default function AdminChat() {
   const typingText = typing.length === 0 ? "" : typing.length === 1 ? `${typing[0]} is typing…` : `${typing.slice(0, -1).join(", ")} and ${typing[typing.length - 1]} are typing…`;
 
   const publicChannels = channels.filter(c => c.type === "public");
-  const dmChannels = channels.filter(c => c.type === "dm");
+  // Include both legacy "dm" and current "direct" channel types
+  const dmChannels = channels.filter(c => c.type === "dm" || c.type === "direct");
+
+  /** Return true if this DM channel is with the given member (match by members[] array) */
+  function isDmWith(ch: Channel, memberUsername: string): boolean {
+    const uname = (memberUsername || "").toLowerCase();
+    try {
+      const arr: string[] = JSON.parse(ch.members ?? "[]");
+      return arr.map(s => s.toLowerCase()).includes(uname) &&
+             arr.map(s => s.toLowerCase()).includes(myUsername.toLowerCase());
+    } catch { return false; }
+  }
 
   return (
     <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 flex bg-[#0f2044]" style={{ zIndex: 40 }}>
@@ -339,8 +363,11 @@ export default function AdminChat() {
             <span className="text-white/40 text-[10px] font-semibold uppercase tracking-widest">Direct Messages</span>
           </div>
           {members.map(m => {
-            const dmCh = channels.find(c => c.type === "dm" && c.name === m.name);
-            const isActive = activeChannel?.id === dmCh?.id;
+            const targetUser = (m.username ?? m.name).toLowerCase().trim();
+            // Skip ourselves — don't show a DM button for the logged-in user
+            if (targetUser === myUsername) return null;
+            const dmCh = dmChannels.find(c => isDmWith(c, targetUser));
+            const isActive = !!(dmCh && activeChannel?.id === dmCh.id);
             return (
               <button key={m.id} onClick={() => startDM(m)} className={`w-full text-left flex items-center gap-2 px-3 py-1 mx-1 rounded-lg text-sm transition-colors ${isActive ? "bg-white/20 text-white font-semibold" : "text-white/60 hover:text-white hover:bg-white/10"}`}>
                 <div className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0" style={{ backgroundColor: nameColor(m.name) }}>{initials(m.name)}</div>
@@ -349,12 +376,25 @@ export default function AdminChat() {
               </button>
             );
           })}
-          {dmChannels.filter(d => !members.find(m => m.name === d.name)).map(ch => (
-            <button key={ch.id} onClick={() => setActiveChannel(ch)} className={`w-full text-left flex items-center gap-2 px-3 py-1 mx-1 rounded-lg text-sm transition-colors ${activeChannel?.id === ch.id ? "bg-white/20 text-white font-semibold" : "text-white/60 hover:text-white hover:bg-white/10"}`}>
-              <AtSign size={13} className="shrink-0 opacity-70" />
-              <span className="truncate text-xs">{ch.name}</span>
-            </button>
-          ))}
+          {/* DM channels with users no longer in the team list */}
+          {dmChannels.filter(d => {
+            try {
+              const arr: string[] = JSON.parse(d.members ?? "[]");
+              const other = arr.find(u => u.toLowerCase() !== myUsername);
+              return other && !members.find(m => (m.username ?? m.name).toLowerCase() === other.toLowerCase());
+            } catch { return false; }
+          }).map(ch => {
+            try {
+              const arr: string[] = JSON.parse(ch.members ?? "[]");
+              const otherName = arr.find(u => u.toLowerCase() !== myUsername) ?? ch.name;
+              return (
+                <button key={ch.id} onClick={() => setActiveChannel(ch)} className={`w-full text-left flex items-center gap-2 px-3 py-1 mx-1 rounded-lg text-sm transition-colors ${activeChannel?.id === ch.id ? "bg-white/20 text-white font-semibold" : "text-white/60 hover:text-white hover:bg-white/10"}`}>
+                  <AtSign size={13} className="shrink-0 opacity-70" />
+                  <span className="truncate text-xs">{otherName}</span>
+                </button>
+              );
+            } catch { return null; }
+          })}
         </div>
       </div>
 

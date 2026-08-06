@@ -1,0 +1,255 @@
+You are a senior full-stack developer. Fix the Direct Message (DM) chat system bug in my Legal Gateway application.
+
+Project stack:
+- Frontend: React + TypeScript + Vite
+- Backend: Node.js + TypeScript
+- Database: PostgreSQL
+- ORM: Drizzle
+- Chat module location:
+  artifacts/lawfirm/src/pages/admin/chat.tsx
+
+Problem:
+
+The admin chat DM system is not working correctly.
+
+Scenario:
+1. User "ashu" opens DM with "parul".
+2. Ashu sends messages.
+3. Message is saved in database.
+4. After browser refresh, chat history disappears.
+5. When Parul opens her chat:
+   - Ashu is not visible.
+   - Ashu's messages are not visible.
+
+Database investigation:
+
+chat_channels table:
+
+Existing DM records:
+
+id | name | type | members
+--------------------------------
+24 | Parul | dm | ["ashu","parul"]
+25 | Parul | dm | ["ashu","parul"]
+26 | Parul | dm | ["ashu","parul"]
+27 | Parul | dm | ["ashu","parul"]
+37 | Parul | dm | ["ashu","parul"]
+40 | Parul | dm | ["ashu","parul"]
+46 | Parul | dm | ["ashu","parul"]
+
+Duplicate DM channels are being created.
+
+Some empty broken DM channels also exist:
+
+54-59
+members = NULL
+
+Messages table:
+
+chat_messages:
+
+channel_id | sender_name | content
+
+24 | ashu | Hello Step6
+25 | ashu | ashu
+26 | ashu | hello parul
+26 | ashu | hello parul
+27 | ashu | parul
+27 | ashu | parul
+37 | ashu | heelo
+40 | ashu | time 11.29
+46 | ashu | time 12.24
+
+
+Important findings:
+
+Frontend currently calls:
+
+GET /api/admin/chat/channels
+
+GET /api/admin/chat/channels/dm?b=parul
+
+The frontend was creating duplicate DMs because startDM() was using slug matching.
+
+I already modified chat.tsx:
+
+Old logic:
+- Check slug
+
+New logic:
+- Check c.members JSON
+- Match both users
+
+Current interface:
+
+interface Channel {
+ id:number;
+ name:string;
+ slug:string;
+ type:string;
+ description:string|null;
+ members:string|null;
+ createdAt:string;
+}
+
+
+Now fix the complete backend and frontend flow.
+
+Required fixes:
+
+1. Backend DM creation:
+
+Find the API:
+
+GET /api/admin/chat/channels/dm
+
+Fix it so:
+
+- It searches existing DM channel by members JSON.
+- It should NOT create a new DM if one already exists.
+- It should normalize usernames lowercase.
+
+Example:
+
+["ashu","parul"]
+
+and
+
+["Parul","Ashu"]
+
+should be treated as same DM.
+
+
+2. Remove duplicate DM creation.
+
+Before creating:
+
+Check:
+
+channel.type='dm'
+
+AND members contain both users.
+
+Return existing channel.
+
+
+3. Fix DM channel listing:
+
+GET /api/admin/chat/channels
+
+Currently Parul sees only her side.
+
+Ensure it returns DM channels where logged-in user exists inside members JSON.
+
+Example:
+
+Ashu should see:
+
+["ashu","parul"]
+
+Parul should also see:
+
+["ashu","parul"]
+
+
+4. Fix message loading:
+
+API:
+
+GET:
+/api/admin/chat/channels/:id/messages
+
+
+Ensure:
+
+- It loads all messages for the channel.
+- It does not filter by sender.
+- Both users can see the same history.
+
+
+5. Fix current user detection.
+
+Do not use localStorage.
+
+Use:
+
+/api/admin/auth/me
+
+
+The logged-in username should be used for DM filtering.
+
+
+6. Database cleanup migration:
+
+Create a safe SQL migration/script:
+
+- Find duplicate DM channels with same users.
+- Keep the oldest channel.
+- Move messages from duplicate channels into the oldest channel.
+- Delete empty duplicate channels.
+
+Example:
+
+Keep id 24.
+
+Move messages:
+
+25 -> 24
+26 -> 24
+27 -> 24
+37 -> 24
+40 -> 24
+46 -> 24
+
+
+7. Add backend logging temporarily:
+
+When creating/loading DM:
+
+console.log:
+
+current user
+target user
+existing channel found
+channel id returned
+
+
+8. Test cases:
+
+Test 1:
+Login Ashu
+
+Open Parul DM
+
+Send:
+"Hello Parul"
+
+Refresh browser.
+
+Expected:
+Message still visible.
+
+
+Test 2:
+Login Parul
+
+Open Ashu DM.
+
+Expected:
+Ashu appears.
+
+Expected message:
+
+"Hello Parul"
+
+
+Test 3:
+
+Create new DM with another employee.
+
+Expected:
+
+Only one DM channel created.
+
+
+Do not only patch frontend. Fix backend API and database logic properly.
