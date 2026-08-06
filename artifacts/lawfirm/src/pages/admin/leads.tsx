@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { AdminLayout } from "./AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -236,6 +237,8 @@ const TIMELINE_COLORS: Record<string, string> = {
 };
 
 function LeadDetailDrawer({ leadId, onClose, onUpdated }: { leadId: number; onClose: () => void; onUpdated: () => void }) {
+  const settings = useSiteSettings();
+  const firmName = settings.site_name || "Legal Filing India";
   const [tab, setTab] = useState<"info" | "notes" | "tasks" | "timeline" | "assign" | "portal-chat" | "portal-docs" | "whatsapp">("info");
   const [noteText, setNoteText] = useState("");
   const [taskForm, setTaskForm] = useState({ title: "", dueDate: "", priority: "medium" });
@@ -508,7 +511,7 @@ function LeadDetailDrawer({ leadId, onClose, onUpdated }: { leadId: number; onCl
             {/* WhatsApp quick button — always visible in the action bar */}
             {(lead.whatsapp || lead.phone) && (
               <a
-                href={`https://wa.me/${(lead.whatsapp || lead.phone).replace(/[^\d+]/g, "")}?text=${encodeURIComponent(`Hi ${lead.name}, this is from Legal Filing India regarding your enquiry on ${lead.serviceInterest}. How can we assist you today?`)}`}
+                href={`https://wa.me/${(lead.whatsapp || lead.phone).replace(/[^\d+]/g, "")}?text=${encodeURIComponent(`Hi ${lead.name}, this is from ${firmName} regarding your enquiry on ${lead.serviceInterest}. How can we assist you today?`)}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="ml-auto flex items-center gap-1.5 text-xs font-medium text-green-700 border border-green-300 bg-white hover:bg-green-50 hover:border-green-400 rounded-full px-3 py-1 transition-colors shrink-0"

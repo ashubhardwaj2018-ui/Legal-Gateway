@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { AdminLayout } from "./AdminLayout";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -432,6 +433,8 @@ ${inv.status === "paid" ? '<div class="watermark">PAID</div>' : ""}
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export default function AdminInvoices() {
+  const settings = useSiteSettings();
+  const firmName = settings.site_name || "Legal Filing India";
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -668,7 +671,7 @@ export default function AdminInvoices() {
                             <button
                               onClick={() => {
                                 const num = inv.clientPhone!.replace(/[\s\-().]/g, "").replace(/[^\d+]/g, "");
-                                sendWaFromInvoice(num, `Dear ${inv.clientName}, your ${inv.type} ${inv.number} for ₹${Number(inv.total).toLocaleString("en-IN")} is ready. Balance due: ₹${(Number(inv.total) - Number(inv.paidAmount ?? 0)).toLocaleString("en-IN")}. Please contact us for any queries. — Legal Filing India`);
+                                sendWaFromInvoice(num, `Dear ${inv.clientName}, your ${inv.type} ${inv.number} for ₹${Number(inv.total).toLocaleString("en-IN")} is ready. Balance due: ₹${(Number(inv.total) - Number(inv.paidAmount ?? 0)).toLocaleString("en-IN")}. Please contact us for any queries. — ${firmName}`);
                               }}
                               className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
                               title="Send WhatsApp"
@@ -729,7 +732,7 @@ export default function AdminInvoices() {
                 {selected.clientPhone && (
                   <WaSendButton
                     phone={selected.clientPhone.replace(/[\s\-().]/g, "").replace(/[^\d+]/g, "")}
-                    defaultMessage={`Dear ${selected.clientName}, your ${TYPE_LABELS[selected.type] ?? selected.type} ${selected.number} for ₹${fmt(selected.total)} has been shared. ${selBalance > 0.01 ? `Balance due: ₹${fmt(String(selBalance))}. ` : ""}Please contact us for any queries. — Legal Filing India`}
+                    defaultMessage={`Dear ${selected.clientName}, your ${TYPE_LABELS[selected.type] ?? selected.type} ${selected.number} for ₹${fmt(selected.total)} has been shared. ${selBalance > 0.01 ? `Balance due: ₹${fmt(String(selBalance))}. ` : ""}Please contact us for any queries. — ${firmName}`}
                     categoryHint="invoice"
                     ctx={{
                       ClientName: selected.clientName,
@@ -737,7 +740,7 @@ export default function AdminInvoices() {
                       Amount: `₹${fmt(selected.total)}`,
                       Balance: selBalance > 0.01 ? `₹${fmt(String(selBalance))}` : "Nil",
                       Type: TYPE_LABELS[selected.type] ?? selected.type,
-                      CompanyName: "Legal Filing India",
+                      CompanyName: firmName,
                       SupportEmail: "info@legalfilingindia.com",
                     }}
                   />

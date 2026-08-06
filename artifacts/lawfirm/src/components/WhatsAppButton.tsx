@@ -1,8 +1,14 @@
 import { useState } from "react";
 import { X, MessageCircle, Send } from "lucide-react";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 
-const WHATSAPP_NUMBER = "919876543210";
-const BUSINESS_NAME = "Legal Filing India";
+/** Strip formatting and ensure the number has a country code for wa.me URLs */
+function toWaNumber(raw: string): string {
+  const d = raw.replace(/\D/g, "");
+  if (!d) return "";
+  if (d.length === 10) return `91${d}`; // bare Indian 10-digit → prepend ISD code
+  return d;
+}
 
 const QUICK_MESSAGES = [
   "I need help with Company Registration",
@@ -15,9 +21,15 @@ const QUICK_MESSAGES = [
 export function WhatsAppButton() {
   const [open, setOpen] = useState(false);
   const [custom, setCustom] = useState("");
+  const settings = useSiteSettings();
+
+  // Prefer the dedicated website WhatsApp number; fall back to primary phone
+  const waNumber = toWaNumber(settings.website_whatsapp || settings.phone_primary || "");
+  const businessName = settings.site_name || "Legal Filing India";
 
   const send = (msg: string) => {
-    const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`;
+    if (!waNumber) return; // no number configured yet
+    const url = `https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`;
     window.open(url, "_blank", "noopener,noreferrer");
     setOpen(false);
   };
@@ -48,7 +60,7 @@ export function WhatsAppButton() {
             </svg>
           </div>
           <div className="flex-1 min-w-0">
-            <div className="font-bold text-white text-sm">{BUSINESS_NAME}</div>
+            <div className="font-bold text-white text-sm">{businessName}</div>
             <div className="text-white/80 text-xs flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 bg-white rounded-full inline-block animate-pulse" />
               Typically replies in minutes

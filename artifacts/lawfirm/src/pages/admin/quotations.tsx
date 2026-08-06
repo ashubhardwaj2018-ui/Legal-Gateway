@@ -3,6 +3,7 @@ import {
   useListQuotations, useCreateQuotation, useUpdateQuotation, useSendQuotation,
   getListQuotationsQueryKey, useGetQuotation, type Quotation
 } from "@workspace/api-client-react";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useQueryClient } from "@tanstack/react-query";
 import { AdminLayout } from "./AdminLayout";
 import { Button } from "@/components/ui/button";
@@ -480,6 +481,8 @@ function QuotationDetail({ quotation, onClose, onSend, onCopyLink, copied }: {
   quotation: Quotation; onClose: () => void; onSend: () => void;
   onCopyLink?: () => void; copied?: boolean;
 }) {
+  const settings = useSiteSettings();
+  const firmName = settings.site_name || "Legal Filing India";
   const items = (quotation.items ?? []) as QuotationItem[];
 
   return (
@@ -594,14 +597,14 @@ function QuotationDetail({ quotation, onClose, onSend, onCopyLink, copied }: {
             {quotation.clientPhone && (
               <WaSendButton
                 phone={quotation.clientPhone}
-                defaultMessage={`Dear ${quotation.clientName}, your quotation ${quotation.quotationNumber} for ₹${(quotation.total ?? 0).toLocaleString("en-IN")} is ready for your review. Valid for ${quotation.validityDays} days. Please contact us for any queries. — Legal Filing India`}
+                defaultMessage={`Dear ${quotation.clientName}, your quotation ${quotation.quotationNumber} for ₹${(quotation.total ?? 0).toLocaleString("en-IN")} is ready for your review. Valid for ${quotation.validityDays} days. Please contact us for any queries. — ${firmName}`}
                 categoryHint="quotation"
                 ctx={{
                   ClientName: quotation.clientName,
                   QuotationNo: quotation.quotationNumber,
                   Amount: `₹${(quotation.total ?? 0).toLocaleString("en-IN")}`,
                   ValidityDays: String(quotation.validityDays),
-                  CompanyName: "Legal Filing India",
+                  CompanyName: firmName,
                   SupportEmail: "info@legalfilingindia.com",
                 }}
               />
@@ -614,6 +617,8 @@ function QuotationDetail({ quotation, onClose, onSend, onCopyLink, copied }: {
 }
 
 export default function AdminQuotations() {
+  const settings = useSiteSettings();
+  const firmName = settings.site_name || "Legal Filing India";
   const queryClient = useQueryClient();
   const { data: quotations, isLoading } = useListQuotations();
   const sendMutation = useSendQuotation();
@@ -751,7 +756,7 @@ export default function AdminQuotations() {
                         <Button size="sm" variant="ghost"
                           onClick={() => {
                             const num = q.clientPhone!.replace(/[\s\-().]/g, "").replace(/[^\d+]/g, "");
-                            sendWaFromQuotation(num, `Dear ${q.clientName}, your quotation ${q.quotationNumber} for ₹${Number(q.total).toLocaleString("en-IN")} is ready for your review. Please let us know if you have any questions. — Legal Filing India`);
+                            sendWaFromQuotation(num, `Dear ${q.clientName}, your quotation ${q.quotationNumber} for ₹${Number(q.total).toLocaleString("en-IN")} is ready for your review. Please let us know if you have any questions. — ${firmName}`);
                           }}
                           className="h-7 px-2 text-xs gap-1 text-green-600 hover:text-green-700 hover:bg-green-50">
                           <MessageCircle size={12} /> WA

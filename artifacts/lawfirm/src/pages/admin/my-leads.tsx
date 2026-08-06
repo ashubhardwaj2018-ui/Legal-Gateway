@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -103,6 +104,8 @@ function LeadCard({ lead, selected, onClick }: { lead: Lead; selected: boolean; 
 // ── Lead Detail Panel ──────────────────────────────────────────────────────────
 
 function LeadDetailPanel({ leadId, onUpdated }: { leadId: number; onUpdated: () => void }) {
+  const settings = useSiteSettings();
+  const firmName = settings.site_name || "Legal Filing India";
   const [tab, setTab] = useState<"info" | "notes" | "tasks" | "timeline">("info");
   const [noteText, setNoteText] = useState("");
   const [taskForm, setTaskForm] = useState({ title: "", dueDate: "", priority: "medium" });
@@ -197,7 +200,7 @@ function LeadDetailPanel({ leadId, onUpdated }: { leadId: number; onUpdated: () 
             <MessageSquare size={11} /> {lead.email}
           </a>
           <a
-            href={`https://wa.me/${((lead as Lead & { whatsapp?: string }).whatsapp || lead.phone).replace(/[^\d+]/g, "")}?text=${encodeURIComponent(`Hi ${lead.name}, this is from Legal Filing India regarding your enquiry on ${lead.serviceInterest}. How can we assist you today?`)}`}
+            href={`https://wa.me/${((lead as Lead & { whatsapp?: string }).whatsapp || lead.phone).replace(/[^\d+]/g, "")}?text=${encodeURIComponent(`Hi ${lead.name}, this is from ${firmName} regarding your enquiry on ${lead.serviceInterest}. How can we assist you today?`)}`}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 bg-green-600 hover:bg-green-500 text-white px-2.5 py-1 rounded-full transition-colors font-medium"
