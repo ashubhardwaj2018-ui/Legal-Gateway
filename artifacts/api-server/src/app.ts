@@ -86,6 +86,10 @@ function isReplitPreview(origin: string): boolean {
 app.use(
   cors({
     origin: (origin, cb) => {
+      // Development: allow all origins — CORS restrictions only protect production
+      if (!isProduction) return cb(null, true);
+
+      // Production rules:
       // No origin = same-origin request, server-to-server, or curl — always allow
       if (!origin) return cb(null, true);
 
@@ -94,9 +98,6 @@ app.use(
 
       // Explicit allowlist: APP_URL, www variant, CORS_EXTRA_ORIGINS
       if (explicitOrigins.has(origin)) return cb(null, true);
-
-      // Development only: permit Replit preview domains
-      if (!isProduction && isReplitPreview(origin)) return cb(null, true);
 
       cb(new Error("CORS policy"), false);
     },
