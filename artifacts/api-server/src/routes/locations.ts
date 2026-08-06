@@ -243,37 +243,52 @@ Sitemap: ${apiBase}/sitemap.xml
 `);
 });
 
-// ── Sitemap index ─────────────────────────────────────────────────────────────
-router.get("/sitemap.xml", async (req, res): Promise<void> => {
+// Companies per sitemap file (Google's 50,000-URL limit)
+const COMPANIES_PER_FILE = 50_000;
+
+// ── Sitemap index builder (shared by /sitemap.xml and /sitemap-index.xml) ─────
+async function buildSitemapIndex(req: import("express").Request): Promise<string> {
   const now = new Date().toISOString().split("T")[0];
   const proto = req.headers["x-forwarded-proto"] ?? "https";
   const host  = req.headers["x-forwarded-host"] ?? req.headers.host ?? "legalfilingindia.com";
   const apiBase = `${proto}://${host}/api`;
 
-  const [{ value: locCount }] = await db
-    .select({ value: count() })
-    .from(locationsTable)
-    .where(eq(locationsTable.isActive, true));
+  const [[{ value: locCount }], [{ value: coCount }]] = await Promise.all([
+    db.select({ value: count() }).from(locationsTable).where(eq(locationsTable.isActive, true)),
+    db.select({ value: count() }).from(indianCompaniesTable),
+  ]);
 
-  const totalLocs = Number(locCount);
-  const numPseoFiles = Math.max(1, Math.ceil(totalLocs / LOC_PER_PSEO_FILE));
+  const numPseoFiles     = Math.max(1, Math.ceil(Number(locCount) / LOC_PER_PSEO_FILE));
+  const numCompanyFiles  = Math.max(1, Math.ceil(Number(coCount)  / COMPANIES_PER_FILE));
 
   const entries: string[] = [
     `  <sitemap><loc>${apiBase}/sitemap-static.xml</loc><lastmod>${now}</lastmod></sitemap>`,
     `  <sitemap><loc>${apiBase}/sitemap-blogs.xml</loc><lastmod>${now}</lastmod></sitemap>`,
-    `  <sitemap><loc>${apiBase}/sitemap-companies.xml</loc><lastmod>${now}</lastmod></sitemap>`,
+    ...Array.from({ length: numCompanyFiles }, (_, i) =>
+      `  <sitemap><loc>${apiBase}/sitemap-companies-${i + 1}.xml</loc><lastmod>${now}</lastmod></sitemap>`
+    ),
     ...Array.from({ length: numPseoFiles }, (_, i) =>
       `  <sitemap><loc>${apiBase}/sitemap-pseo-${i + 1}.xml</loc><lastmod>${now}</lastmod></sitemap>`
     ),
   ];
 
-  res.setHeader("Content-Type", "application/xml; charset=utf-8");
-  res.setHeader("Cache-Control", "public, max-age=3600");
-  res.send(
-`<?xml version="1.0" encoding="UTF-8"?>
+  return `<?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${entries.join("\n")}
-</sitemapindex>`);
+</sitemapindex>`;
+}
+
+// ── Sitemap index — two canonical URLs ───────────────────────────────────────
+router.get("/sitemap.xml", async (req, res): Promise<void> => {
+  res.setHeader("Content-Type", "application/xml; charset=utf-8");
+  res.setHeader("Cache-Control", "public, max-age=3600");
+  res.send(await buildSitemapIndex(req));
+});
+
+router.get("/sitemap-index.xml", async (req, res): Promise<void> => {
+  res.setHeader("Content-Type", "application/xml; charset=utf-8");
+  res.setHeader("Cache-Control", "public, max-age=3600");
+  res.send(await buildSitemapIndex(req));
 });
 
 // ── Static + service pages sitemap ───────────────────────────────────────────
@@ -336,29 +351,40 @@ ${blogUrls.join("\n")}
 </urlset>`);
 });
 
-// ── Companies sitemap ─────────────────────────────────────────────────────────
-router.get("/sitemap-companies.xml", async (_req, res): Promise<void> => {
-  const now = new Date().toISOString().split("T")[0];
+// ── Companies sitemap — paginated (sitemap-companies-N.xml) ──────────────────
+// Each file covers up to COMPANIES_PER_FILE slugs (≤ 50,000 per Google's limit)
+router.get("/sitemap-companies-:page.xml", async (req, res): Promise<void> => {
+  const page = parseInt(req.params.page as string, 10);
+  if (isNaN(page) || page < 1) { res.status(404).send("Not found"); return; }
 
-  let compUrls: string[] = [];
-  try {
-    const companies = await db
-      .select({ cin: indianCompaniesTable.cin })
-      .from(indianCompaniesTable)
-      .limit(50_000);
+  const now    = new Date().toISOString().split("T")[0];
+  const offset = (page - 1) * COMPANIES_PER_FILE;
 
-    compUrls = companies.map((c) =>
-      xmlUrl(`${BASE_URL}/companies/${c.cin}`, now, "monthly", "0.4")
-    );
-  } catch { /* indianCompaniesTable may not have expected fields */ }
+  const companies = await db
+    .select({ slug: indianCompaniesTable.slug })
+    .from(indianCompaniesTable)
+    .orderBy(indianCompaniesTable.id)
+    .limit(COMPANIES_PER_FILE)
+    .offset(offset);
+
+  if (companies.length === 0) { res.status(404).send("No companies for this page"); return; }
+
+  const compUrls = companies.map((c) =>
+    xmlUrl(`${BASE_URL}/company/${c.slug}`, now, "monthly", "0.4")
+  );
 
   res.setHeader("Content-Type", "application/xml; charset=utf-8");
-  res.setHeader("Cache-Control", "public, max-age=3600");
+  res.setHeader("Cache-Control", "public, max-age=86400");
   res.send(
 `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${compUrls.join("\n")}
 </urlset>`);
+});
+
+// ── Legacy alias: sitemap-companies.xml → page 1 ─────────────────────────────
+router.get("/sitemap-companies.xml", async (req, res): Promise<void> => {
+  res.redirect(301, req.path.replace("sitemap-companies.xml", "sitemap-companies-1.xml"));
 });
 
 // ── pSEO sitemap — page N (all services × location slice) ─────────────────────
