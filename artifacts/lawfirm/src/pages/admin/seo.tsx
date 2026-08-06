@@ -369,33 +369,100 @@ function InternalLinkingTab() {
   );
 }
 
+// ── Sitemap helpers ───────────────────────────────────────────────────────────
+interface SitemapEntry { url: string; filename: string; label: string; desc: string; group: string; }
+
+function classifyUrl(url: string): { label: string; desc: string; group: string } {
+  const file = url.split("/").pop() ?? url;
+  if (file === "sitemap-index.xml" || file === "sitemap.xml")
+    return { label: "Sitemap Index", desc: "Master index — submit this to Google Search Console", group: "index" };
+  if (file === "sitemap-static.xml")
+    return { label: "Static + Services", desc: "Home, service, and category pages", group: "core" };
+  if (file === "sitemap-blogs.xml")
+    return { label: "Blog Posts", desc: "All published blog articles", group: "core" };
+  const coMatch = file.match(/^sitemap-companies-(\d+)\.xml$/);
+  if (coMatch)
+    return { label: `Companies — part ${coMatch[1]}`, desc: "Up to 50,000 company pages", group: "companies" };
+  const pseoMatch = file.match(/^sitemap-pseo-(\d+)\.xml$/);
+  if (pseoMatch)
+    return { label: `pSEO — part ${pseoMatch[1]}`, desc: "Service × location pages (up to 50,000 URLs)", group: "pseo" };
+  return { label: file, desc: "", group: "other" };
+}
+
+/** Parse <loc> values out of a sitemapindex XML string */
+function parseSitemapIndex(xml: string): string[] {
+  const locs: string[] = [];
+  const re = /<loc>\s*([^<]+)\s*<\/loc>/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(xml)) !== null) locs.push(m[1].trim());
+  return locs;
+}
+
+const GROUP_ORDER = ["index", "core", "companies", "pseo", "other"];
+const GROUP_LABELS: Record<string, string> = {
+  index: "Sitemap Index",
+  core: "Core Files",
+  companies: "Company Sitemaps",
+  pseo: "pSEO Sitemaps (Service × Location)",
+  other: "Other",
+};
+
 // ── Sitemap Tab ──────────────────────────────────────────────────────────────
 function SitemapTab() {
   const { toast } = useToast();
-  const [stats, setStats] = useState<{ locations: number; services: number; blogs: number; companies: number } | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [pinging, setPinging] = useState(false);
+  const [stats, setStats]       = useState<{ locations: number; services: number; blogs: number; companies: number } | null>(null);
+  const [entries, setEntries]   = useState<SitemapEntry[]>([]);
+  const [loading, setLoading]   = useState(false);
+  const [pinging, setPinging]   = useState(false);
   const [pingResult, setPingResult] = useState<{ google: boolean; bing: boolean; message: string } | null>(null);
 
-  const fetchStats = async () => {
+  const fetchAll = async () => {
     setLoading(true);
     try {
-      const [loc, svc, blog, co] = await Promise.all([
-        fetch(`${BASE}/api/locations?limit=1`, { credentials: "include" }).then(r => r.json()).then(d => d.total ?? 0).catch(() => 0),
+      const [loc, svc, blog, co, indexXml] = await Promise.all([
+        fetch(`${BASE}/api/locations?limit=1`, { credentials: "include" }).then(r => r.json()).then(d => Number(d.total ?? 0)).catch(() => 0),
         fetch(`${BASE}/api/services`, { credentials: "include" }).then(r => r.json()).then(d => Array.isArray(d) ? d.length : 0).catch(() => 0),
-        fetch(`${BASE}/api/blogs?limit=1`, { credentials: "include" }).then(r => r.json()).then(d => d.total ?? 0).catch(() => 0),
-        fetch(`${BASE}/api/companies?limit=1`).then(r => r.json()).then(d => d.total ?? 0).catch(() => 0),
+        fetch(`${BASE}/api/blogs?limit=1`, { credentials: "include" }).then(r => r.json()).then(d => Number(d.total ?? 0)).catch(() => 0),
+        fetch(`${BASE}/api/companies?limit=1`).then(r => r.json()).then(d => Number(d.total ?? 0)).catch(() => 0),
+        fetch(`${BASE}/api/sitemap-index.xml`).then(r => r.text()).catch(() => ""),
       ]);
       setStats({ locations: loc, services: svc, blogs: blog, companies: co });
+
+      // Parse every <loc> from the index, then add the index itself at the front
+      const locs = parseSitemapIndex(indexXml);
+      const built: SitemapEntry[] = [
+        // Index file itself (always first)
+        (() => {
+          const u = `${BASE}/api/sitemap-index.xml`;
+          const { label, desc, group } = classifyUrl(u);
+          return { url: u, filename: "sitemap-index.xml", label, desc, group };
+        })(),
+        // Static + blogs (always present, may or may not be in the index)
+        ...([`${BASE}/api/sitemap-static.xml`, `${BASE}/api/sitemap-blogs.xml`].map(u => {
+          const { label, desc, group } = classifyUrl(u);
+          return { url: u, filename: u.split("/").pop()!, label, desc, group };
+        })),
+        // Everything from the parsed index (companies, pseo, …)
+        ...locs.map(rawUrl => {
+          // Rewrite the hostname to the current origin so links work in dev
+          const filename = rawUrl.split("/").pop() ?? rawUrl;
+          const url = `${BASE}/api/${filename}`;
+          const { label, desc, group } = classifyUrl(url);
+          return { url, filename, label, desc, group };
+        }),
+      ];
+
+      // Deduplicate by filename, preserve order
+      const seen = new Set<string>();
+      setEntries(built.filter(e => { if (seen.has(e.filename)) return false; seen.add(e.filename); return true; }));
     } finally { setLoading(false); }
   };
 
   const pingSearchEngines = async () => {
-    setPinging(true);
-    setPingResult(null);
+    setPinging(true); setPingResult(null);
     try {
       const r = await fetch(`${BASE}/api/admin/sitemap/ping`, { method: "POST", credentials: "include" });
-      if (!r.ok) throw new Error("Ping failed");
+      if (!r.ok) throw new Error();
       const d = await r.json();
       setPingResult({ google: d.google, bing: d.bing, message: d.message });
       toast({ title: `Sitemap pinged — Google: ${d.google ? "✓" : "✗"}  Bing: ${d.bing ? "✓" : "✗"}` });
@@ -404,27 +471,23 @@ function SitemapTab() {
     } finally { setPinging(false); }
   };
 
-  useEffect(() => { fetchStats(); }, []);
+  useEffect(() => { fetchAll(); }, []);
 
-  // Compute number of company sitemap files from stats
-  const numCompanyFiles = stats ? Math.max(1, Math.ceil(stats.companies / 50000)) : 1;
-
-  const CORE_SITEMAP_LINKS = [
-    { label: "Sitemap Index", url: `${BASE}/api/sitemap-index.xml`, desc: "Master index — submit this to Google Search Console" },
-    { label: "Static + Services", url: `${BASE}/api/sitemap-static.xml`, desc: "Home, service, and category pages" },
-    { label: "Blog Posts", url: `${BASE}/api/sitemap-blogs.xml`, desc: "All published blog articles" },
-    { label: "HTML Sitemap", url: `${BASE}/sitemap`, desc: "Human-readable sitemap for visitors" },
-  ];
+  // Group entries
+  const grouped = GROUP_ORDER.reduce<Record<string, SitemapEntry[]>>((acc, g) => {
+    acc[g] = entries.filter(e => e.group === g);
+    return acc;
+  }, {});
 
   return (
     <div className="space-y-5">
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: "Locations", value: stats?.locations, color: "bg-blue-50 border-blue-100 text-blue-700" },
-          { label: "Services", value: stats?.services, color: "bg-amber-50 border-amber-100 text-amber-700" },
-          { label: "Blog Posts", value: stats?.blogs, color: "bg-green-50 border-green-100 text-green-700" },
-          { label: "Companies", value: stats?.companies, color: "bg-purple-50 border-purple-100 text-purple-700" },
+          { label: "Locations",  value: stats?.locations,  color: "bg-blue-50   border-blue-100   text-blue-700"   },
+          { label: "Services",   value: stats?.services,   color: "bg-amber-50  border-amber-100  text-amber-700"  },
+          { label: "Blog Posts", value: stats?.blogs,      color: "bg-green-50  border-green-100  text-green-700"  },
+          { label: "Companies",  value: stats?.companies,  color: "bg-purple-50 border-purple-100 text-purple-700" },
         ].map(s => (
           <div key={s.label} className={`rounded-xl border p-4 text-center ${s.color}`}>
             <div className="text-2xl font-bold">{loading ? "…" : (s.value ?? "—").toLocaleString()}</div>
@@ -433,99 +496,87 @@ function SitemapTab() {
         ))}
       </div>
 
-      {/* Ping search engines */}
+      {/* Ping */}
       <div className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col sm:flex-row sm:items-center gap-4">
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-[#0f2044]">Ping Search Engines</p>
           <p className="text-xs text-gray-400 mt-0.5">Notify Google &amp; Bing that the sitemap has been updated</p>
           {pingResult && (
-            <div className="flex gap-3 mt-2">
-              <span className={`text-xs font-medium flex items-center gap-1 ${pingResult.google ? "text-green-600" : "text-red-500"}`}>
-                {pingResult.google ? "✓" : "✗"} Google
-              </span>
-              <span className={`text-xs font-medium flex items-center gap-1 ${pingResult.bing ? "text-green-600" : "text-red-500"}`}>
-                {pingResult.bing ? "✓" : "✗"} Bing
-              </span>
+            <div className="flex gap-3 mt-2 flex-wrap">
+              <span className={`text-xs font-medium ${pingResult.google ? "text-green-600" : "text-red-500"}`}>{pingResult.google ? "✓" : "✗"} Google</span>
+              <span className={`text-xs font-medium ${pingResult.bing   ? "text-green-600" : "text-red-500"}`}>{pingResult.bing   ? "✓" : "✗"} Bing</span>
               <span className="text-xs text-gray-400">{pingResult.message}</span>
             </div>
           )}
         </div>
-        <Button
-          onClick={pingSearchEngines}
-          disabled={pinging}
-          className="bg-[#0f2044] hover:bg-[#c9a227] hover:text-[#0f2044] text-white gap-2 shrink-0 transition-colors"
-          size="sm"
-        >
+        <Button onClick={pingSearchEngines} disabled={pinging}
+          className="bg-[#0f2044] hover:bg-[#c9a227] hover:text-[#0f2044] text-white gap-2 shrink-0 transition-colors" size="sm">
           <RefreshCw size={13} className={pinging ? "animate-spin" : ""} />
           {pinging ? "Pinging…" : "Ping Google & Bing"}
         </Button>
       </div>
 
-      {/* Core sitemap links */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
-          <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Core Sitemap Files</p>
-          <button onClick={fetchStats} disabled={loading} className="text-xs text-[#c9a227] hover:underline flex items-center gap-1">
-            <RefreshCw size={11} className={loading ? "animate-spin" : ""} /> Refresh
-          </button>
+      {/* All sitemap files grouped */}
+      {loading ? (
+        <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm">
+          <RefreshCw size={18} className="animate-spin mx-auto mb-2" /> Loading sitemap files…
         </div>
-        <div className="divide-y divide-gray-100">
-          {CORE_SITEMAP_LINKS.map(l => (
-            <div key={l.url} className="px-4 py-3 flex items-center justify-between gap-4">
+      ) : (
+        GROUP_ORDER.filter(g => grouped[g]?.length > 0).map(g => (
+          <div key={g} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-[#0f2044]">{l.label}</p>
-                <p className="text-xs text-gray-400">{l.desc}</p>
+                <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">{GROUP_LABELS[g]}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{grouped[g].length} file{grouped[g].length !== 1 ? "s" : ""}</p>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <a href={l.url} download className="flex items-center gap-1 text-xs text-gray-500 hover:text-[#0f2044] border border-gray-200 px-2 py-1 rounded-lg hover:border-[#0f2044] transition-colors">
-                  ↓ Download
-                </a>
-                <a href={l.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-blue-600 hover:underline">
-                  <ExternalLink size={12} /> View
-                </a>
-              </div>
+              {g === "index" && (
+                <button onClick={fetchAll} disabled={loading}
+                  className="text-xs text-[#c9a227] hover:underline flex items-center gap-1">
+                  <RefreshCw size={11} className={loading ? "animate-spin" : ""} /> Refresh all
+                </button>
+              )}
             </div>
-          ))}
-        </div>
-      </div>
+            <div className={`divide-y divide-gray-100 ${grouped[g].length > 6 ? "max-h-72 overflow-y-auto" : ""}`}>
+              {grouped[g].map(e => (
+                <div key={e.filename} className="px-4 py-2.5 flex items-center justify-between gap-4 hover:bg-gray-50/60 transition-colors">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-[#0f2044] truncate">{e.label}</p>
+                    {e.desc && <p className="text-xs text-gray-400 mt-0.5">{e.desc}</p>}
+                    <p className="text-[10px] text-gray-300 font-mono mt-0.5 truncate">{e.filename}</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <a href={e.url} download={e.filename}
+                      className="flex items-center gap-1 text-xs text-gray-600 hover:text-[#0f2044] border border-gray-200 px-2.5 py-1.5 rounded-lg hover:border-[#0f2044] hover:bg-gray-50 transition-all font-medium">
+                      ↓ Download
+                    </a>
+                    <a href={e.url} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 hover:underline">
+                      <ExternalLink size={12} /> View
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))
+      )}
 
-      {/* Company sitemap files */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
-          <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
-            Company Sitemaps — {numCompanyFiles} file{numCompanyFiles !== 1 ? "s" : ""} ({(stats?.companies ?? 0).toLocaleString()} companies)
-          </p>
-          <p className="text-xs text-gray-400 mt-0.5">50,000 companies per file — download each to inspect or submit individually</p>
+      {/* HTML sitemap link (not an XML file — listed separately) */}
+      <div className="bg-white rounded-xl border border-gray-200 px-4 py-3 flex items-center justify-between gap-4">
+        <div>
+          <p className="text-sm font-medium text-[#0f2044]">HTML Sitemap</p>
+          <p className="text-xs text-gray-400">Human-readable page for visitors and crawlers</p>
         </div>
-        <div className="divide-y divide-gray-100 max-h-60 overflow-y-auto">
-          {Array.from({ length: numCompanyFiles }, (_, i) => {
-            const url = `${BASE}/api/sitemap-companies-${i + 1}.xml`;
-            const from = (i * 50000 + 1).toLocaleString();
-            const to   = Math.min((i + 1) * 50000, stats?.companies ?? 0).toLocaleString();
-            return (
-              <div key={i} className="px-4 py-2.5 flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm font-medium text-[#0f2044]">companies-{i + 1}.xml</p>
-                  <p className="text-xs text-gray-400">Companies {from}–{to}</p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <a href={url} download={`sitemap-companies-${i + 1}.xml`} className="flex items-center gap-1 text-xs text-gray-500 hover:text-[#0f2044] border border-gray-200 px-2 py-1 rounded-lg hover:border-[#0f2044] transition-colors">
-                    ↓ Download
-                  </a>
-                  <a href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-blue-600 hover:underline">
-                    <ExternalLink size={12} /> View
-                  </a>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <a href={`${BASE}/sitemap`} target="_blank" rel="noopener noreferrer"
+          className="flex items-center gap-1 text-xs text-blue-600 hover:underline shrink-0">
+          <ExternalLink size={12} /> Open
+        </a>
       </div>
 
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
         <strong>Tip:</strong> Submit <code className="bg-amber-100 px-1 rounded text-xs">/api/sitemap-index.xml</code> to
-        Google Search Console — it references all company, pSEO, blog, and static sitemaps automatically.
-        Use the Ping button after adding new blog posts, locations, or company data.
+        Google Search Console — it automatically references all company, pSEO, blog, and static sitemaps.
+        Hit <strong>Ping Google &amp; Bing</strong> after importing new data or publishing blog posts.
       </div>
     </div>
   );
