@@ -17,3 +17,10 @@ id = "GQGtnbpGKSOSM7gTl2cHS"
 uri = "file://attached_assets/service-city-reference.xlsx"
 type = "table"
 title = "Service × City Cross-Reference (143 Services × 5000 Cities + pSEO URLs)"
+
+[[outputs]]
+id = "x3FgOvywdgrlR_gmKPqUf"
+uri = "file://db_dump.pgdump"
+type = "unspecified"
+title = "PostgreSQL Database Dump"
+description = "Full Replit DB dump (78 MB compressed). Import this on your Hostinger VPS to restore all data including Indian companies."
