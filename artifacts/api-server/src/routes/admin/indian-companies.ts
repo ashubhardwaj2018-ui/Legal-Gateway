@@ -315,7 +315,7 @@ router.get("/admin/indian-companies/import-status/:jobId", (req, res): void => {
 // ─── Browse / list ────────────────────────────────────────────────────────────
 router.get("/admin/indian-companies", async (req, res): Promise<void> => {
   const {
-    search, state, status, type: companyType,
+    search, state, status, type: companyType, letter,
     page: pageStr, limit: limitStr,
   } = req.query as Record<string, string | undefined>;
 
@@ -331,6 +331,9 @@ router.get("/admin/indian-companies", async (req, res): Promise<void> => {
         ilike(indianCompaniesTable.cin, `%${search}%`),
       ) as ReturnType<typeof eq>
     );
+  }
+  if (letter && /^[a-zA-Z]$/.test(letter)) {
+    conditions.push(ilike(indianCompaniesTable.companyName, `${letter}%`) as ReturnType<typeof eq>);
   }
   if (state) conditions.push(ilike(indianCompaniesTable.state, `%${state}%`) as ReturnType<typeof eq>);
   if (status) conditions.push(ilike(indianCompaniesTable.companyStatus, `%${status}%`) as ReturnType<typeof eq>);

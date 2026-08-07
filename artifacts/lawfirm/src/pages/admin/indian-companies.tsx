@@ -81,6 +81,7 @@ export default function AdminIndianCompanies() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
+  const [letterFilter, setLetterFilter] = useState("");
   const [page, setPage] = useState(1);
   const [data, setData] = useState<{ data: Company[]; total: number } | null>(null);
   const [loading, setLoading] = useState(false);
@@ -106,12 +107,13 @@ export default function AdminIndianCompanies() {
     if (debouncedSearch) params.set("search", debouncedSearch);
     if (statusFilter) params.set("status", statusFilter);
     if (typeFilter) params.set("type", typeFilter);
+    if (letterFilter) params.set("letter", letterFilter);
     setLoading(true);
     try {
       const r = await fetch(`/api/admin/indian-companies?${params}`);
       setData(await r.json());
     } finally { setLoading(false); }
-  }, [debouncedSearch, statusFilter, typeFilter, page]);
+  }, [debouncedSearch, statusFilter, typeFilter, letterFilter, page]);
 
   useEffect(() => { loadCompanies(); }, [loadCompanies]);
 
@@ -256,10 +258,16 @@ export default function AdminIndianCompanies() {
       {/* ── BROWSE TAB ────────────────────────────────────────────────────────── */}
       {tab === "browse" && (
         <div>
-          <div className="flex flex-wrap gap-3 mb-5">
+          {/* ── Filters row ── */}
+          <div className="flex flex-wrap gap-3 mb-3">
             <div className="relative flex-1 min-w-48">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <Input placeholder="Search by name or CIN…" value={search} onChange={e => setSearch(e.target.value)} className="pl-9 h-9" />
+              <Input
+                placeholder="Search by name or CIN…"
+                value={search}
+                onChange={e => { setSearch(e.target.value); setLetterFilter(""); }}
+                className="pl-9 h-9"
+              />
             </div>
             <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1); }} className="h-9 border border-gray-200 rounded-lg px-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0f2044]/20">
               <option value="">All Status</option>
@@ -277,6 +285,25 @@ export default function AdminIndianCompanies() {
               <option>Foreign</option>
             </select>
             <Button variant="outline" size="sm" onClick={loadCompanies} className="h-9"><RefreshCw size={14} /></Button>
+          </div>
+
+          {/* ── A–Z alphabet bar ── */}
+          <div className="flex flex-wrap gap-1 mb-5">
+            <button
+              onClick={() => { setLetterFilter(""); setSearch(""); setPage(1); }}
+              className={`px-2.5 py-1 rounded text-xs font-semibold transition-colors ${letterFilter === "" && !search ? "bg-[#0f2044] text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+            >
+              All
+            </button>
+            {"ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map(l => (
+              <button
+                key={l}
+                onClick={() => { setLetterFilter(l); setSearch(""); setPage(1); }}
+                className={`w-7 h-7 rounded text-xs font-semibold transition-colors ${letterFilter === l ? "bg-[#0f2044] text-white" : "bg-gray-100 text-gray-600 hover:bg-[#c9a227] hover:text-white"}`}
+              >
+                {l}
+              </button>
+            ))}
           </div>
 
           {loading && (
