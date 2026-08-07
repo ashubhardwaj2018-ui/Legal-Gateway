@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { CheckCircle2, ChevronRight, MapPin, Clock, IndianRupee, Phone, Shield, Star, FileText, Users, ArrowRight, ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { getServiceBySlug, getServicesByCategory, ALL_SERVICES } from "@/data/service-index";
+import { getServiceBySlug, getServicesByCategory, ALL_SERVICES, SERVICE_INDEX } from "@/data/service-index";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import {
   generatePageContent,
@@ -164,6 +164,20 @@ export default function ServiceLocation() {
     .filter((s) => s.slug !== service.slug)
     .slice(0, 6);
 
+  // Cross-category popular services (exclude current category)
+  const POPULAR_SLUGS = ["private-limited-company","gst-registration","trademark-registration","fssai-registration-online","individual-income-tax-filing","legal-notice","msmessi-registration","gst-filing"];
+  const popularServices = POPULAR_SLUGS
+    .map((sl) => SERVICE_INDEX[sl])
+    .filter((s) => !!s && s.categoryId !== service.categoryId && s.slug !== service.slug)
+    .slice(0, 5);
+
+  // Professional consultation slugs
+  const PROF_SLUGS = ["talk-to-a-lawyer","talk-to-a-ca","talk-to-a-cs","talk-to-an-iptrademark-lawyer"];
+  const professionals = PROF_SLUGS
+    .map((sl) => SERVICE_INDEX[sl])
+    .filter((s) => !!s && s.slug !== service.slug)
+    .slice(0, 4);
+
   const pageUrl = `https://legalfilingindia.com/${serviceSlug}/${locationSlug}`;
 
   return (
@@ -172,11 +186,13 @@ export default function ServiceLocation() {
         <title>{seo.title}</title>
         <meta name="description" content={seo.description} />
         <meta name="keywords" content={seo.keywords.join(", ")} />
+        <meta name="robots" content="index, follow" />
         <link rel="canonical" href={pageUrl} />
         <meta property="og:title" content={seo.title} />
         <meta property="og:description" content={seo.description} />
         <meta property="og:url" content={pageUrl} />
         <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="Legal Filing India" />
         <meta name="twitter:card" content="summary" />
         <meta name="twitter:title" content={seo.title} />
         <meta name="twitter:description" content={seo.description} />
@@ -328,10 +344,10 @@ export default function ServiceLocation() {
               </div>
             </section>
 
-            {/* Related services in same city */}
+            {/* Related services in same category */}
             {relatedServices.length > 0 && (
               <section>
-                <h2 className="text-2xl font-serif font-bold text-[#0f2044] mb-5">Other Services in {city}</h2>
+                <h2 className="text-2xl font-serif font-bold text-[#0f2044] mb-5">Other {service.categoryTitle} Services in {city}</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {relatedServices.map((svc) => (
                     <Link
@@ -342,6 +358,52 @@ export default function ServiceLocation() {
                       <div>
                         <div className="font-medium text-[#0f2044] text-sm group-hover:text-[#c9a227] transition-colors">{svc.name} in {city}</div>
                         <div className="text-xs text-gray-400 mt-0.5">{svc.price}</div>
+                      </div>
+                      <ArrowRight size={14} className="text-gray-300 group-hover:text-[#c9a227] transition-colors shrink-0" />
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Popular cross-category services */}
+            {popularServices.length > 0 && (
+              <section>
+                <h2 className="text-2xl font-serif font-bold text-[#0f2044] mb-2">Popular Legal Services in {city}</h2>
+                <p className="text-sm text-gray-500 mb-4">Frequently used by businesses in {city}, {loc.state}.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {popularServices.map((svc) => (
+                    <Link
+                      key={svc.slug}
+                      href={`/${svc.slug}/${locationSlug}`}
+                      className="flex items-center justify-between p-4 rounded-xl border border-gray-200 hover:border-[#c9a227]/50 hover:bg-[#c9a227]/5 transition-all group"
+                    >
+                      <div>
+                        <div className="font-medium text-[#0f2044] text-sm group-hover:text-[#c9a227] transition-colors">{svc.name} in {city}</div>
+                        <div className="text-xs text-gray-400 mt-0.5">{svc.categoryTitle} · {svc.price}</div>
+                      </div>
+                      <ArrowRight size={14} className="text-gray-300 group-hover:text-[#c9a227] transition-colors shrink-0" />
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Talk to a professional */}
+            {professionals.length > 0 && (
+              <section className="bg-[#0f2044]/5 rounded-2xl p-6">
+                <h2 className="text-xl font-serif font-bold text-[#0f2044] mb-1">Talk to a Professional in {city}</h2>
+                <p className="text-sm text-gray-500 mb-4">Get instant expert advice from qualified lawyers, CAs, and CSs.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {professionals.map((svc) => (
+                    <Link
+                      key={svc.slug}
+                      href={`/${svc.slug}/${locationSlug}`}
+                      className="flex items-center justify-between p-4 rounded-xl bg-white border border-gray-200 hover:border-[#c9a227] hover:bg-[#c9a227]/5 transition-all group"
+                    >
+                      <div>
+                        <div className="font-medium text-[#0f2044] text-sm group-hover:text-[#c9a227] transition-colors">{svc.name}</div>
+                        <div className="text-xs text-gray-400 mt-0.5">Starts at {svc.price} · Same day</div>
                       </div>
                       <ArrowRight size={14} className="text-gray-300 group-hover:text-[#c9a227] transition-colors shrink-0" />
                     </Link>

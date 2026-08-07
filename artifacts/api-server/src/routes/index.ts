@@ -10,6 +10,7 @@ import companiesRouter from "./companies";
 import portalRouter from "./portal";
 import publicPagesRouter from "./public-pages";
 import publicDocRouter from "./public-doc";
+import ssrRouter from "./ssr";
 import adminRouter from "./admin/index";
 
 const router: IRouter = Router();
@@ -29,6 +30,7 @@ router.use(companiesRouter);
 router.use(portalRouter);
 router.use(publicPagesRouter);
 router.use(publicDocRouter);
+router.use(ssrRouter);
 
 // ── Admin routes last (protected by adminAuthMiddleware inside) ────────────────
 router.use(adminRouter);
