@@ -4,19 +4,34 @@
  * GET /api/ssr/:serviceSlug/:locationSlug
  *
  * Returns a complete, SEO-optimised HTML page for any pSEO URL.
- * Search-engine crawlers configured via Nginx to hit this endpoint
- * instead of the React SPA will receive full SEO content in the initial response.
+ * Search-engine crawlers routed here via Nginx receive full SEO content
+ * (title, JSON-LD, H1, FAQs, internal links) in the initial response.
+ * Regular users still get the React SPA.
  *
- * Nginx bot-detection snippet (add to your server block):
+ * Full Nginx config lives at: deploy/nginx/legalfilingindia.conf
  *
- *   map $http_user_agent $is_bot {
+ * Key snippet (map{} at http context; locations inside server block):
+ *
+ *   map $http_user_agent $is_seo_bot {
  *     default 0;
- *     ~*(Googlebot|bingbot|Slurp|DuckDuckBot|Baiduspider|YandexBot|facebot|ia_archiver) 1;
+ *     ~*(Googlebot|bingbot|Slurp|DuckDuckBot|Baiduspider|YandexBot|Sogou|facebot|ia_archiver) 1;
  *   }
- *   if ($is_bot) {
- *     rewrite ^/([^/]+)/([^/]+)$ /api/ssr/$1/$2 break;
- *     proxy_pass http://127.0.0.1:8080;
+ *   location /api/ {
+ *     proxy_pass http://127.0.0.1:8080;   # bare proxy_pass required in prefix locations
  *   }
+ *   location ~* "^/([a-z0-9-]+)/([a-z0-9-]+)$" {
+ *     if ($is_seo_bot) {
+ *       rewrite ^/([a-z0-9-]+)/([a-z0-9-]+)$ /api/ssr/$1/$2 last;
+ *     }
+ *     try_files $uri /index.html;
+ *   }
+ *
+ * The rewrite restarts Nginx location matching so the /api/ prefix location
+ * (with its bare proxy_pass) handles the proxying — proxy_pass with a URI
+ * path component is invalid inside regex locations and if blocks.
+ *
+ * Cache-Control: public, max-age=3600, stale-while-revalidate=86400
+ * is set by this handler and passes through Nginx to the crawler.
  */
 
 import { Router, type IRouter } from "express";
@@ -373,19 +388,55 @@ router.get("/ssr", (_req, res): void => {
     endpoint: "GET /api/ssr/:serviceSlug/:locationSlug",
     example: "/api/ssr/private-limited-company/abbarajupalem-andhra-pradesh",
     description: "Returns complete SEO-optimised HTML for pSEO pages. Use this with Nginx to serve bot crawlers.",
-    nginxConfig: `
-# Add inside your Nginx server block (before the React SPA catch-all):
+    configFile: "deploy/nginx/legalfilingindia.conf (in repo root)",
+    nginxConfig: `# Additive changes to /etc/nginx/conf.d/legalfilingindia.conf
+# Full file lives at deploy/nginx/legalfilingindia.conf in the repo.
+#
+# 1. Add TWO map{} blocks at the TOP of the file (http{} context level,
+#    before the server{} blocks):
+#
 map $http_user_agent $is_seo_bot {
-  default 0;
-  ~*(Googlebot|bingbot|Slurp|DuckDuckBot|Baiduspider|YandexBot|Sogou|facebot|ia_archiver) 1;
+    default                                                                          0;
+    ~*(Googlebot|bingbot|Slurp|DuckDuckBot|Baiduspider|YandexBot|Sogou|facebot|ia_archiver) 1;
 }
+
+# Reserved first-path-segments that must NOT be SSR-routed:
+#   /blog/:slug, /company/:slug, /state/:stateSlug, /portal/dashboard,
+#   /services/:id, /public/…, /admin/…
+map $uri $is_reserved_prefix {
+    default       0;
+    ~^/blog/      1;
+    ~^/company/   1;
+    ~^/state/     1;
+    ~^/portal/    1;
+    ~^/services/  1;
+    ~^/public/    1;
+    ~^/admin/     1;
+}
+
+# 2. Add this location block inside the https server{} block, AFTER the
+#    /api/ and static-asset locations but BEFORE the catch-all location /:
+#
+# $is_seo_bot$is_reserved_prefix = "10" means: bot AND not a reserved route.
+# Comparing the concatenated string is the standard Nginx AND-logic pattern.
+# proxy_pass with a URI is invalid in regex locations / if blocks;
+# rewrite + last is the correct alternative (Nginx restarts matching and
+# the /api/ prefix location proxies the rewritten /api/ssr/… URL to Express).
+#
 location ~* "^/([a-z0-9-]+)/([a-z0-9-]+)$" {
-  if ($is_seo_bot) {
-    proxy_pass http://127.0.0.1:8080/api/ssr/$1/$2;
-    break;
-  }
-  try_files $uri /index.html;
+    if ($is_seo_bot$is_reserved_prefix = "10") {
+        rewrite ^/([a-z0-9-]+)/([a-z0-9-]+)$ /api/ssr/$1/$2 last;
+    }
+    root  /var/www/legalfilingindia/artifacts/lawfirm/dist/public;
+    try_files $uri /index.html;
 }`,
+    deployInstructions: [
+      "1. Copy deploy/nginx/legalfilingindia.conf from the repo to /etc/nginx/conf.d/ on the VPS",
+      "2. Run: nginx -t   (to validate config syntax)",
+      "3. Run: systemctl reload nginx",
+      "4. Verify bot routing: curl -A 'Googlebot' https://legalfilingindia.com/gst-registration/delhi-dl",
+      "5. Verify human routing: curl https://legalfilingindia.com/gst-registration/delhi-dl  (should return React shell)",
+    ],
   });
 });
 
