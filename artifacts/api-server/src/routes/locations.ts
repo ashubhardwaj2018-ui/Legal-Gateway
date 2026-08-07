@@ -280,19 +280,27 @@ ${entries.join("\n")}
 
 // ── Sitemap index — two canonical URLs ───────────────────────────────────────
 router.get("/sitemap.xml", async (req, res): Promise<void> => {
+  const xml = await buildSitemapIndex(req);
+  if (req.query.download !== undefined) {
+    res.setHeader("Content-Disposition", 'attachment; filename="sitemap.xml"');
+  }
   res.setHeader("Content-Type", "application/xml; charset=utf-8");
   res.setHeader("Cache-Control", "public, max-age=3600");
-  res.send(await buildSitemapIndex(req));
+  res.send(xml);
 });
 
 router.get("/sitemap-index.xml", async (req, res): Promise<void> => {
+  const xml = await buildSitemapIndex(req);
+  if (req.query.download !== undefined) {
+    res.setHeader("Content-Disposition", 'attachment; filename="sitemap-index.xml"');
+  }
   res.setHeader("Content-Type", "application/xml; charset=utf-8");
   res.setHeader("Cache-Control", "public, max-age=3600");
-  res.send(await buildSitemapIndex(req));
+  res.send(xml);
 });
 
 // ── Static + service pages sitemap ───────────────────────────────────────────
-router.get("/sitemap-static.xml", async (_req, res): Promise<void> => {
+router.get("/sitemap-static.xml", async (req, res): Promise<void> => {
   const now = new Date().toISOString().split("T")[0];
 
   const staticUrls = [
@@ -313,15 +321,13 @@ router.get("/sitemap-static.xml", async (_req, res): Promise<void> => {
     })),
   ];
 
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"\n        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n        xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9 http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">\n${staticUrls.map(({ url, priority, freq }) => xmlUrl(url, now, freq, priority)).join("\n")}\n</urlset>`;
+  if (req.query.download !== undefined) {
+    res.setHeader("Content-Disposition", 'attachment; filename="sitemap-static.xml"');
+  }
   res.setHeader("Content-Type", "application/xml; charset=utf-8");
   res.setHeader("Cache-Control", "public, max-age=3600");
-  res.send(
-`<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
-        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9 http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
-${staticUrls.map(({ url, priority, freq }) => xmlUrl(url, now, freq, priority)).join("\n")}
-</urlset>`);
+  res.send(xml);
 });
 
 // ── Blogs sitemap ─────────────────────────────────────────────────────────────
@@ -367,24 +373,40 @@ router.get("/sitemap-companies-:page.xml", async (req, res): Promise<void> => {
     .limit(COMPANIES_PER_FILE)
     .offset(offset);
 
-  if (companies.length === 0) { res.status(404).send("No companies for this page"); return; }
-
+  // Return an empty valid urlset (not 404) so Google doesn't report HTTP errors
   const compUrls = companies.map((c) =>
     xmlUrl(`${BASE_URL}/company/${c.slug}`, now, "monthly", "0.4")
   );
 
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${compUrls.join("\n")}\n</urlset>`;
+  if (req.query.download !== undefined) {
+    res.setHeader("Content-Disposition", `attachment; filename="sitemap-companies-${page}.xml"`);
+  }
   res.setHeader("Content-Type", "application/xml; charset=utf-8");
   res.setHeader("Cache-Control", "public, max-age=86400");
-  res.send(
-`<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${compUrls.join("\n")}
-</urlset>`);
+  res.send(xml);
 });
 
-// ── Legacy alias: sitemap-companies.xml → page 1 ─────────────────────────────
+// ── Legacy alias: sitemap-companies.xml — serve page 1 content directly ───────
+// (No redirect — redirects confuse Google Search Console)
 router.get("/sitemap-companies.xml", async (req, res): Promise<void> => {
-  res.redirect(301, req.path.replace("sitemap-companies.xml", "sitemap-companies-1.xml"));
+  const now = new Date().toISOString().split("T")[0];
+  const companies = await db
+    .select({ slug: indianCompaniesTable.slug })
+    .from(indianCompaniesTable)
+    .orderBy(indianCompaniesTable.id)
+    .limit(COMPANIES_PER_FILE);
+
+  const compUrls = companies.map((c) =>
+    xmlUrl(`${BASE_URL}/company/${c.slug}`, now, "monthly", "0.4")
+  );
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${compUrls.join("\n")}\n</urlset>`;
+  if (req.query.download !== undefined) {
+    res.setHeader("Content-Disposition", 'attachment; filename="sitemap-companies-1.xml"');
+  }
+  res.setHeader("Content-Type", "application/xml; charset=utf-8");
+  res.setHeader("Cache-Control", "public, max-age=86400");
+  res.send(xml);
 });
 
 // ── pSEO sitemap — page N (all services × location slice) ─────────────────────
@@ -404,12 +426,7 @@ router.get("/sitemap-pseo-:page.xml", async (req, res): Promise<void> => {
     .limit(LOC_PER_PSEO_FILE)
     .offset(offset);
 
-  if (locations.length === 0) {
-    res.status(404).send("No locations for this page");
-    return;
-  }
-
-  // Determine priority: higher for high-traffic services
+  // Return a valid empty urlset (never 404) — Google reports HTTP errors for non-200
   const highPriorityServices = new Set([
     "gst-registration","trademark-registration","private-limited-company",
     "individual-income-tax-filing","fssai-registration-online","msmessi-registration",
@@ -424,15 +441,13 @@ router.get("/sitemap-pseo-:page.xml", async (req, res): Promise<void> => {
     }
   }
 
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"\n        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n        xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9 http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">\n${entries.join("\n")}\n</urlset>`;
+  if (req.query.download !== undefined) {
+    res.setHeader("Content-Disposition", `attachment; filename="sitemap-pseo-${page}.xml"`);
+  }
   res.setHeader("Content-Type", "application/xml; charset=utf-8");
-  res.setHeader("Cache-Control", "public, max-age=86400"); // 24h cache
-  res.send(
-`<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
-        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9 http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
-${entries.join("\n")}
-</urlset>`);
+  res.setHeader("Cache-Control", "public, max-age=86400");
+  res.send(xml);
 });
 
 export default router;

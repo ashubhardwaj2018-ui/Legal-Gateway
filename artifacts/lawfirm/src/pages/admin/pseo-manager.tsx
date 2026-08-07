@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { AdminLayout } from "./AdminLayout";
 import {
   Globe, RefreshCw, Send, FileText, MapPin, BarChart2,
-  ExternalLink, CheckCircle2, AlertCircle, Loader2, Search,
+  ExternalLink, CheckCircle2, AlertCircle, Loader2, Search, Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -14,6 +14,8 @@ interface PseoStats {
   totalServices: number;
   totalPseoUrls: number;
   pseoSitemapFiles: number;
+  companySitemapFiles: number;
+  totalCompanies: number;
   locationsPerFile: number;
   serviceCategories: number;
   baseDomain: string;

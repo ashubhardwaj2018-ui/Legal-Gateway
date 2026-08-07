@@ -99,7 +99,7 @@ export default function IndianCompanies() {
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search by Company Name or CIN..."
-              className="w-full pl-11 pr-12 py-4 rounded-2xl text-gray-900 text-base focus:outline-none focus:ring-2 focus:ring-[#c9a227] shadow-xl"
+              className="w-full pl-11 pr-12 py-4 rounded-2xl bg-white text-gray-900 placeholder:text-gray-400 text-base focus:outline-none focus:ring-2 focus:ring-[#c9a227] shadow-xl"
             />
             {search && (
               <button onClick={() => setSearch("")} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
