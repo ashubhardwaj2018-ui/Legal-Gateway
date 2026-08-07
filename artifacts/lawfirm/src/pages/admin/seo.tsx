@@ -212,18 +212,20 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Save, Globe, Eye, EyeOff, Link2, FileCode2, Map, Tag,
   Plus, Trash2, ExternalLink, RefreshCw, Search,
+  AlertTriangle, AlertCircle, CheckCircle2, Wrench,
 } from "lucide-react";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 // ── Tab types ───────────────────────────────────────────────────────────────
-type SeoTab = "meta" | "linking" | "sitemap" | "robots";
+type SeoTab = "meta" | "linking" | "sitemap" | "robots" | "audit";
 
 const SEO_TABS: Array<{ key: SeoTab; label: string; icon: React.ElementType }> = [
   { key: "meta",     label: "Meta Tags",          icon: Tag },
   { key: "linking",  label: "Internal Linking",   icon: Link2 },
   { key: "sitemap",  label: "Sitemap",             icon: Map },
   { key: "robots",   label: "Robots.txt",          icon: FileCode2 },
+  { key: "audit",    label: "Audit",               icon: AlertTriangle },
 ];
 
 // ── Meta Tags tab ────────────────────────────────────────────────────────────
@@ -624,13 +626,13 @@ const GROUP_LABELS_META: Record<PageGroup, string> = { static: "Static Pages", c
 const GROUP_COLORS: Record<PageGroup, string> = { static: "bg-blue-100 text-blue-700", category: "bg-amber-100 text-amber-700", service: "bg-green-100 text-green-700" };
 
 // ── Meta Tags Tab Component ──────────────────────────────────────────────────
-function MetaTagsTab() {
+function MetaTagsTab({ initialPage }: { initialPage?: string }) {
   const queryClient = useQueryClient();
   const { data: seoSettings } = useListSeoSettings();
   const upsertMutation = useUpsertSeoSetting();
   const { toast } = useToast();
 
-  const [selectedPage, setSelectedPage] = useState(ALL_PAGES[0].id);
+  const [selectedPage, setSelectedPage] = useState(initialPage ?? ALL_PAGES[0].id);
   const [saving, setSaving] = useState(false);
   const [previewMode, setPreviewMode] = useState(false);
   const [search, setSearch] = useState("");
@@ -1279,9 +1281,226 @@ function RobotsTab() {
   );
 }
 
+// ── Audit Tab ─────────────────────────────────────────────────────────────────
+type AuditIssueType =
+  | "missing_title" | "missing_description"
+  | "title_too_short" | "description_too_short"
+  | "duplicate_title";
+
+interface AuditIssue { type: AuditIssueType; severity: "error" | "warning"; message: string; }
+interface AuditRow {
+  pageId: string; label: string; group: "static" | "category" | "service";
+  effectiveTitle: string; effectiveDescription: string; hasDbRecord: boolean; issues: AuditIssue[];
+}
+interface AuditResult { rows: AuditRow[]; errorCount: number; warningCount: number; totalPages: number; checkedAt: string; }
+
+const ISSUE_LABELS: Record<AuditIssueType, string> = {
+  missing_title:        "Missing title",
+  missing_description:  "Missing description",
+  title_too_short:      "Title too short",
+  description_too_short:"Desc. too short",
+  duplicate_title:      "Duplicate title",
+};
+
+function AuditTab({ onFix }: { onFix: (pageId: string) => void }) {
+  const [data, setData] = useState<AuditResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [severityFilter, setSeverityFilter] = useState<"all" | "error" | "warning">("all");
+  const [issueFilter, setIssueFilter] = useState<AuditIssueType | "all">("all");
+  const [search, setSearch] = useState("");
+
+  const run = async () => {
+    setLoading(true);
+    try {
+      const r = await fetch(`${BASE}/api/admin/seo/audit`, { credentials: "include" });
+      if (!r.ok) throw new Error("Audit request failed");
+      setData(await r.json());
+    } finally { setLoading(false); }
+  };
+
+  // All issue rows flat for display — one row per issue
+  const flatRows = useMemo(() => {
+    if (!data) return [];
+    const out: Array<AuditRow & { issue: AuditIssue }> = [];
+    for (const row of data.rows) {
+      for (const issue of row.issues) {
+        if (severityFilter !== "all" && issue.severity !== severityFilter) continue;
+        if (issueFilter !== "all" && issue.type !== issueFilter) continue;
+        if (search && !row.label.toLowerCase().includes(search.toLowerCase()) && !row.pageId.toLowerCase().includes(search.toLowerCase())) continue;
+        out.push({ ...row, issue });
+      }
+    }
+    return out;
+  }, [data, severityFilter, issueFilter, search]);
+
+  const errorCount = data?.errorCount ?? 0;
+  const warningCount = data?.warningCount ?? 0;
+
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-sm font-semibold text-[#0f2044]">SEO Audit</h2>
+          <p className="text-xs text-gray-400 mt-0.5">Scans all known pages for missing or duplicate meta data</p>
+        </div>
+        <Button onClick={run} disabled={loading} className="bg-[#0f2044] hover:bg-[#c9a227] hover:text-[#0f2044] text-white gap-2 shrink-0 transition-colors" size="sm">
+          <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
+          {loading ? "Running audit…" : "Run Audit"}
+        </Button>
+      </div>
+
+      {/* Summary badges */}
+      {data && (
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+            <AlertCircle size={14} className="text-red-500" />
+            <span className="text-sm font-semibold text-red-700">{errorCount} errors</span>
+          </div>
+          <div className="flex items-center gap-2 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+            <AlertTriangle size={14} className="text-amber-500" />
+            <span className="text-sm font-semibold text-amber-700">{warningCount} warnings</span>
+          </div>
+          {errorCount === 0 && warningCount === 0 && (
+            <div className="flex items-center gap-2 bg-green-50 border border-green-100 rounded-lg px-3 py-2">
+              <CheckCircle2 size={14} className="text-green-500" />
+              <span className="text-sm font-semibold text-green-700">All clear!</span>
+            </div>
+          )}
+          <span className="text-xs text-gray-400 ml-auto">
+            Scanned at {new Date(data.checkedAt).toLocaleTimeString()}
+          </span>
+        </div>
+      )}
+
+      {/* Filters */}
+      {data && data.rows.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-3 flex flex-wrap gap-2 items-center">
+          <div className="relative">
+            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Filter pages…"
+              className="pl-7 pr-2 py-1.5 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-[#0f2044] w-44"
+            />
+          </div>
+          <div className="flex gap-1">
+            {(["all", "error", "warning"] as const).map(s => (
+              <button key={s} onClick={() => setSeverityFilter(s)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${severityFilter === s ? "bg-[#0f2044] text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
+                {s === "all" ? "All" : s === "error" ? "Errors only" : "Warnings only"}
+              </button>
+            ))}
+          </div>
+          <select
+            value={issueFilter}
+            onChange={e => setIssueFilter(e.target.value as AuditIssueType | "all")}
+            className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-[#0f2044]"
+          >
+            <option value="all">All issue types</option>
+            {(Object.keys(ISSUE_LABELS) as AuditIssueType[]).map(k => (
+              <option key={k} value={k}>{ISSUE_LABELS[k]}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {/* Results table */}
+      {!data && !loading && (
+        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+          <AlertTriangle size={32} className="text-gray-300 mx-auto mb-3" />
+          <p className="text-sm font-medium text-gray-500">Click <strong>Run Audit</strong> to scan all pages</p>
+          <p className="text-xs text-gray-400 mt-1">Checks for missing titles, short descriptions, duplicate titles, and missing canonicals</p>
+        </div>
+      )}
+
+      {loading && (
+        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+          <RefreshCw size={24} className="animate-spin text-[#0f2044] mx-auto mb-3" />
+          <p className="text-sm text-gray-400">Auditing {ALL_PAGES.length} pages…</p>
+        </div>
+      )}
+
+      {data && !loading && data.rows.length === 0 && (
+        <div className="bg-green-50 border border-green-200 rounded-xl p-8 text-center">
+          <CheckCircle2 size={32} className="text-green-500 mx-auto mb-3" />
+          <p className="text-sm font-medium text-green-700">No issues found — all pages look great!</p>
+        </div>
+      )}
+
+      {flatRows.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+            <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">{flatRows.length} issue{flatRows.length !== 1 ? "s" : ""}</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[600px]">
+              <thead className="bg-gray-50 border-b border-gray-100">
+                <tr>
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500">Page</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500">Severity</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500">Issue</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500">Detail</th>
+                  <th className="px-4 py-2.5 w-16 text-xs font-semibold text-gray-500">Fix</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {flatRows.map((row, i) => (
+                  <tr key={`${row.pageId}-${row.issue.type}-${i}`} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-2.5">
+                      <p className="font-medium text-[#0f2044] text-xs truncate max-w-[180px]">{row.label}</p>
+                      <p className="text-[10px] text-gray-400 font-mono truncate max-w-[180px]">{row.pageId}</p>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      {row.issue.severity === "error" ? (
+                        <span className="inline-flex items-center gap-1 bg-red-100 text-red-700 text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                          <AlertCircle size={9} /> Error
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                          <AlertTriangle size={9} /> Warning
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2.5 text-xs text-gray-600">{ISSUE_LABELS[row.issue.type]}</td>
+                    <td className="px-4 py-2.5 text-xs text-gray-500 max-w-[240px]">{row.issue.message}</td>
+                    <td className="px-4 py-2.5">
+                      <button
+                        onClick={() => onFix(row.pageId)}
+                        className="inline-flex items-center gap-1 text-xs text-[#0f2044] hover:text-[#c9a227] font-medium border border-gray-200 hover:border-[#c9a227] px-2 py-1 rounded-lg transition-all"
+                        title="Jump to this page in Meta Tags editor"
+                      >
+                        <Wrench size={10} /> Fix
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {data && flatRows.length === 0 && data.rows.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6 text-center text-gray-400 text-sm">
+          No issues match your current filters.
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main export ──────────────────────────────────────────────────────────────
 export default function AdminSeo() {
   const [activeTab, setActiveTab] = useState<SeoTab>("meta");
+  const [metaInitialPage, setMetaInitialPage] = useState<string | undefined>(undefined);
+
+  const handleFix = (pageId: string) => {
+    setMetaInitialPage(pageId);
+    setActiveTab("meta");
+  };
 
   return (
     <AdminLayout title="SEO Manager" subtitle="Meta tags, internal linking, sitemap & robots.txt">
@@ -1300,10 +1519,11 @@ export default function AdminSeo() {
         </div>
       </div>
 
-      {activeTab === "meta"     && <MetaTagsTab />}
+      {activeTab === "meta"     && <MetaTagsTab key={metaInitialPage} initialPage={metaInitialPage} />}
       {activeTab === "linking"  && <InternalLinkingTab />}
       {activeTab === "sitemap"  && <SitemapTab />}
       {activeTab === "robots"   && <RobotsTab />}
+      {activeTab === "audit"    && <AuditTab onFix={handleFix} />}
     </AdminLayout>
   );
 }

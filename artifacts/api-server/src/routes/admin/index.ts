@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import seoRouter from "./seo";
+import seoAuditRouter from "./seo-audit";
 import servicesRouter from "./services";
 import quotationsRouter from "./quotations";
 import companyDataRouter from "./company-data";
@@ -104,6 +105,7 @@ router.use(reportsRouter);
 router.use(tasksRouter);
 router.use(teamRouter);
 router.use(indianCompaniesRouter);
+router.use(seoAuditRouter);
 router.use(seoRouter);
 router.use(servicesRouter);
 router.use(quotationsRouter);
