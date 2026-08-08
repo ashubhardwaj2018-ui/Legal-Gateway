@@ -43,7 +43,7 @@ const LOC_PER_PSEO_FILE = Math.max(1, Math.floor(50_000 / ALL_UNIQUE_SERVICE_SLU
 // sitemap falls back to the top-N locations by population so a missed seed
 // never produces a 0-file sitemap.
 const MIN_PRIORITY_THRESHOLD = 100;
-const FALLBACK_PRIORITY_COUNT = 741;
+const FALLBACK_PRIORITY_COUNT = 1560;
 
 const BASE_URL = "https://legalfilingindia.com";
 

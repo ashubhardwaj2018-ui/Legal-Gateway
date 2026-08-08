@@ -36,10 +36,10 @@
 import { Client } from "pg";
 
 // ─── Constants (must match locations.ts) ─────────────────────────────────────
-const FALLBACK_PRIORITY_COUNT = 741;
+const FALLBACK_PRIORITY_COUNT = 1560;
 const LOC_PER_PSEO_FILE       = Math.floor(50_000 / 143); // 349
 const MIN_PRIORITY_THRESHOLD  = 100;
-const MIN_PSEO_FILES          = Math.ceil(FALLBACK_PRIORITY_COUNT / LOC_PER_PSEO_FILE); // 3
+const MIN_PSEO_FILES          = Math.ceil(FALLBACK_PRIORITY_COUNT / LOC_PER_PSEO_FILE); // 5
 
 const API_URL = process.env.API_URL ?? "http://localhost:8080";
 

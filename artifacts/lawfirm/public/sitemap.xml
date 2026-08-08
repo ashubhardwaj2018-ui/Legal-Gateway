@@ -5,7 +5,7 @@
   Child sitemaps are generated dynamically by the API server at /api/sitemap-*.xml
 
   Last generated: 2026-08-08
-  Priority locations: 741  → 3 pSEO sitemap files
+  Priority locations: 1560  → 5 pSEO sitemap files
   Companies:         1048585 → 21 company sitemap files
 
   Regenerate: node scripts/generate-sitemap-index.mjs
@@ -37,4 +37,6 @@
   <sitemap><loc>https://legalfilingindia.com/api/sitemap-pseo-1.xml</loc></sitemap>
   <sitemap><loc>https://legalfilingindia.com/api/sitemap-pseo-2.xml</loc></sitemap>
   <sitemap><loc>https://legalfilingindia.com/api/sitemap-pseo-3.xml</loc></sitemap>
+  <sitemap><loc>https://legalfilingindia.com/api/sitemap-pseo-4.xml</loc></sitemap>
+  <sitemap><loc>https://legalfilingindia.com/api/sitemap-pseo-5.xml</loc></sitemap>
 </sitemapindex>
