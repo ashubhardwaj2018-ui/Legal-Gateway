@@ -9,6 +9,11 @@
   },
   "devDependencies": {
     "@types/node": "catalog:",
-    "tsx": "catalog:"
+    "tsx": "catalog:",
+    "xlsx": "^0.18.5"
+  },
+  "dependencies": {
+    "@types/pg": "^8.18.0",
+    "pg": "^8.20.0"
   }
 }
