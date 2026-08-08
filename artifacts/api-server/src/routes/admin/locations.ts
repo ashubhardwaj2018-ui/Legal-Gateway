@@ -269,7 +269,8 @@ router.get("/admin/locations/stats", async (req, res): Promise<void> => {
       COUNT(*) FILTER (WHERE city IS NOT NULL) AS cities,
       COUNT(*) FILTER (WHERE town IS NOT NULL AND city IS NULL) AS towns,
       COUNT(*) FILTER (WHERE village IS NOT NULL AND city IS NULL AND town IS NULL) AS villages,
-      COUNT(*) FILTER (WHERE is_active = true) AS active
+      COUNT(*) FILTER (WHERE is_active = true) AS active,
+      COUNT(*) FILTER (WHERE seo_priority = true) AS priority
     FROM locations
   `);
   const row = (result.rows[0] ?? {}) as Record<string, unknown>;
@@ -286,6 +287,7 @@ router.get("/admin/locations/stats", async (req, res): Promise<void> => {
     towns: Number(row.towns) || 0,
     villages: Number(row.villages) || 0,
     active: Number(row.active) || 0,
+    priority: Number(row.priority) || 0,
     lastUpload: lastUpload ?? null,
   });
 });
@@ -305,6 +307,7 @@ router.get("/admin/locations", async (req, res): Promise<void> => {
   const search = typeof req.query.search === "string" ? req.query.search : undefined;
   const state = typeof req.query.state === "string" ? req.query.state : undefined;
   const district = typeof req.query.district === "string" ? req.query.district : undefined;
+  const priorityFilter = typeof req.query.priority === "string" ? req.query.priority : undefined; // "1" | "0" | undefined
   const page = Math.max(1, parseInt(String(req.query.page ?? "1"), 10));
   const limit = Math.min(200, Math.max(10, parseInt(String(req.query.limit ?? "50"), 10)));
   const offset = (page - 1) * limit;
@@ -323,6 +326,8 @@ router.get("/admin/locations", async (req, res): Promise<void> => {
   }
   if (state) conditions.push(eq(locationsTable.state, state));
   if (district) conditions.push(eq(locationsTable.district, district));
+  if (priorityFilter === "1") conditions.push(eq(locationsTable.seoPriority, true));
+  if (priorityFilter === "0") conditions.push(eq(locationsTable.seoPriority, false));
 
   const where = conditions.length > 0 ? and(...conditions) : undefined;
 
@@ -331,8 +336,8 @@ router.get("/admin/locations", async (req, res): Promise<void> => {
     : await db.select({ value: count() }).from(locationsTable);
 
   const data = where
-    ? await db.select().from(locationsTable).where(where).orderBy(desc(locationsTable.createdAt)).limit(limit).offset(offset)
-    : await db.select().from(locationsTable).orderBy(desc(locationsTable.createdAt)).limit(limit).offset(offset);
+    ? await db.select().from(locationsTable).where(where).orderBy(desc(locationsTable.population), desc(locationsTable.createdAt)).limit(limit).offset(offset)
+    : await db.select().from(locationsTable).orderBy(desc(locationsTable.population), desc(locationsTable.createdAt)).limit(limit).offset(offset);
 
   res.json({ data, total: totalRes?.value ?? 0, page, limit });
 });
@@ -595,6 +600,23 @@ router.patch("/admin/locations/:id/status", async (req, res): Promise<void> => {
   const [current] = await db.select().from(locationsTable).where(eq(locationsTable.id, id));
   if (!current) { res.status(404).json({ error: "Not found" }); return; }
   const [row] = await db.update(locationsTable).set({ isActive: !current.isActive }).where(eq(locationsTable.id, id)).returning();
+  res.json(row);
+});
+
+// Toggle SEO priority
+router.patch("/admin/locations/:id/seo-priority", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id as string, 10);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+  const [current] = await db
+    .select({ seoPriority: locationsTable.seoPriority })
+    .from(locationsTable)
+    .where(eq(locationsTable.id, id));
+  if (!current) { res.status(404).json({ error: "Not found" }); return; }
+  const [row] = await db
+    .update(locationsTable)
+    .set({ seoPriority: !current.seoPriority })
+    .where(eq(locationsTable.id, id))
+    .returning();
   res.json(row);
 });
 

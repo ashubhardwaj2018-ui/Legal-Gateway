@@ -6,7 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Upload, Download, Trash2, Edit2, ToggleLeft, ToggleRight,
   MapPin, Building2, Globe, Home, TreePine, RefreshCw,
-  CheckCircle2, AlertCircle, X, Search
+  CheckCircle2, AlertCircle, X, Search, Star
 } from "lucide-react";
 import * as XLSX from "xlsx";
 
@@ -23,6 +23,7 @@ interface Location {
   pincode?: string | null;
   slug: string;
   isActive: boolean;
+  seoPriority?: boolean | null;
   population?: number | null;
   createdAt: string;
 }
@@ -35,6 +36,7 @@ interface Stats {
   towns: number;
   villages: number;
   active: number;
+  priority: number;
   lastUpload?: { fileName: string; inserted: number; updated: number; createdAt: string } | null;
 }
 
@@ -101,6 +103,7 @@ export default function AdminLocations() {
 
   const [search, setSearch] = useState("");
   const [stateFilter, setStateFilter] = useState("");
+  const [priorityFilter, setPriorityFilter] = useState<"" | "1" | "0">("");
   const [page, setPage] = useState(1);
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -121,11 +124,12 @@ export default function AdminLocations() {
   });
 
   const { data: locData, isLoading: listLoading } = useQuery<{ data: Location[]; total: number }>({
-    queryKey: ["locations-list", search, stateFilter, page],
+    queryKey: ["locations-list", search, stateFilter, priorityFilter, page],
     queryFn: () => {
       const p = new URLSearchParams({ page: String(page), limit: "50" });
       if (search) p.set("search", search);
       if (stateFilter) p.set("state", stateFilter);
+      if (priorityFilter) p.set("priority", priorityFilter);
       return fetch(`${BASE}/api/admin/locations?${p}`).then((r) => r.json());
     },
     placeholderData: (prev) => prev,
@@ -144,6 +148,15 @@ export default function AdminLocations() {
   const toggleMutation = useMutation({
     mutationFn: (id: number) => fetch(`${BASE}/api/admin/locations/${id}/status`, { method: "PATCH" }).then((r) => r.json()),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["locations-list"] }),
+  });
+
+  const seoPriorityMutation = useMutation({
+    mutationFn: (id: number) =>
+      fetch(`${BASE}/api/admin/locations/${id}/seo-priority`, { method: "PATCH" }).then((r) => r.json()),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["locations-list"] });
+      qc.invalidateQueries({ queryKey: ["location-stats"] });
+    },
   });
 
   const bulkDeleteMutation = useMutation({
@@ -223,13 +236,14 @@ export default function AdminLocations() {
       }
     >
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-4 mb-6">
         <StatCard icon={Globe} label="Total Records" value={stats?.total ?? 0} color="bg-blue-50 text-blue-600" />
         <StatCard icon={MapPin} label="States" value={stats?.states ?? 0} color="bg-purple-50 text-purple-600" />
         <StatCard icon={Building2} label="Districts" value={stats?.districts ?? 0} color="bg-indigo-50 text-indigo-600" />
         <StatCard icon={Home} label="Cities" value={stats?.cities ?? 0} color="bg-green-50 text-green-600" />
         <StatCard icon={TreePine} label="Towns" value={stats?.towns ?? 0} color="bg-orange-50 text-orange-600" />
         <StatCard icon={CheckCircle2} label="Active" value={stats?.active ?? 0} color="bg-emerald-50 text-emerald-600" />
+        <StatCard icon={Star} label="SEO Priority" value={stats?.priority ?? 0} color="bg-yellow-50 text-yellow-600" />
       </div>
 
       {/* Last upload info */}
@@ -365,6 +379,15 @@ export default function AdminLocations() {
               <option value="">All States</option>
               {statesList.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
+            <select
+              className="border border-gray-200 rounded-lg px-2.5 py-2 text-sm focus:outline-none text-gray-600"
+              value={priorityFilter}
+              onChange={(e) => { setPriorityFilter(e.target.value as "" | "1" | "0"); setPage(1); }}
+            >
+              <option value="">All Locations</option>
+              <option value="1">⭐ SEO Priority Only</option>
+              <option value="0">Non-Priority</option>
+            </select>
           </div>
         </div>
 
@@ -391,6 +414,9 @@ export default function AdminLocations() {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">State</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Slug</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">
+                    <span className="flex items-center gap-1"><Star size={11} className="text-yellow-500" />SEO Priority</span>
+                  </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Actions</th>
                 </tr>
               </thead>
@@ -410,6 +436,22 @@ export default function AdminLocations() {
                       <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${loc.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
                         {loc.isActive ? "Active" : "Inactive"}
                       </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => seoPriorityMutation.mutate(loc.id)}
+                        disabled={seoPriorityMutation.isPending}
+                        title={loc.seoPriority ? "Remove SEO priority" : "Mark as SEO priority"}
+                        className="flex items-center gap-1.5 group"
+                      >
+                        <Star
+                          size={15}
+                          className={`transition-colors ${loc.seoPriority ? "fill-yellow-400 text-yellow-400" : "text-gray-300 group-hover:text-yellow-300"}`}
+                        />
+                        <span className={`text-xs font-medium ${loc.seoPriority ? "text-yellow-600" : "text-gray-400 group-hover:text-yellow-500"}`}>
+                          {loc.seoPriority ? "Priority" : "—"}
+                        </span>
+                      </button>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1">
