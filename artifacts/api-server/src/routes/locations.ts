@@ -38,7 +38,58 @@ const SERVICE_CATEGORY_IDS = [
 // Locations per pSEO sitemap file — ensures ≤ 50,000 URLs per file
 const LOC_PER_PSEO_FILE = Math.max(1, Math.floor(50_000 / ALL_UNIQUE_SERVICE_SLUGS.length));
 
+// Fallback city count used when seo_priority has not been seeded yet.
+// If fewer than MIN_PRIORITY_THRESHOLD rows are marked seo_priority=true the
+// sitemap falls back to the top-N locations by population so a missed seed
+// never produces a 0-file sitemap.
+const MIN_PRIORITY_THRESHOLD = 100;
+const FALLBACK_PRIORITY_COUNT = 741;
+
 const BASE_URL = "https://legalfilingindia.com";
+
+// ── Auto-seed guard ───────────────────────────────────────────────────────────
+// When the seo_priority column has been dropped and re-added (e.g. after a
+// publish that resets it to DEFAULT false), this function detects the unseeded
+// state and immediately marks the top-FALLBACK_PRIORITY_COUNT active locations
+// by population as seo_priority=true.  It is idempotent: a no-op once the DB
+// is already seeded, so it is safe to call on every sitemap request.
+// Consistent with the canonical SSR route (ssr.ts) which returns
+// `noindex, follow` for seoPriority=false rows.
+let _seedCheckPromise: Promise<void> | null = null;
+
+async function ensurePrioritySeeded(): Promise<void> {
+  // Reuse any in-flight check so concurrent requests don't all run the UPDATE
+  if (_seedCheckPromise) return _seedCheckPromise;
+  _seedCheckPromise = (async () => {
+    try {
+      const [{ value: seedCount }] = await db
+        .select({ value: count() })
+        .from(locationsTable)
+        .where(and(eq(locationsTable.isActive, true), eq(locationsTable.seoPriority, true)));
+
+      if (Number(seedCount) >= MIN_PRIORITY_THRESHOLD) return; // already seeded
+
+      // Mark the top-N active locations by population as seo_priority=true so the
+      // sitemap and canonical pages are consistent without requiring a manual step.
+      await db.execute(
+        sql`UPDATE locations
+            SET    seo_priority = true
+            WHERE  is_active = true
+              AND  id IN (
+                     SELECT id FROM locations
+                     WHERE  is_active = true
+                     ORDER  BY population DESC NULLS LAST, slug ASC
+                     LIMIT  ${FALLBACK_PRIORITY_COUNT}
+                   )`
+      );
+      console.log(`[sitemap] Auto-seeded seo_priority for top-${FALLBACK_PRIORITY_COUNT} locations by population.`);
+    } finally {
+      // Reset after a short delay so a future request re-checks (handles cold-start races)
+      setTimeout(() => { _seedCheckPromise = null; }, 60_000);
+    }
+  })();
+  return _seedCheckPromise;
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function xmlUrl(loc: string, lastmod: string, freq: string, priority: string): string {
@@ -253,6 +304,9 @@ const COMPANIES_PER_FILE = 50_000;
 
 // ── Sitemap index builder (shared by /sitemap.xml and /sitemap-index.xml) ─────
 async function buildSitemapIndex(req: import("express").Request): Promise<string> {
+  // Seed seo_priority when needed — ensures sitemap and canonical pages agree
+  await ensurePrioritySeeded();
+
   const now = new Date().toISOString().split("T")[0];
   const proto = req.headers["x-forwarded-proto"] ?? "https";
   const host  = req.headers["x-forwarded-host"] ?? req.headers.host ?? "legalfilingindia.com";
@@ -420,9 +474,15 @@ router.get("/sitemap-companies.xml", async (req, res): Promise<void> => {
 // IMPORTANT: Only seo_priority=true locations are included.
 // This prevents 21.5M low-value URLs from entering the sitemap.
 // Each file covers LOC_PER_PSEO_FILE priority locations × ALL services ≤ 50,000 URLs.
+// ensurePrioritySeeded() is called first so the DB is always seeded before
+// the query runs — guaranteeing sitemap and canonical pages agree on indexability.
 router.get("/sitemap-pseo-:page.xml", async (req, res): Promise<void> => {
   const page = parseInt(req.params.page as string, 10);
   if (isNaN(page) || page < 1) { res.status(404).send("Not found"); return; }
+
+  // Auto-seed if needed so seo_priority=true rows exist and canonical pages
+  // return `index, follow` for the same locations we're about to serve.
+  await ensurePrioritySeeded();
 
   const now = new Date().toISOString().split("T")[0];
   const offset = (page - 1) * LOC_PER_PSEO_FILE;
