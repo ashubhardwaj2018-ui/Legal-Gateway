@@ -4,15 +4,19 @@ import { AdminLayout } from "./AdminLayout";
 import {
   Globe, RefreshCw, Send, FileText, MapPin, BarChart2,
   ExternalLink, CheckCircle2, AlertCircle, Loader2, Search, Download,
+  Server, Copy, Star, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 interface PseoStats {
   totalLocations: number;
+  priorityLocations: number;
   totalServices: number;
   totalPseoUrls: number;
+  qualifiedPseoUrls: number;
   pseoSitemapFiles: number;
   companySitemapFiles: number;
   totalCompanies: number;
@@ -76,8 +80,10 @@ function StatCard({ icon: Icon, label, value, sub, color = "blue" }: {
 }
 
 export default function AdminPSEOManager() {
+  const { toast } = useToast();
   const [rebuildLog, setRebuildLog] = useState<string | null>(null);
   const [pingLog, setPingLog] = useState<string | null>(null);
+  const [nginxExpanded, setNginxExpanded] = useState(false);
 
   const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useQuery<PseoStats>({
     queryKey: ["pseo-public-stats"],
@@ -167,14 +173,14 @@ export default function AdminPSEOManager() {
             sub={`${stats?.serviceCategories ?? "?"} categories`}
           />
           <StatCard
-            icon={Globe} label="Total pSEO URLs" color="blue"
-            value={statsLoading ? "…" : (stats?.totalPseoUrls ?? 0)}
-            sub={`${stats?.pseoSitemapFiles ?? "?"} sitemap files`}
+            icon={Star} label="SEO Priority Cities" color="gold"
+            value={statsLoading ? "…" : (stats?.priorityLocations ?? 0)}
+            sub={`${statsLoading ? "…" : (stats?.qualifiedPseoUrls ?? 0).toLocaleString("en-IN")} indexed URLs`}
           />
           <StatCard
-            icon={BarChart2} label="Cities Covered" color="green"
-            value={adminStatsLoading ? "…" : (adminStats?.cities ?? 0)}
-            sub={`${adminStats?.active ?? "?"} active locations`}
+            icon={Globe} label="Indexed pSEO URLs" color="blue"
+            value={statsLoading ? "…" : (stats?.qualifiedPseoUrls ?? 0)}
+            sub={`${stats?.pseoSitemapFiles ?? "?"} sitemap files (priority only)`}
           />
           <StatCard
             icon={Search} label="Sitemap Files" color="purple"
@@ -327,6 +333,112 @@ export default function AdminPSEOManager() {
             </div>
           </div>
         )}
+
+        {/* VPS Nginx Deployment Guide */}
+        <div className="bg-white border border-gray-200 rounded-2xl p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center">
+                <Server size={16} className="text-[#0f2044]" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-[#0f2044]">VPS Nginx Deployment</h3>
+                <p className="text-xs text-gray-500">Route Googlebot to the SSR endpoint — completes the SEO loop</p>
+              </div>
+            </div>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 font-medium">
+              Pending VPS deploy
+            </span>
+          </div>
+
+          {/* Steps */}
+          <ol className="space-y-3 mb-4">
+            {[
+              { n: "1", text: "Pull the latest code on your VPS", cmd: "git pull origin main" },
+              { n: "2", text: "Copy the config file to Nginx", cmd: "sudo cp deploy/nginx/legalfilingindia.conf /etc/nginx/conf.d/legalfilingindia.conf" },
+              { n: "3", text: "Validate the config syntax", cmd: "sudo nginx -t" },
+              { n: "4", text: "Reload Nginx (zero-downtime)", cmd: "sudo systemctl reload nginx" },
+              { n: "5", text: "Verify bot routing works", cmd: `curl -A "Googlebot" https://legalfilingindia.com/gst-registration/mumbai | grep '<title>'` },
+            ].map((step) => (
+              <li key={step.n} className="flex gap-3 items-start">
+                <span className="w-6 h-6 rounded-full bg-[#0f2044] text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">{step.n}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-gray-700 mb-1">{step.text}</p>
+                  <div className="flex items-center gap-2 bg-gray-900 rounded-lg px-3 py-2">
+                    <code className="text-xs text-green-400 font-mono flex-1 break-all">{step.cmd}</code>
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(step.cmd); toast({ title: "Copied!", description: step.cmd.slice(0, 60) + (step.cmd.length > 60 ? "…" : "") }); }}
+                      className="text-gray-400 hover:text-white transition-colors shrink-0"
+                      title="Copy command"
+                    >
+                      <Copy size={13} />
+                    </button>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ol>
+
+          {/* Expected output */}
+          <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-xl text-xs text-green-800">
+            <strong>Expected output from step 5:</strong>{" "}
+            <code className="font-mono">{"<title>GST Registration in Mumbai | Expert Legal Services | Legal Filing India</title>"}</code>
+            <br />
+            If you see this, Googlebot is now receiving full SEO HTML instead of the React shell.
+          </div>
+
+          {/* Full config toggle */}
+          <button
+            onClick={() => setNginxExpanded((v) => !v)}
+            className="flex items-center gap-2 text-xs text-[#0f2044] font-medium hover:text-[#c9a227] transition-colors"
+          >
+            {nginxExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            {nginxExpanded ? "Hide" : "Show"} full Nginx config preview
+          </button>
+
+          {nginxExpanded && (
+            <div className="mt-3 relative">
+              <button
+                onClick={() => {
+                  const snippet = `map $http_user_agent $is_seo_bot {\n    default 0;\n    ~*(Googlebot|bingbot|Slurp|DuckDuckBot|Baiduspider|YandexBot|Sogou|facebot|ia_archiver) 1;\n}\nmap $uri $is_reserved_prefix {\n    default       0;\n    ~^/blog/      1;\n    ~^/company/   1;\n    ~^/state/     1;\n    ~^/portal/    1;\n    ~^/services/  1;\n    ~^/public/    1;\n    ~^/admin/     1;\n}\n# pSEO location block (inside https server{} block):\nlocation ~* "^/([a-z0-9-]+)/([a-z0-9-]+)$" {\n    if ($is_seo_bot$is_reserved_prefix = "10") {\n        rewrite ^/([a-z0-9-]+)/([a-z0-9-]+)$ /api/ssr/$1/$2 last;\n    }\n    root  /var/www/legalfilingindia/artifacts/lawfirm/dist/public;\n    try_files $uri /index.html;\n}`;
+                  navigator.clipboard.writeText(snippet);
+                  toast({ title: "Config snippet copied!" });
+                }}
+                className="absolute top-2 right-2 text-gray-400 hover:text-white transition-colors bg-gray-700 hover:bg-gray-600 rounded p-1.5"
+                title="Copy key snippet"
+              >
+                <Copy size={13} />
+              </button>
+              <pre className="bg-gray-900 text-green-300 text-xs font-mono p-4 rounded-xl overflow-x-auto leading-relaxed">
+{`# http{} context — add these TWO map blocks above your server{} blocks:
+map $http_user_agent $is_seo_bot {
+    default 0;
+    ~*(Googlebot|bingbot|Slurp|DuckDuckBot|Baiduspider|YandexBot
+       |Sogou|facebot|ia_archiver) 1;
+}
+map $uri $is_reserved_prefix {
+    default 0;  ~^/blog/ 1;  ~^/company/ 1;
+    ~^/state/ 1;  ~^/portal/ 1;  ~^/services/ 1;
+    ~^/public/ 1;  ~^/admin/ 1;
+}
+
+# Inside your https server{} block — before the catch-all location /:
+location ~* "^/([a-z0-9-]+)/([a-z0-9-]+)$" {
+    if ($is_seo_bot$is_reserved_prefix = "10") {
+        rewrite ^/([a-z0-9-]+)/([a-z0-9-]+)$ /api/ssr/$1/$2 last;
+    }
+    root  /var/www/legalfilingindia/artifacts/lawfirm/dist/public;
+    try_files $uri /index.html;
+}
+
+# Full config: deploy/nginx/legalfilingindia.conf in the repo`}
+              </pre>
+              <p className="text-xs text-gray-500 mt-2">
+                Full annotated config: <code className="bg-gray-100 px-1 rounded">deploy/nginx/legalfilingindia.conf</code> in the repository root.
+              </p>
+            </div>
+          )}
+        </div>
 
         {/* Quick Links */}
         <div className="bg-[#0f2044]/5 rounded-2xl p-5">
