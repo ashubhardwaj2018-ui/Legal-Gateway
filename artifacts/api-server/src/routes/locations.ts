@@ -341,6 +341,12 @@ ${entries.join("\n")}
 
 // ── Sitemap index — two canonical URLs ───────────────────────────────────────
 router.get("/sitemap.xml", async (req, res): Promise<void> => {
+  // Dev/test only: ?_force_seed_check=1 resets the in-memory seed cache so the
+  // next buildSitemapIndex call re-evaluates the DB state immediately.
+  // Never active in production (NODE_ENV=production ignores this param).
+  if (process.env.NODE_ENV !== "production" && req.query._force_seed_check === "1") {
+    _seedCheckPromise = null;
+  }
   const xml = await buildSitemapIndex(req);
   if (req.query.download !== undefined) {
     res.setHeader("Content-Disposition", 'attachment; filename="sitemap.xml"');
