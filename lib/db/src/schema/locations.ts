@@ -21,6 +21,7 @@ export const locationsTable = pgTable(
     parentLocation: text("parent_location"),
     population: integer("population"),
     isActive: boolean("is_active").notNull().default(true),
+    seoPriority: boolean("seo_priority").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
   },
@@ -29,6 +30,7 @@ export const locationsTable = pgTable(
     stateIdx: index("locations_state_idx").on(table.state),
     districtIdx: index("locations_district_idx").on(table.district),
     cityIdx: index("locations_city_idx").on(table.city),
+    seoPriorityIdx: index("locations_seo_priority_idx").on(table.seoPriority),
   }),
 );
 

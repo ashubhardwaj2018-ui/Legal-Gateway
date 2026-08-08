@@ -185,6 +185,7 @@ function buildJsonLd(
 // ── Full HTML template ────────────────────────────────────────────────────────
 function buildHtml(o: {
   title: string; description: string; canonical: string; keywords: string;
+  robotsMeta: string;
   city: string; state: string; district: string; stateSlug: string;
   svc: SvcInfo; locationSlug: string; intro: string;
   faqs: Array<{ q: string; a: string }>;
@@ -194,7 +195,7 @@ function buildHtml(o: {
   nearbyLocations: Array<{ slug: string; city?: string | null; town?: string | null; village?: string | null; district?: string | null; state: string }>;
   jsonLds: object[];
 }): string {
-  const { title, description, canonical, keywords, city, state, stateSlug,
+  const { title, description, canonical, keywords, robotsMeta, city, state, stateSlug,
     svc, locationSlug, intro, faqs,
     relatedSameCategory, popularServices, professionals, nearbyLocations, jsonLds } = o;
 
@@ -223,7 +224,7 @@ function buildHtml(o: {
   <title>${h(title)}</title>
   <meta name="description" content="${h(description)}"/>
   <meta name="keywords" content="${h(keywords)}"/>
-  <meta name="robots" content="index, follow"/>
+  <meta name="robots" content="${h(robotsMeta)}"/>
   <link rel="canonical" href="${esc(canonical)}"/>
   <meta property="og:type" content="website"/>
   <meta property="og:title" content="${h(title)}"/>
@@ -329,6 +330,10 @@ router.get("/ssr/:serviceSlug/:locationSlug", async (req, res): Promise<void> =>
     return;
   }
 
+  // SEO qualification: only priority locations get index,follow
+  // Non-priority pages remain accessible but tell Google not to index them
+  const robotsMeta = locRow.seoPriority ? "index, follow" : "noindex, follow";
+
   const city     = primaryPlace(locRow);
   const state    = locRow.state;
   const district = locRow.district || state;
@@ -371,6 +376,7 @@ router.get("/ssr/:serviceSlug/:locationSlug", async (req, res): Promise<void> =>
   const html = buildHtml({
     title, description, canonical, keywords,
     city, state, district, stateSlug,
+    robotsMeta,
     svc, locationSlug, intro, faqs,
     relatedSameCategory, popularServices, professionals,
     nearbyLocations: nearbyLocations.filter((n) => n.slug !== locationSlug),

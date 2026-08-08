@@ -196,20 +196,25 @@ router.get("/location-states", async (_req, res): Promise<void> => {
 
 // ── pSEO stats (public) ───────────────────────────────────────────────────────
 router.get("/pseo-stats", async (_req, res): Promise<void> => {
-  const [{ value: locCount }] = await db
-    .select({ value: count() })
-    .from(locationsTable)
-    .where(eq(locationsTable.isActive, true));
+  const [[{ value: locCount }], [{ value: priorityCount }]] = await Promise.all([
+    db.select({ value: count() }).from(locationsTable).where(eq(locationsTable.isActive, true)),
+    db.select({ value: count() }).from(locationsTable)
+      .where(and(eq(locationsTable.isActive, true), eq(locationsTable.seoPriority, true))),
+  ]);
 
-  const totalLocations = Number(locCount);
-  const totalServices = ALL_UNIQUE_SERVICE_SLUGS.length;
-  const totalUrls = totalLocations * totalServices;
-  const pseoFiles = Math.max(1, Math.ceil(totalLocations / LOC_PER_PSEO_FILE));
+  const totalLocations   = Number(locCount);
+  const priorityLocations = Number(priorityCount);
+  const totalServices    = ALL_UNIQUE_SERVICE_SLUGS.length;
+  const totalUrls        = totalLocations * totalServices;
+  const qualifiedUrls    = priorityLocations * totalServices;
+  const pseoFiles        = Math.max(1, Math.ceil(priorityLocations / LOC_PER_PSEO_FILE));
 
   res.json({
     totalLocations,
+    priorityLocations,
     totalServices,
     totalPseoUrls: totalUrls,
+    qualifiedPseoUrls: qualifiedUrls,
     pseoSitemapFiles: pseoFiles,
     locationsPerFile: LOC_PER_PSEO_FILE,
     serviceCategories: SERVICE_CATEGORY_IDS.length,
@@ -253,12 +258,14 @@ async function buildSitemapIndex(req: import("express").Request): Promise<string
   const host  = req.headers["x-forwarded-host"] ?? req.headers.host ?? "legalfilingindia.com";
   const apiBase = `${proto}://${host}/api`;
 
-  const [[{ value: locCount }], [{ value: coCount }]] = await Promise.all([
-    db.select({ value: count() }).from(locationsTable).where(eq(locationsTable.isActive, true)),
+  const [[{ value: priorityLocCount }], [{ value: coCount }]] = await Promise.all([
+    // Only count SEO-priority locations for pSEO sitemaps
+    db.select({ value: count() }).from(locationsTable)
+      .where(and(eq(locationsTable.isActive, true), eq(locationsTable.seoPriority, true))),
     db.select({ value: count() }).from(indianCompaniesTable),
   ]);
 
-  const numPseoFiles     = Math.max(1, Math.ceil(Number(locCount) / LOC_PER_PSEO_FILE));
+  const numPseoFiles     = Math.max(1, Math.ceil(Number(priorityLocCount) / LOC_PER_PSEO_FILE));
   const numCompanyFiles  = Math.max(1, Math.ceil(Number(coCount)  / COMPANIES_PER_FILE));
 
   const entries: string[] = [
@@ -409,8 +416,10 @@ router.get("/sitemap-companies.xml", async (req, res): Promise<void> => {
   res.send(xml);
 });
 
-// ── pSEO sitemap — page N (all services × location slice) ─────────────────────
-// Each file covers LOC_PER_PSEO_FILE locations × ALL services = ~50,000 URLs
+// ── pSEO sitemap — page N (priority locations × SEO-enabled services only) ────
+// IMPORTANT: Only seo_priority=true locations are included.
+// This prevents 21.5M low-value URLs from entering the sitemap.
+// Each file covers LOC_PER_PSEO_FILE priority locations × ALL services ≤ 50,000 URLs.
 router.get("/sitemap-pseo-:page.xml", async (req, res): Promise<void> => {
   const page = parseInt(req.params.page as string, 10);
   if (isNaN(page) || page < 1) { res.status(404).send("Not found"); return; }
@@ -418,35 +427,29 @@ router.get("/sitemap-pseo-:page.xml", async (req, res): Promise<void> => {
   const now = new Date().toISOString().split("T")[0];
   const offset = (page - 1) * LOC_PER_PSEO_FILE;
 
+  // ONLY query seo_priority=true locations — critical SEO qualification gate
   const locations = await db
     .select({ slug: locationsTable.slug })
     .from(locationsTable)
-    .where(eq(locationsTable.isActive, true))
+    .where(and(eq(locationsTable.isActive, true), eq(locationsTable.seoPriority, true)))
     .orderBy(desc(locationsTable.population), asc(locationsTable.state), asc(locationsTable.slug))
     .limit(LOC_PER_PSEO_FILE)
     .offset(offset);
 
   // Return a valid empty urlset (never 404) — Google reports HTTP errors for non-200
-  const highPriorityServices = new Set([
-    "gst-registration","trademark-registration","private-limited-company",
-    "individual-income-tax-filing","fssai-registration-online","msmessi-registration",
-    "legal-notice","property-registration","copyright-registration","gst-filing",
-  ]);
-
   const entries: string[] = [];
   for (const loc of locations) {
     for (const svcSlug of ALL_UNIQUE_SERVICE_SLUGS) {
-      const priority = highPriorityServices.has(svcSlug) ? "0.7" : "0.5";
-      entries.push(xmlUrl(`${BASE_URL}/${svcSlug}/${loc.slug}`, now, "monthly", priority));
+      entries.push(`  <url><loc>${escXml(`${BASE_URL}/${svcSlug}/${loc.slug}`)}</loc></url>`);
     }
   }
 
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"\n        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n        xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9 http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">\n${entries.join("\n")}\n</urlset>`;
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${entries.join("\n")}\n</urlset>`;
   if (req.query.download !== undefined) {
     res.setHeader("Content-Disposition", `attachment; filename="sitemap-pseo-${page}.xml"`);
   }
   res.setHeader("Content-Type", "application/xml; charset=utf-8");
-  res.setHeader("Cache-Control", "public, max-age=86400");
+  res.setHeader("Cache-Control", "public, max-age=3600");
   res.send(xml);
 });
 

@@ -186,7 +186,7 @@ export default function ServiceLocation() {
         <title>{seo.title}</title>
         <meta name="description" content={seo.description} />
         <meta name="keywords" content={seo.keywords.join(", ")} />
-        <meta name="robots" content="index, follow" />
+        <meta name="robots" content={loc?.seoPriority ? "index, follow" : "noindex, follow"} />
         <link rel="canonical" href={pageUrl} />
         <meta property="og:title" content={seo.title} />
         <meta property="og:description" content={seo.description} />

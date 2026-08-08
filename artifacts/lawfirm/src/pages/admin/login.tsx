@@ -30,8 +30,12 @@ export default function AdminLogin() {
     setLoading(false);
     if (r.ok) {
       const user = d.user as { userType?: string; forcePasswordChange?: boolean } | undefined;
-      if (user?.forcePasswordChange) navigate("/admin/my-dashboard"); // AdminLayout shows force-change screen
-      else navigate(user?.userType === "employee" ? "/admin/my-dashboard" : "/admin");
+      // Use hard redirect so the browser sends the fresh session cookie on the
+      // next full HTTP request — avoids the "need to refresh" issue that occurs
+      // when a client-side navigate() fires the AdminLayout auth check before
+      // the cookie is fully committed in the proxied/iframe environment.
+      const dest = user?.userType === "employee" ? "/admin/my-dashboard" : "/admin";
+      window.location.href = dest;
     }
     else setError(d.error ?? "Login failed");
   };

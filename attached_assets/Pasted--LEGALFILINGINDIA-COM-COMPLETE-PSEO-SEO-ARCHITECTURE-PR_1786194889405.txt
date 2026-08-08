@@ -1,0 +1,1189 @@
+# LEGALFILINGINDIA.COM — COMPLETE PSEO SEO ARCHITECTURE + PRIORITY CITY IMPORT + SSR + SITEMAP IMPLEMENTATION
+
+## IMPORTANT — READ BEFORE MAKING CHANGES
+
+This is a production SEO architecture task for LegalFilingIndia.
+
+Do not make destructive changes.
+
+Do not delete existing locations.
+
+Do not delete existing URLs.
+
+Do not change unrelated application functionality.
+
+Do not make all PSEO URLs indexable.
+
+Do not generate a sitemap containing millions of low-value URLs.
+
+First inspect the existing implementation, then implement the architecture described below.
+
+---
+
+# 1. CURRENT VERIFIED SCALE
+
+LegalFilingIndia currently has:
+
+* **150,497 active locations**
+* **143 active/rendered services**
+* **21,521,071 possible PSEO service × location combinations**
+
+Calculation:
+
+```text
+150,497 locations
+×
+143 services
+=
+21,521,071 possible PSEO combinations
+```
+
+This is the theoretical URL space.
+
+IMPORTANT:
+
+**21,521,071 possible URLs does NOT mean 21,521,071 URLs should be indexed by Google.**
+
+The database can contain all locations and services.
+
+Google indexation must be controlled by an SEO qualification layer.
+
+---
+
+# 2. PRIORITY CITY FILE
+
+I have uploaded a file to the Replit workspace containing the list of **priority cities**.
+
+The file contains **CITY NAMES ONLY**.
+
+It does NOT necessarily contain:
+
+* location ID
+* state
+* district
+* PIN code
+* slug
+* coordinates
+* database ID
+
+The existing LegalFilingIndia location database is the primary source of truth for existing locations.
+
+The uploaded file defines the cities that should become the first/primary SEO-priority location layer.
+
+---
+
+# 3. FIRST: INSPECT THE EXISTING PROJECT
+
+Before modifying code or database structure, inspect the existing implementation.
+
+Identify the exact files responsible for:
+
+1. Location database/schema
+2. Service database/schema
+3. Location routes
+4. Service routes
+5. Service + location routes
+6. Slug generation
+7. React routing
+8. Backend routing
+9. SSR/prerendering
+10. SEO metadata
+11. `<title>`
+12. meta description
+13. canonical
+14. robots meta
+15. sitemap generation
+16. sitemap API
+17. robots.txt
+18. internal linking
+19. existing SEO/indexability fields
+20. existing location import logic
+
+Do not duplicate functionality that already exists.
+
+Reuse existing architecture wherever appropriate.
+
+---
+
+# 4. PRIORITY CITY FILE — INSPECT FIRST
+
+Find the uploaded priority-city file.
+
+Determine:
+
+* filename
+* format
+* number of rows
+* header
+* unique city names
+* duplicate rows
+* blank rows
+* invalid values
+* spelling variations
+* whitespace/capitalization variations
+
+The file may look like:
+
+```text
+Delhi
+Mumbai
+Noida
+Pune
+Jaipur
+Indore
+...
+```
+
+Normalize only for matching.
+
+Do not modify the original uploaded file.
+
+Report:
+
+```text
+Total rows:
+Unique city names:
+Duplicate rows:
+Blank/invalid rows:
+```
+
+---
+
+# 5. MATCH PRIORITY CITIES TO EXISTING LOCATIONS
+
+For each uploaded city name, first search the existing location database.
+
+Normalize:
+
+* leading/trailing whitespace
+* capitalization
+* repeated spaces
+* common Unicode variations
+
+Use the strongest existing match available.
+
+Do NOT create duplicates when the location already exists.
+
+Do NOT match solely by city name if multiple locations with that name exist.
+
+---
+
+# 6. AMBIGUOUS CITY NAMES
+
+If the uploaded city name matches multiple existing locations, do NOT randomly choose one.
+
+Example:
+
+```text
+Aurangabad
+```
+
+could potentially match multiple records.
+
+For ambiguous records, report:
+
+```text
+Uploaded city:
+Existing matching locations:
+Location ID:
+State:
+District:
+Slug:
+```
+
+Do not automatically mark an ambiguous location as priority unless there is a clearly identifiable canonical record in the existing database.
+
+---
+
+# 7. MISSING PRIORITY CITIES — CREATE THEM
+
+If a priority city from the uploaded file does NOT exist in the current 150,497-location database:
+
+**Create the missing location**, provided it can be confidently identified as a legitimate Indian city/town/locality.
+
+Use the existing location database schema.
+
+Populate the fields required by the existing schema, such as:
+
+```text
+name
+slug
+state
+state_slug
+district
+district_slug
+country
+location_type
+status
+seo_priority
+```
+
+Use the existing project's conventions.
+
+Set:
+
+```text
+status = active
+seo_priority = true
+```
+
+for successfully created priority locations.
+
+IMPORTANT:
+
+Do NOT invent administrative data.
+
+Do not fabricate:
+
+* state
+* district
+* PIN code
+* coordinates
+* municipality
+* population
+* geographic information
+
+If required information cannot be confidently determined, put the city into an unresolved/manual-review report instead of creating an incorrect location.
+
+---
+
+# 8. LOCATION DATA INTEGRITY
+
+Do not modify existing location IDs unnecessarily.
+
+Do not rename existing locations.
+
+Do not change existing slugs unless there is an actual duplicate/data-integrity issue.
+
+Do not create duplicate locations.
+
+Do not deactivate existing locations simply because they are not in the priority-city file.
+
+The priority file only determines SEO priority.
+
+---
+
+# 9. SEO PRIORITY FIELD
+
+Inspect whether the location table already contains an appropriate SEO field.
+
+If an equivalent field exists, reuse it.
+
+If not, add an appropriate field such as:
+
+```text
+seo_priority
+```
+
+or:
+
+```text
+seo_enabled
+```
+
+according to the existing database conventions.
+
+For successfully matched or newly created priority cities:
+
+```text
+seo_priority = true
+```
+
+For locations not in the priority file:
+
+Do NOT automatically set them inactive.
+
+They simply remain non-priority.
+
+---
+
+# 10. CREATE A CENTRAL PSEO QUALIFICATION SYSTEM
+
+Create/reuse one central function/service:
+
+```text
+isSeoIndexableLocationService(location, service)
+```
+
+This must become the single source of truth for whether a service/location URL is eligible for Google indexation.
+
+Initial rules:
+
+```text
+location.status = active
+AND
+location.seo_priority = true
+AND
+service.status = active
+AND
+service.seo_enabled = true
+AND
+location/service combination is valid
+```
+
+Keep this system extensible for future service-specific relevance rules.
+
+Do NOT hardcode "2,000 cities".
+
+The uploaded priority list determines the current priority locations.
+
+---
+
+# 11. DO NOT AUTOMATICALLY INDEX ALL 143 SERVICES
+
+A priority city does NOT necessarily mean all 143 services need to be indexable.
+
+The qualification layer must allow:
+
+```text
+priority location
++
+eligible service
+=
+indexable PSEO page
+```
+
+Only services that are active and SEO-enabled should qualify.
+
+Do not create fake service relevance.
+
+Do not generate fake location-specific claims.
+
+---
+
+# 12. KEEP ALL 150,497 LOCATIONS
+
+Do NOT delete the existing 150,497 locations.
+
+They must remain available to the application.
+
+They may continue to be used for:
+
+* location search
+* location selection
+* user navigation
+* service selection
+* future SEO expansion
+* database relationships
+* nearby locations
+* internal application functionality
+
+The SEO layer must be separate from the master location database.
+
+---
+
+# 13. EXISTING PSEO URLS
+
+Existing URLs such as:
+
+```text
+https://legalfilingindia.com/pitch-deck/pachkeria-jharkhand
+```
+
+must not be mass-deleted.
+
+Do not introduce mass 404 responses.
+
+Do not introduce mass redirects merely because a location is not priority.
+
+Existing URLs should remain functional where technically appropriate.
+
+SEO indexability will be controlled separately.
+
+---
+
+# 14. CRITICAL SSR / RAW HTML REQUIREMENT
+
+The current example URL:
+
+```text
+https://legalfilingindia.com/pitch-deck/pachkeria-jharkhand
+```
+
+was inspected and its initial HTML contained essentially:
+
+```html
+<title>Legal Filing India — India's Trusted Filing Platform</title>
+<div id="root"></div>
+<script type="module" ...></script>
+```
+
+Therefore:
+
+**DO NOT ASSUME THE PSEO PAGES ARE SSR.**
+
+Verify the actual initial HTTP response.
+
+For SEO-qualified PSEO pages, the raw HTTP HTML returned by the server must contain the essential SEO information before JavaScript executes.
+
+---
+
+# 15. SERVER-RENDERED SEO PAGE
+
+For an SEO-qualified URL such as:
+
+```text
+/pitch-deck/noida-uttar-pradesh
+```
+
+the initial HTTP HTML must contain:
+
+```html
+<title>Pitch Deck Services in Noida, Uttar Pradesh | Legal Filing India</title>
+
+<meta
+  name="description"
+  content="..."
+>
+
+<link
+  rel="canonical"
+  href="https://legalfilingindia.com/pitch-deck/noida-uttar-pradesh"
+>
+
+<meta name="robots" content="index,follow">
+
+<h1>Pitch Deck Services in Noida, Uttar Pradesh</h1>
+```
+
+The actual service/location content must also be present in the raw HTML.
+
+JavaScript can enhance the page afterward.
+
+Google should not have to execute React JavaScript to discover the basic SEO content.
+
+Do NOT create 150,497 individual templates.
+
+Use one reusable dynamic PSEO renderer.
+
+---
+
+# 16. PAGE TITLE
+
+For SEO-qualified PSEO pages, dynamically generate a natural service + location title.
+
+Example:
+
+```text
+Pitch Deck Services in Noida, Uttar Pradesh | Legal Filing India
+```
+
+Do NOT use the generic:
+
+```text
+Legal Filing India — India's Trusted Filing Platform
+```
+
+for qualified PSEO pages.
+
+Do not keyword stuff.
+
+---
+
+# 17. H1
+
+Generate a service/location-specific H1.
+
+Example:
+
+```text
+Pitch Deck Services in Noida, Uttar Pradesh
+```
+
+The H1 must match the actual service and location.
+
+---
+
+# 18. META DESCRIPTION
+
+Generate a useful service/location-specific meta description.
+
+It must:
+
+* be natural
+* describe the actual service
+* mention the actual location where appropriate
+* not be keyword stuffed
+* not contain fabricated claims
+
+Do not simply replace the city name inside an otherwise meaningless sentence.
+
+---
+
+# 19. CANONICAL
+
+Every SEO-qualified PSEO page must have a self-referencing canonical.
+
+Example:
+
+```html
+<link
+  rel="canonical"
+  href="https://legalfilingindia.com/pitch-deck/noida-uttar-pradesh"
+/>
+```
+
+Use:
+
+```text
+https://legalfilingindia.com
+```
+
+as the production canonical domain.
+
+Normalize:
+
+* HTTPS
+* lowercase URL
+* trailing slash convention
+* duplicate URL variants
+* query parameters
+* www/non-www according to the site's established canonical policy
+
+Do NOT canonicalize every location page to the service root.
+
+---
+
+# 20. NON-PRIORITY PSEO PAGES
+
+Locations that are not priority locations remain in the database.
+
+Their dynamic pages can remain accessible.
+
+However, non-qualified PSEO pages should NOT be submitted to Google through the sitemap.
+
+Use an appropriate dynamic SEO policy.
+
+Preferred implementation:
+
+```html
+<meta name="robots" content="noindex,follow">
+```
+
+for non-qualified PSEO combinations.
+
+Do NOT apply `noindex` globally.
+
+Do NOT noindex the SEO-qualified pages.
+
+Do NOT use robots.txt to block these pages if Google needs to crawl them and see the noindex directive.
+
+---
+
+# 21. SITEMAP — CRITICAL
+
+The current theoretical PSEO URL space is:
+
+```text
+150,497 × 143
+=
+21,521,071
+```
+
+DO NOT generate a sitemap containing 21.5 million URLs.
+
+The sitemap must contain ONLY URLs that satisfy:
+
+```text
+isSeoIndexableLocationService(location, service) === true
+```
+
+Therefore:
+
+```text
+Priority location
++
+SEO-qualified service
+=
+Sitemap URL
+```
+
+Non-priority/noindex URLs must NOT appear in the PSEO sitemap.
+
+---
+
+# 22. SITEMAP INDEX
+
+The main sitemap must be:
+
+```text
+https://legalfilingindia.com/sitemap.xml
+```
+
+It should be a valid sitemap index.
+
+It may reference:
+
+```text
+/sitemap-static.xml
+/sitemap-services.xml
+/sitemap-locations-1.xml
+/sitemap-locations-2.xml
+/sitemap-pseo-1.xml
+/sitemap-pseo-2.xml
+...
+```
+
+Use only the sitemap files actually required.
+
+Do not create unnecessary sitemap files.
+
+---
+
+# 23. SITEMAP LIMITS
+
+Respect Google's sitemap limits:
+
+* maximum 50,000 URLs per sitemap
+* maximum 50 MB uncompressed per sitemap
+
+Split PSEO URLs into deterministic chunks.
+
+Use database pagination/batching.
+
+Do NOT load all PSEO URLs into memory.
+
+---
+
+# 24. SITEMAP GENERATION PERFORMANCE
+
+Do NOT do an unbounded query such as:
+
+```sql
+SELECT *
+FROM locations
+CROSS JOIN services
+```
+
+and load the entire result into Node memory.
+
+Instead use:
+
+* indexed database fields
+* SEO priority filtering
+* service filtering
+* pagination
+* batching
+* streaming where appropriate
+* caching where appropriate
+
+The sitemap generator should query only SEO-qualified combinations.
+
+---
+
+# 25. SITEMAP API
+
+Review the existing sitemap API/routes.
+
+Ensure:
+
+```text
+GET /sitemap.xml
+```
+
+returns:
+
+* HTTP 200
+* valid XML
+* sitemap index
+* correct XML Content-Type
+* no authentication
+* HTTPS URLs
+* production hostname
+
+Child sitemaps must also:
+
+* return HTTP 200
+* return valid XML
+* contain only qualified URLs
+* contain no duplicates
+* contain no noindex URLs
+* contain no redirects
+* contain no 404 URLs
+
+---
+
+# 26. SITEMAP URL FORMAT
+
+Use standard XML:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+```
+
+Example:
+
+```xml
+<url>
+  <loc>https://legalfilingindia.com/pitch-deck/noida-uttar-pradesh</loc>
+</url>
+```
+
+Use `<lastmod>` only if there is a real meaningful modification date.
+
+Do not fabricate dates.
+
+Do not add fake changefreq/priority values.
+
+---
+
+# 27. ROBOTS.TXT
+
+Verify:
+
+```text
+https://legalfilingindia.com/robots.txt
+```
+
+It must contain:
+
+```text
+Sitemap: https://legalfilingindia.com/sitemap.xml
+```
+
+Do not block required:
+
+* JavaScript
+* CSS
+* images
+* SEO page resources
+
+Do not use robots.txt as the mechanism for noindex.
+
+---
+
+# 28. INTERNAL LINKING
+
+Do NOT create millions of internal links.
+
+Do NOT make every service page link to every one of the 150,497 locations.
+
+Build a controlled hierarchy.
+
+Example:
+
+```text
+Service
+   ↓
+Priority city
+   ↓
+Service + priority city
+   ↓
+Related services
+   ↓
+Relevant nearby locations
+```
+
+Only strongly promote SEO-qualified pages through internal linking.
+
+---
+
+# 29. PSEO CONTENT QUALITY
+
+Do NOT create fake unique content simply by replacing:
+
+```text
+Delhi
+Mumbai
+Pachkeria
+Jaipur
+```
+
+inside the same paragraph.
+
+The dynamic page should use real information from the database.
+
+Where available, use:
+
+* city
+* district
+* state
+* PIN
+* location hierarchy
+* relevant nearby locations
+* service information
+* legitimate service availability
+* real local data
+
+Do NOT fabricate:
+
+* offices
+* customers
+* testimonials
+* statistics
+* local demand
+* service availability
+* local business claims
+
+A rural location having little or no search demand is NOT by itself a reason to consider the page spam.
+
+The important issue is whether the page provides genuine value and whether the site is generating large numbers of substantially interchangeable pages.
+
+---
+
+# 30. PRIORITY CITY IMPORT SCRIPT
+
+Create a safe, repeatable import process for future priority-city files.
+
+Use the project's existing script conventions.
+
+For example:
+
+```text
+scripts/import-priority-cities.ts
+```
+
+The import process must:
+
+1. Read city-name file
+2. Normalize city names
+3. Match existing locations
+4. Create missing legitimate locations
+5. Mark matched locations as priority
+6. Mark newly created locations as active + priority
+7. Detect duplicate cities
+8. Detect ambiguous matches
+9. Report unresolved cities
+10. Produce an import summary
+
+Do not expose this as a public API.
+
+---
+
+# 31. NEW LOCATION CREATION SAFETY
+
+When creating a missing priority city:
+
+Only create it when its identity can be confidently established.
+
+Use the existing location hierarchy/schema.
+
+If required administrative information is uncertain:
+
+DO NOT invent it.
+
+Put the city into a manual-review report.
+
+---
+
+# 32. URL/SLUG PRESERVATION
+
+Do not unnecessarily modify existing:
+
+* location IDs
+* city names
+* slugs
+* URLs
+
+Newly created locations must use the project's existing slug-generation convention.
+
+Do not create duplicate slugs.
+
+Do not create mass redirects.
+
+---
+
+# 33. DATABASE PERFORMANCE
+
+Ensure efficient lookup by:
+
+* location slug
+* location ID
+* SEO priority
+* service slug
+* service ID
+* location/service relationship where applicable
+
+Do not query all 150,497 locations for every page request.
+
+Do not query all 143 services for every page request unnecessarily.
+
+Use appropriate indexes.
+
+---
+
+# 34. TEST PRIORITY PAGE
+
+After implementation, choose one successfully matched priority city.
+
+Example:
+
+```text
+Noida
+```
+
+Test one service:
+
+```text
+/pitch-deck/noida-uttar-pradesh
+```
+
+Verify RAW HTTP HTML, not only browser DOM.
+
+Verify:
+
+```text
+HTTP status: 200
+Title: service + city specific
+Meta description: service + city specific
+H1: service + city
+Canonical: self-referencing
+Robots: index,follow
+Service in raw HTML: YES
+City in raw HTML: YES
+Meaningful content in raw HTML: YES
+```
+
+---
+
+# 35. TEST NEWLY CREATED PRIORITY LOCATION
+
+Select one city that did not previously exist in the database but was successfully created from the uploaded file.
+
+Verify:
+
+```text
+Location exists: YES
+Status: active
+SEO priority: true
+Slug: valid
+State: valid
+District: valid where required
+No duplicate location: YES
+```
+
+Then test one service/location URL.
+
+---
+
+# 36. TEST NON-PRIORITY LOCATION
+
+Select a location that is NOT in the uploaded priority list.
+
+Verify:
+
+```text
+Location still exists: YES
+Existing route not unnecessarily broken: YES
+PSEO sitemap inclusion: NO
+Robots policy: noindex,follow
+```
+
+Do not delete the location.
+
+---
+
+# 37. TEST SITEMAP
+
+Test:
+
+```text
+https://legalfilingindia.com/sitemap.xml
+```
+
+Verify:
+
+* HTTP 200
+* valid XML
+* sitemap index
+* correct child sitemap URLs
+* HTTPS
+* correct hostname
+
+Then test every child sitemap.
+
+Verify:
+
+* HTTP 200
+* valid XML
+* maximum 50,000 URLs
+* no duplicates
+* no noindex URLs
+* no 404 URLs
+* no redirect URLs
+* no staging/localhost URLs
+
+---
+
+# 38. GOOGLE SEARCH CONSOLE COMPATIBILITY
+
+The final sitemap must be directly submit-able in Google Search Console:
+
+```text
+https://legalfilingindia.com/sitemap.xml
+```
+
+Do not require:
+
+* authentication
+* API keys
+* cookies
+* JavaScript
+* admin login
+
+---
+
+# 39. IMPORTANT — DO NOT BREAK EXISTING APPLICATION
+
+Do NOT modify unrelated functionality.
+
+Do not break:
+
+* Admin
+* CRM
+* authentication
+* consultations
+* payments
+* chat
+* dashboards
+* service forms
+* location search
+* existing APIs
+* existing frontend functionality
+
+Only change components necessary for:
+
+* priority-city import
+* location SEO flags
+* PSEO qualification
+* PSEO SSR/rendering
+* SEO metadata
+* canonical
+* robots
+* sitemap
+* sitemap API
+* robots.txt
+* controlled internal linking
+
+---
+
+# 40. FINAL REPORT — REQUIRED
+
+After implementation, provide an exact report.
+
+## Priority file
+
+```text
+Uploaded file:
+Total rows:
+Unique city names:
+Duplicate rows:
+Blank/invalid rows:
+```
+
+## Location matching
+
+```text
+Existing locations matched:
+New locations created:
+Ambiguous cities:
+Unresolved cities:
+```
+
+## Current database
+
+```text
+Total active locations:
+Priority locations:
+Active services:
+Potential PSEO combinations:
+```
+
+Expected potential combinations:
+
+```text
+21,521,071
+```
+
+## SEO qualification
+
+```text
+SEO-qualified PSEO combinations:
+Non-qualified PSEO combinations:
+PSEO URLs included in sitemap:
+```
+
+## Sitemap
+
+```text
+Sitemap index:
+Number of child sitemaps:
+Largest child sitemap URL count:
+```
+
+## Example priority page
+
+Provide:
+
+```text
+URL:
+HTTP status:
+Title:
+Meta description:
+H1:
+Canonical:
+Robots:
+Raw HTML contains city: YES/NO
+Raw HTML contains service: YES/NO
+Raw HTML contains meaningful content: YES/NO
+```
+
+## Example newly created location
+
+Provide:
+
+```text
+City:
+Location ID:
+State:
+District:
+Slug:
+Status:
+SEO priority:
+```
+
+## Example non-priority page
+
+Provide:
+
+```text
+URL:
+HTTP status:
+Robots:
+Included in sitemap: YES/NO
+```
+
+## Final verification
+
+Confirm:
+
+```text
+Priority city import completed: YES/NO
+Existing locations preserved: YES/NO
+Duplicate locations created: YES/NO
+Missing legitimate priority cities created: YES/NO
+Existing URLs preserved: YES/NO
+SEO-qualified pages server-rendered: YES/NO
+Raw HTML contains SEO metadata: YES/NO
+Canonical implemented: YES/NO
+Non-qualified PSEO pages controlled: YES/NO
+Sitemap valid: YES/NO
+Sitemap excludes non-qualified URLs: YES/NO
+Sitemap avoids 21,521,071 URL generation: YES/NO
+Sitemap API working: YES/NO
+robots.txt verified: YES/NO
+Google Search Console sitemap URL working: YES/NO
+```
+
+IMPORTANT:
+
+Do not claim SSR is implemented merely because React renders correctly in a browser.
+
+Verify the actual raw HTTP response.
+
+Do not claim sitemap completion until the sitemap XML has been fetched and validated.
+
+Do not deploy destructive changes.
+
+Do not make unrelated application changes.

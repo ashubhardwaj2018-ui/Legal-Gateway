@@ -21,6 +21,7 @@ export interface LocationData {
   town?: string | null;
   village?: string | null;
   country?: string;
+  seoPriority?: boolean | null;
 }
 
 export interface NearbyLocation {
