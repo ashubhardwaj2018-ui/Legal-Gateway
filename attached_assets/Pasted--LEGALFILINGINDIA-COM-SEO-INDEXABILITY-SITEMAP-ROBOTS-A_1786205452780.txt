@@ -1,0 +1,448 @@
+# LEGALFILINGINDIA.COM — SEO INDEXABILITY + SITEMAP + ROBOTS AUDIT
+
+IMPORTANT: THIS IS A REPORT-ONLY TASK.
+
+DO NOT modify code, database, sitemap, robots.txt, routes, SEO metadata, or deployment.
+
+I need a complete report of the CURRENT implementation.
+
+The report must cover four areas:
+
+1. Priority PSEO URLs
+2. Static pages
+3. Indian MCA company database pages
+4. Non-priority PSEO URLs
+
+Also audit the sitemap architecture and robots.txt.
+
+---
+
+# 1. PRIORITY PSEO URL REPORT
+
+Identify how the application determines a priority location.
+
+Report:
+
+* Total active locations
+* Total priority locations
+* Total active services
+* Total priority PSEO combinations
+* Total priority PSEO URLs currently generated
+
+For priority PSEO URLs, check whether they have:
+
+* HTTP 200
+* `index,follow`
+* self-referencing canonical
+* unique/dynamic `<title>`
+* location in title
+* service in title
+* location in H1
+* service in H1
+* location in raw HTML
+* service in raw HTML
+* meaningful content in raw HTML
+* JSON-LD where applicable
+* SSR HTML available before JavaScript execution
+
+Test at least 5 real priority PSEO URLs.
+
+Provide the exact URLs tested and the results.
+
+Example:
+
+```text
+URL:
+HTTP:
+Robots:
+Canonical:
+Title:
+H1:
+Location in raw HTML:
+Service in raw HTML:
+SSR:
+JSON-LD:
+```
+
+---
+
+# 2. STATIC PAGE REPORT
+
+Identify all important static/indexable pages.
+
+Examples may include:
+
+* Homepage
+* About
+* Contact
+* Services
+* Important service landing pages
+* Other important SEO pages
+
+Report:
+
+* Total important static pages
+* Which are indexable
+* Which have `index,follow`
+* Which have `noindex`
+* Which are included in sitemap
+* Which are missing from sitemap
+* Canonical status
+* HTTP status
+
+Test representative static pages and report:
+
+```text
+URL:
+HTTP:
+Robots:
+Canonical:
+Title:
+H1:
+In sitemap:
+```
+
+---
+
+# 3. INDIAN MCA COMPANY DATABASE REPORT
+
+LegalFilingIndia has an Indian MCA-registered company database.
+
+Identify the company profile URL architecture.
+
+Report:
+
+* Total company records
+* Total active/valid company records
+* Total company profile URLs
+* Total company pages currently indexable
+* Total company pages currently noindex
+* Total company pages included in sitemap
+* Total company pages excluded from sitemap
+
+Test at least 5 real company profile URLs.
+
+For each test, report:
+
+```text
+Company:
+URL:
+HTTP:
+Robots:
+Canonical:
+Title:
+Company name in raw HTML:
+Company data in raw HTML:
+In company sitemap:
+```
+
+IMPORTANT:
+
+Determine whether valid MCA company profile pages are currently configured as:
+
+`index,follow`
+
+or:
+
+`noindex,follow`
+
+or:
+
+`blocked`
+
+or another robots policy.
+
+Do NOT assume the intended policy. Report the ACTUAL implementation.
+
+---
+
+# 4. NON-PRIORITY PSEO REPORT
+
+This is extremely important.
+
+Identify PSEO locations that are NOT priority locations.
+
+Test at least 5 real non-priority service/location URLs.
+
+Report:
+
+```text
+URL:
+HTTP:
+Robots:
+Canonical:
+Title:
+H1:
+Location in raw HTML:
+Service in raw HTML:
+SSR:
+In sitemap:
+```
+
+Determine whether the current implementation is:
+
+```text
+index,follow
+```
+
+or:
+
+```text
+noindex,follow
+```
+
+or:
+
+```text
+blocked by robots.txt
+```
+
+or another configuration.
+
+IMPORTANT:
+
+Non-priority PSEO URLs should remain crawlable if the current intended architecture is:
+
+`noindex,follow`
+
+Therefore specifically verify that robots.txt is NOT blocking those URLs.
+
+---
+
+# 5. SITEMAP.XML AUDIT
+
+Inspect:
+
+```text
+https://legalfilingindia.com/sitemap.xml
+```
+
+Report:
+
+* HTTP status
+* Content-Type
+* Is it valid XML?
+* Is it a sitemap index?
+* Number of child sitemaps
+* URLs represented by each sitemap
+* Duplicate URLs
+* Invalid URLs
+* Redirect URLs
+* 404 URLs
+* noindex URLs inside sitemap
+* canonical mismatches
+* HTTP URLs
+* HTTPS URLs
+* localhost/staging URLs
+
+Separate the sitemap contents into:
+
+```text
+Static pages:
+MCA company pages:
+Priority PSEO pages:
+Non-priority PSEO pages:
+Other:
+```
+
+Give exact counts.
+
+---
+
+# 6. PSEO SITEMAP AUDIT
+
+Determine exactly how PSEO URLs are selected for sitemap inclusion.
+
+Report the current rule.
+
+For example:
+
+```text
+All PSEO URLs
+```
+
+or:
+
+```text
+Priority locations only
+```
+
+or:
+
+```text
+Other rule
+```
+
+Also report:
+
+```text
+Total possible PSEO combinations:
+Priority combinations:
+Non-priority combinations:
+PSEO URLs actually in sitemap:
+```
+
+Current theoretical maximum is approximately:
+
+150,497 locations × 143 services = 21,521,071 combinations
+
+Do NOT generate all 21.5M URLs just for this audit.
+
+Use database counts/queries where possible.
+
+---
+
+# 7. ROBOTS.TXT AUDIT
+
+Inspect:
+
+```text
+https://legalfilingindia.com/robots.txt
+```
+
+Report the exact current rules relevant to:
+
+* PSEO URLs
+* company pages
+* static pages
+* JavaScript
+* CSS
+* images
+* APIs
+* sitemap
+
+Specifically answer:
+
+### Can Google crawl priority PSEO pages?
+
+YES / NO
+
+### Can Google crawl non-priority PSEO pages?
+
+YES / NO
+
+### Can Google crawl company pages?
+
+YES / NO
+
+### Is `/api/ssr/` blocked?
+
+YES / NO
+
+### Is the sitemap declared?
+
+YES / NO
+
+Report:
+
+```text
+Sitemap:
+```
+
+and identify any rule that could accidentally prevent Google from crawling SEO pages.
+
+---
+
+# 8. INDEXABILITY MATRIX
+
+At the end provide this exact table:
+
+| Page Type         | Crawlable | Indexable | Robots | In Sitemap | Canonical |
+| ----------------- | --------- | --------- | ------ | ---------- | --------- |
+| Static pages      |           |           |        |            |           |
+| MCA company pages |           |           |        |            |           |
+| Priority PSEO     |           |           |        |            |           |
+| Non-priority PSEO |           |           |        |            |           |
+
+---
+
+# 9. IMPORTANT FINAL QUESTIONS
+
+Answer these explicitly:
+
+### A. Priority PSEO
+
+Are priority PSEO pages currently:
+
+`index,follow + sitemap`
+
+YES / NO
+
+### B. Static pages
+
+Are important static pages currently:
+
+`index,follow + sitemap`
+
+YES / NO
+
+### C. MCA companies
+
+Are valid MCA company pages currently:
+
+`index,follow + company sitemap`
+
+YES / NO
+
+### D. Non-priority PSEO
+
+Are non-priority PSEO pages currently:
+
+`noindex,follow + NOT in sitemap`
+
+YES / NO
+
+### E. Robots.txt
+
+Does robots.txt allow Google to crawl all pages that need to be crawled?
+
+YES / NO
+
+### F. Sitemap
+
+Does the Google sitemap contain only URLs that are intended to be indexable?
+
+YES / NO
+
+---
+
+# 10. FINAL REPORT
+
+End the report with:
+
+```text
+TOTAL ACTIVE LOCATIONS:
+TOTAL PRIORITY LOCATIONS:
+TOTAL ACTIVE SERVICES:
+TOTAL POSSIBLE PSEO COMBINATIONS:
+TOTAL PRIORITY PSEO COMBINATIONS:
+TOTAL NON-PRIORITY PSEO COMBINATIONS:
+
+TOTAL MCA COMPANIES:
+TOTAL INDEXABLE MCA COMPANY PAGES:
+TOTAL NON-INDEXABLE MCA COMPANY PAGES:
+
+TOTAL STATIC INDEXABLE PAGES:
+
+TOTAL URLs IN GOOGLE SITEMAP:
+TOTAL PSEO URLs IN SITEMAP:
+TOTAL COMPANY URLs IN SITEMAP:
+TOTAL STATIC URLs IN SITEMAP:
+
+ROBOTS.TXT:
+SITEMAP.XML:
+PRIORITY PSEO:
+NON-PRIORITY PSEO:
+MCA COMPANY PAGES:
+STATIC PAGES:
+```
+
+Then provide a final section:
+
+## ISSUES FOUND
+
+List only actual problems discovered.
+
+## NO CHANGES MADE
+
+Confirm that this task made no modifications to the application or server.
