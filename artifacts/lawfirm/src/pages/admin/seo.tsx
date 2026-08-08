@@ -1023,7 +1023,7 @@ const GROUP_LABELS: Record<string, string> = {
 // ── Sitemap Tab ──────────────────────────────────────────────────────────────
 function SitemapTab() {
   const { toast } = useToast();
-  const [stats, setStats]       = useState<{ locations: number; services: number; blogs: number; companies: number } | null>(null);
+  const [stats, setStats]       = useState<{ priorityLocations: number; pseoUrls: number; blogs: number; companies: number } | null>(null);
   const [entries, setEntries]   = useState<SitemapEntry[]>([]);
   const [loading, setLoading]   = useState(false);
   const [pinging, setPinging]   = useState(false);
@@ -1032,14 +1032,18 @@ function SitemapTab() {
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [loc, svc, blog, co, indexXml] = await Promise.all([
-        fetch(`${BASE}/api/locations?limit=1`, { credentials: "include" }).then(r => r.json()).then(d => Number(d.total ?? 0)).catch(() => 0),
-        fetch(`${BASE}/api/services`, { credentials: "include" }).then(r => r.json()).then(d => Array.isArray(d) ? d.length : 0).catch(() => 0),
+      const [pseoStats, blog, co, indexXml] = await Promise.all([
+        fetch(`${BASE}/api/pseo-stats`).then(r => r.json()).catch(() => ({ priorityLocations: 0, totalServices: 0, qualifiedPseoUrls: 0 })),
         fetch(`${BASE}/api/blogs?limit=1`, { credentials: "include" }).then(r => r.json()).then(d => Number(d.total ?? 0)).catch(() => 0),
         fetch(`${BASE}/api/companies?limit=1`).then(r => r.json()).then(d => Number(d.total ?? 0)).catch(() => 0),
         fetch(`${BASE}/api/sitemap-index.xml`).then(r => r.text()).catch(() => ""),
       ]);
-      setStats({ locations: loc, services: svc, blogs: blog, companies: co });
+      setStats({
+        priorityLocations: Number(pseoStats.priorityLocations ?? 0),
+        pseoUrls: Number(pseoStats.qualifiedPseoUrls ?? 0),
+        blogs: blog,
+        companies: co,
+      });
 
       // Parse every <loc> from the index, then add the index itself at the front
       const locs = parseSitemapIndex(indexXml);
@@ -1097,14 +1101,15 @@ function SitemapTab() {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: "Locations",  value: stats?.locations,  color: "bg-blue-50   border-blue-100   text-blue-700"   },
-          { label: "Services",   value: stats?.services,   color: "bg-amber-50  border-amber-100  text-amber-700"  },
-          { label: "Blog Posts", value: stats?.blogs,      color: "bg-green-50  border-green-100  text-green-700"  },
-          { label: "Companies",  value: stats?.companies,  color: "bg-purple-50 border-purple-100 text-purple-700" },
+          { label: "Priority Locations", value: stats?.priorityLocations, color: "bg-blue-50   border-blue-100   text-blue-700",   sub: "in sitemap" },
+          { label: "pSEO URLs",          value: stats?.pseoUrls,          color: "bg-amber-50  border-amber-100  text-amber-700",  sub: "loc × service" },
+          { label: "Blog Posts",         value: stats?.blogs,             color: "bg-green-50  border-green-100  text-green-700",  sub: "published" },
+          { label: "Companies",          value: stats?.companies,         color: "bg-purple-50 border-purple-100 text-purple-700", sub: "indexed" },
         ].map(s => (
           <div key={s.label} className={`rounded-xl border p-4 text-center ${s.color}`}>
             <div className="text-2xl font-bold">{loading ? "…" : (s.value ?? "—").toLocaleString()}</div>
-            <div className="text-xs mt-0.5">{s.label}</div>
+            <div className="text-xs font-medium mt-0.5">{s.label}</div>
+            <div className="text-[10px] opacity-60 mt-0.5">{s.sub}</div>
           </div>
         ))}
       </div>

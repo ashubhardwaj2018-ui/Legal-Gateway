@@ -116,12 +116,14 @@ const CORRECTIONS: Record<string, Correction> = {
   // Delhi
   "new delhi":                  ["delhi",            "delhi"],
 
-  // City-level renames (no state hint)
-  "bhubaneshwar":               ["bhubaneswar"],
-  "tiruchirappalli":            ["tiruchirappalli"],
-  "rajamahendravaram":          ["rajahmundry"],
-  "kalyan-dombivli":            ["kalyan"],
-  "vasai-virar":                ["vasai"],
+  // City-level renames — state filters added to prevent wildcard cross-state pollution
+  // Previously these had NO statePattern, causing ILIKE '%term%' to match unrelated
+  // post offices in other states (e.g. "kalyan" matched "Kalyanpur" in 7 states).
+  "bhubaneshwar":               ["bhubaneswar",       "odisha"],
+  "tiruchirappalli":            ["tiruchirappalli",   "tamilnadu"],
+  "rajamahendravaram":          ["rajahmundry",       "andhra"],
+  "kalyan-dombivli":            ["kalyan",            "maharashtra"],
+  "vasai-virar":                ["vasai",             "maharashtra"],
 };
 
 // Entries to skip entirely (not in India / not useful)
