@@ -355,10 +355,12 @@ export default function AdminPSEOManager() {
           <ol className="space-y-3 mb-4">
             {[
               { n: "1", text: "Pull the latest code on your VPS", cmd: "git pull origin main" },
-              { n: "2", text: "Copy the config file to Nginx", cmd: "sudo cp deploy/nginx/legalfilingindia.conf /etc/nginx/conf.d/legalfilingindia.conf" },
-              { n: "3", text: "Validate the config syntax", cmd: "sudo nginx -t" },
-              { n: "4", text: "Reload Nginx (zero-downtime)", cmd: "sudo systemctl reload nginx" },
-              { n: "5", text: "Verify bot routing works", cmd: `curl -A "Googlebot" https://legalfilingindia.com/gst-registration/mumbai | grep '<title>'` },
+              { n: "2", text: "Create the Nginx cache directory", cmd: "sudo mkdir -p /var/cache/nginx/pseo && sudo chown nginx:nginx /var/cache/nginx/pseo" },
+              { n: "3", text: "Copy the config file to Nginx", cmd: "sudo cp deploy/nginx/legalfilingindia.conf /etc/nginx/conf.d/legalfilingindia.conf" },
+              { n: "4", text: "Validate the config syntax", cmd: "sudo nginx -t" },
+              { n: "5", text: "Reload Nginx (zero-downtime)", cmd: "sudo systemctl reload nginx" },
+              { n: "6", text: "Verify bot routing works", cmd: `curl -A "Googlebot" https://legalfilingindia.com/gst-registration/mumbai | grep '<title>'` },
+              { n: "7", text: "Verify cache is working (run twice — second should show HIT)", cmd: `curl -sI -A "Googlebot" https://legalfilingindia.com/gst-registration/delhi-dl | grep X-Cache-Status` },
             ].map((step) => (
               <li key={step.n} className="flex gap-3 items-start">
                 <span className="w-6 h-6 rounded-full bg-[#0f2044] text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">{step.n}</span>
@@ -380,11 +382,20 @@ export default function AdminPSEOManager() {
           </ol>
 
           {/* Expected output */}
-          <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-xl text-xs text-green-800">
-            <strong>Expected output from step 5:</strong>{" "}
+          <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded-xl text-xs text-green-800">
+            <strong>Expected output from step 6:</strong>{" "}
             <code className="font-mono">{"<title>GST Registration in Mumbai | Expert Legal Services | Legal Filing India</title>"}</code>
             <br />
             If you see this, Googlebot is now receiving full SEO HTML instead of the React shell.
+          </div>
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-800">
+            <strong>Expected output from step 7 (1st request):</strong>{" "}
+            <code className="font-mono">X-Cache-Status: MISS</code>
+            {"  "}
+            <strong>(2nd request):</strong>{" "}
+            <code className="font-mono">X-Cache-Status: HIT</code>
+            <br />
+            <span className="text-blue-700 mt-0.5 block">Cache TTL: 1 hour · Zone: 512 MB · Stale-on-error: enabled. Googlebot crawl bursts now hit Nginx, not Express.</span>
           </div>
 
           {/* Full config toggle */}
@@ -400,7 +411,7 @@ export default function AdminPSEOManager() {
             <div className="mt-3 relative">
               <button
                 onClick={() => {
-                  const snippet = `map $http_user_agent $is_seo_bot {\n    default 0;\n    ~*(Googlebot|bingbot|Slurp|DuckDuckBot|Baiduspider|YandexBot|Sogou|facebot|ia_archiver) 1;\n}\nmap $uri $is_reserved_prefix {\n    default       0;\n    ~^/blog/      1;\n    ~^/company/   1;\n    ~^/state/     1;\n    ~^/portal/    1;\n    ~^/services/  1;\n    ~^/public/    1;\n    ~^/admin/     1;\n}\n# pSEO location block (inside https server{} block):\nlocation ~* "^/([a-z0-9-]+)/([a-z0-9-]+)$" {\n    if ($is_seo_bot$is_reserved_prefix = "10") {\n        rewrite ^/([a-z0-9-]+)/([a-z0-9-]+)$ /api/ssr/$1/$2 last;\n    }\n    root  /var/www/legalfilingindia/artifacts/lawfirm/dist/public;\n    try_files $uri /index.html;\n}`;
+                  const snippet = `# http{} context — add proxy_cache_path + TWO map blocks above server{}:\nproxy_cache_path /var/cache/nginx/pseo levels=1:2 keys_zone=pseo:10m max_size=512m inactive=1d use_temp_path=off;\n\nmap $http_user_agent $is_seo_bot {\n    default 0;\n    ~*(Googlebot|bingbot|Slurp|DuckDuckBot|Baiduspider|YandexBot|Sogou|facebot|ia_archiver) 1;\n}\nmap $uri $is_reserved_prefix {\n    default       0;\n    ~^/blog/      1;\n    ~^/company/   1;\n    ~^/state/     1;\n    ~^/portal/    1;\n    ~^/services/  1;\n    ~^/public/    1;\n    ~^/admin/     1;\n}\n\n# /api/ location — generic proxy, NO cache (admin/auth/data APIs):\nlocation /api/ {\n    proxy_pass         http://127.0.0.1:8080;\n    proxy_http_version 1.1;\n    proxy_set_header   Host $host;\n    proxy_set_header   X-Real-IP $remote_addr;\n    proxy_set_header   X-Forwarded-Proto $scheme;\n    proxy_read_timeout 120s;\n}\n\n# /api/ssr/ — SSR-only cache (bot-rendered pSEO pages):\nlocation ^~ /api/ssr/ {\n    proxy_pass         http://127.0.0.1:8080;\n    proxy_http_version 1.1;\n    proxy_set_header   Host $host;\n    proxy_set_header   X-Real-IP $remote_addr;\n    proxy_set_header   X-Forwarded-Proto $scheme;\n    proxy_read_timeout 120s;\n    proxy_cache             pseo;\n    proxy_cache_valid       200 1h;\n    proxy_cache_use_stale   error timeout updating http_500;\n    proxy_cache_lock        on;\n    add_header              X-Cache-Status $upstream_cache_status;\n}\n\n# pSEO location block (before the catch-all location /):\nlocation ~* "^/([a-z0-9-]+)/([a-z0-9-]+)$" {\n    if ($is_seo_bot$is_reserved_prefix = "10") {\n        rewrite ^/([a-z0-9-]+)/([a-z0-9-]+)$ /api/ssr/$1/$2 last;\n    }\n    root  /var/www/legalfilingindia/artifacts/lawfirm/dist/public;\n    try_files $uri /index.html;\n}`;
                   navigator.clipboard.writeText(snippet);
                   toast({ title: "Config snippet copied!" });
                 }}
@@ -410,7 +421,14 @@ export default function AdminPSEOManager() {
                 <Copy size={13} />
               </button>
               <pre className="bg-gray-900 text-green-300 text-xs font-mono p-4 rounded-xl overflow-x-auto leading-relaxed">
-{`# http{} context — add these TWO map blocks above your server{} blocks:
+{`# http{} context — add proxy_cache_path + TWO map blocks above server{}:
+proxy_cache_path /var/cache/nginx/pseo
+                 levels=1:2
+                 keys_zone=pseo:10m
+                 max_size=512m
+                 inactive=1d
+                 use_temp_path=off;
+
 map $http_user_agent $is_seo_bot {
     default 0;
     ~*(Googlebot|bingbot|Slurp|DuckDuckBot|Baiduspider|YandexBot
@@ -422,7 +440,27 @@ map $uri $is_reserved_prefix {
     ~^/public/ 1;  ~^/admin/ 1;
 }
 
-# Inside your https server{} block — before the catch-all location /:
+# /api/ — generic proxy, NO cache (admin/auth/data APIs stay live):
+location /api/ {
+    proxy_pass         http://127.0.0.1:8080;
+    # ... existing proxy_set_header / timeout lines ...
+}
+
+# /api/ssr/ — SSR-only cache (^~ takes priority over regex locations):
+location ^~ /api/ssr/ {
+    proxy_pass         http://127.0.0.1:8080;
+    proxy_set_header   Host $host;
+    proxy_set_header   X-Real-IP $remote_addr;
+    proxy_set_header   X-Forwarded-Proto $scheme;
+    proxy_read_timeout 120s;
+    proxy_cache             pseo;
+    proxy_cache_valid       200 1h;
+    proxy_cache_use_stale   error timeout updating http_500;
+    proxy_cache_lock        on;
+    add_header              X-Cache-Status $upstream_cache_status;
+}
+
+# pSEO block (before the catch-all location /):
 location ~* "^/([a-z0-9-]+)/([a-z0-9-]+)$" {
     if ($is_seo_bot$is_reserved_prefix = "10") {
         rewrite ^/([a-z0-9-]+)/([a-z0-9-]+)$ /api/ssr/$1/$2 last;
