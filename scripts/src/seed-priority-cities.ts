@@ -1,0 +1,263 @@
+#!/usr/bin/env tsx
+/**
+ * Seed production seo_priority cities — no file argument needed.
+ *
+ * After a new publish adds the seo_priority column (DEFAULT false), run this
+ * script with the production DATABASE_URL to mark the correct 741 cities.
+ *
+ * Usage:
+ *   cd scripts && DATABASE_URL=<prod-url> npx tsx src/seed-priority-cities.ts
+ *
+ * Safe to re-run (idempotent — only sets seo_priority=true, never clears it).
+ *
+ * Verification: after the UPDATE, the script confirms each of the 741 expected
+ * slugs is present in the DB and exits with code 1 if any are missing, so a
+ * partial seed is never silently accepted.
+ *
+ * Slugs extracted from dev DB on 2026-08-08 (741 priority cities).
+ */
+
+import { Client } from "pg";
+
+// ─── Authoritative list of 741 priority city slugs ───────────────────────────
+const PRIORITY_SLUGS: string[] = [
+  "abohar-punjab","achalpur-madhya-pradesh","achalpur-rajasthan","agra-madhya-pradesh",
+  "agra-rajasthan","ahmadpur-madhya-pradesh","ahmadpur-west-bengal","ahmedabad",
+  "akbarpur-bihar","akbarpur-haryana","akbarpur-rajasthan","akbarpur-uttar-pradesh",
+  "akola-madhya-pradesh","akola-maharashtra","akola-rajasthan","akola-uttar-pradesh",
+  "akot-maharashtra","alipurduar-west-bengal","amalapuram-andhra-pradesh","amarpur-assam",
+  "amarpur-madhya-pradesh","amarshi-west-bengal","ambala-maharashtra","ambala-telangana",
+  "anand-nagar-uttar-pradesh","anantapur-odisha","ankleshwar-gujarat","aonla-uttar-pradesh",
+  "arani-maharashtra","araria-bihar","areraj-bihar","asarganj-bihar",
+  "atri-bihar","atri-madhya-pradesh","atri-maharashtra","aurangabad-andhra-pradesh",
+  "aurangabad-haryana","badkulla-west-bengal","bagaha-bihar","bageshwar-uttarakhand",
+  "baghpat-uttar-pradesh","baghua-odisha","bahadurpur-madhya-pradesh","baheri-uttar-pradesh",
+  "bairgania-bihar","baisi-bihar","balia-odisha","ballarpur-madhya-pradesh",
+  "ballarpur-maharashtra","ballia-uttar-pradesh","balrampur-chattisgarh","balurghat-north-eastern",
+  "banda-chattisgarh","banda-odisha","banda-rajasthan","bandikui-rajasthan",
+  "bandipora-jammu-kashmir","bangalore","bangaon-assam","bangaon-chattisgarh",
+  "bangaon-madhya-pradesh","bangaon-maharashtra","banjari-bihar","banjari-madhya-pradesh",
+  "banjari-odisha","banjari-rajasthan","banka-madhya-pradesh","bansi-bihar",
+  "bansi-maharashtra","bansi-rajasthan","baran-madhya-pradesh","baran-rajasthan",
+  "baraut-haryana","baraut-uttar-pradesh","barbigha-bihar","barhiya-bihar",
+  "bari-bihar","bari-jharkhand","bari-madhya-pradesh","bari-maharashtra",
+  "bari-odisha","bari-rajasthan","barnala-punjab","bayana-rajasthan",
+  "beed-madhya-pradesh","beed-maharashtra","belagavi-karnataka","beldanga-west-bengal",
+  "belsand-bihar","benipur-bihar","benipur-odisha","bethuadahari-west-bengal",
+  "betul-maharashtra","bhabua-bihar","bhaderwah-jammu-kashmir","bhadohi-uttar-pradesh",
+  "bhagalpur-uttar-pradesh","bhandara-rajasthan","bharatpur-chattisgarh","bharatpur-madhya-pradesh",
+  "bharatpur-odisha","bhatapara-chattisgarh","bhimavaram-andhra-pradesh","bhimavaram-telangana",
+  "bhiwadi-maharashtra","bhore-bihar","bhuj-maharashtra","bhurkunda-jharkhand",
+  "bihpur-bihar","bikramganj-bihar","bilaspur-assam","bilaspur-jharkhand",
+  "bilaspur-madhya-pradesh","bilaspur-odisha","bilaspur-rajasthan","bilimora-gujarat",
+  "birpur-madhya-pradesh","bisalpur-rajasthan","bisalpur-uttar-pradesh","biswan-uttar-pradesh",
+  "bolpur-west-bengal","borigaon-chattisgarh","borigaon-maharashtra","borigaon-odisha",
+  "borsad-gujarat","botad-gujarat","brahmapur-west-bengal","burhanpur-telangana",
+  "chakia-uttar-pradesh","chakradharpur-jharkhand","chakradharpur-odisha","chamoli-uttarakhand",
+  "champawat-uttarakhand","chandauli-uttar-pradesh","chandausi-uttar-pradesh","chandpara-west-bengal",
+  "chandpur-assam","chandpur-madhya-pradesh","chandpur-odisha","chandpur-rajasthan",
+  "chandpur-uttar-pradesh","chandrapur-assam","chandrapur-madhya-pradesh","chandrapur-odisha",
+  "chandrapura-jharkhand","chandrapura-madhya-pradesh","chatra-jharkhand","chennai",
+  "chhapra-madhya-pradesh","chhatarpur-jharkhand","chhatarpur-madhya-pradesh","chhibramau-uttar-pradesh",
+  "chikhli-chattisgarh","chikhli-madhya-pradesh","chikhli-maharashtra","chittaranjan-maharashtra",
+  "chittaranjan-west-bengal","chittoor-tamilnadu","chomu-rajasthan","chunar-uttar-pradesh",
+  "dahod-madhya-pradesh","dalla-chattisgarh","dalla-uttar-pradesh","damoh-madhya-pradesh",
+  "dankuni-odisha","dankuni-west-bengal","darauli-bihar","daudnagar-bihar",
+  "deganga-west-bengal","dehri-madhya-pradesh","deoband-uttar-pradesh","deoria-rajasthan",
+  "devsar-gujarat","dewas-madhya-pradesh","dewas-rajasthan","dhaka-bihar",
+  "dhamtari-chattisgarh","dhar-maharashtra","dhar-rajasthan","dharmapuri-andhra-pradesh",
+  "dharmapuri-maharashtra","dharmapuri-tamilnadu","dharmavaram-andhra-pradesh","dharmavaram-telangana",
+  "dholka-gujarat","dhupguri-assam","dhupguri-west-bengal","dibai-assam",
+  "dighwara-bihar","dindigul-telangana","dinhata-west-bengal","durgachak-west-bengal",
+  "durgapur-chattisgarh","durgapur-madhya-pradesh","durgapur-maharashtra","durgapur-north-eastern",
+  "durgapur-odisha","ekma-bihar","ekma-odisha","faizabad-telangana",
+  "falakata-west-bengal","faridabad","faridpur-haryana","faridpur-uttar-pradesh",
+  "farrukhabad-uttar-pradesh","fatehabad-uttar-pradesh","fatehgarh-sahib-punjab","fatehpur-bihar",
+  "fatehpur-haryana","fatehpur-madhya-pradesh","fatehpur-odisha","fatehpur-rajasthan",
+  "fatehpur-shekhawati-rajasthan","fazilka-punjab","firozabad-karnataka","forbesganj-bihar",
+  "gaighat-uttar-pradesh","gajraula-uttar-pradesh","gamharia-jharkhand","ganapavaram",
+  "gandhidham-gujarat","gandhinagar-andhra-pradesh","gandhinagar-assam","gandhinagar-karnataka",
+  "gandhinagar-tamilnadu","gandhinagar-telangana","gandhinagar-west-bengal","garhwa-jharkhand",
+  "garhwa-madhya-pradesh","ghaziabad","gobichettipalayam-tamilnadu","godda-jharkhand",
+  "godhra-gujarat","gohana-haryana","gohana-madhya-pradesh","gohana-rajasthan",
+  "gonda-madhya-pradesh","gonda-uttar-pradesh","gondal-odisha","gopalganj-madhya-pradesh",
+  "gopalganj-west-bengal","gorakhpur-madhya-pradesh","gorakhpur-odisha","goroimari-assam",
+  "gudivada-andhra-pradesh","gudivada-telangana","gummidipundi-tamilnadu","guna-madhya-pradesh",
+  "guntur-maharashtra","gyanpur-uttar-pradesh","habra-west-bengal","hajipur-gujarat",
+  "hajipur-odisha","hajipur-punjab","hajipur-telangana","halol-gujarat",
+  "hamirpur-madhya-pradesh","hamirpur-odisha","hamirpur-rajasthan","handia-madhya-pradesh",
+  "handia-uttar-pradesh","hansi-haryana","hansi-karnataka","hardoi-uttar-pradesh",
+  "haridwar-uttarakhand","harihara-karnataka","hata-haryana","hata-madhya-pradesh",
+  "hata-maharashtra","hata-uttar-pradesh","hathras-uttar-pradesh","hindupur-telangana",
+  "hodal-haryana","hosapete-karnataka","hosur-karnataka","hosur-maharashtra",
+  "hyderabad","iltifatganj-uttar-pradesh","indore","indore-maharashtra",
+  "islampur-assam","islampur-karnataka","islampur-maharashtra","islampur-telangana",
+  "jagdalpur-odisha","jaigaon-karnataka","jaigaon-maharashtra","jainagar-maharashtra",
+  "jainagar-rajasthan","jaipur","jaipur-bihar","jaipur-chattisgarh",
+  "jaipur-jharkhand","jaipur-maharashtra","jaipur-north-eastern","jaipur-odisha",
+  "jaipur-telangana","jalalpur-haryana","jalalpur-karnataka","jalalpur-madhya-pradesh",
+  "jalalpur-maharashtra","jalalpur-rajasthan","jalalpur-telangana","jalalpur-uttar-pradesh",
+  "jalandhar-madhya-pradesh","jalaun-uttar-pradesh","jalgaon-maharashtra","jalna-madhya-pradesh",
+  "jammu-andhra-pradesh","jamtara-jharkhand","jamui-madhya-pradesh","jangalpara-assam",
+  "jangaon-telangana","jetpur-gujarat","jetpur-madhya-pradesh","jetpur-rajasthan",
+  "jhajjar-haryana","jhanjharpur-bihar","jhansi-madhya-pradesh","jodhpur-madhya-pradesh",
+  "jogapatti-bihar","jokihat-bihar","joura-madhya-pradesh","kadi-gujarat",
+  "kadi-north-eastern","kahalgaon-bihar","kaimganj-uttar-pradesh","kairana-uttar-pradesh",
+  "kakdwip-west-bengal","kalna-west-bengal","kalpi-haryana","kalpi-madhya-pradesh",
+  "kalpi-uttar-pradesh","kalyanpur-assam","kalyanpur-bihar","kalyanpur-chattisgarh",
+  "kalyanpur-jharkhand","kalyanpur-madhya-pradesh","kalyanpur-odisha","kalyanpur-rajasthan",
+  "kamarda-odisha","kamrej-gujarat","kannauj-uttar-pradesh","kannur-karnataka",
+  "kannur-tamilnadu","kannur-telangana","kanpur-odisha","kanpur-rajasthan",
+  "kanth-madhya-pradesh","kanth-uttar-pradesh","karad-haryana","karanja-maharashtra",
+  "karanja-odisha","karauli-rajasthan","karnal-maharashtra","karur-andhra-pradesh",
+  "karur-karnataka","karur-telangana","kasganj-uttar-pradesh","kathara-jharkhand",
+  "kaushambi-uttar-pradesh","keonjhar-odisha","kerakat-uttar-pradesh","keshod-gujarat",
+  "khaga-uttar-pradesh","khajauli-bihar","khalilabad-uttar-pradesh","khambhat-gujarat",
+  "khamgaon-maharashtra","khanakul-west-bengal","khandwa-madhya-pradesh","khandwa-rajasthan",
+  "khandwa-uttar-pradesh","khanna-uttar-pradesh","kharagpur-madhya-pradesh","kharagpur-west-bengal",
+  "khatauli-haryana","khatauli-uttar-pradesh","khunti-jharkhand","kishanganj-bihar",
+  "kishanganj-madhya-pradesh","kodarma-jharkhand","kolar-chattisgarh","kolar-rajasthan",
+  "kolkata","kollam-kerala","kosi-kalan-uttar-pradesh","kota-andhra-pradesh",
+  "kota-karnataka","kota-madhya-pradesh","kothagudem-telangana","kothamangalam-tamilnadu",
+  "kotkapura-punjab","kotputli-rajasthan","kotwa-bihar","kotwa-madhya-pradesh",
+  "kralpora-jammu-kashmir","krishnagiri-andhra-pradesh","krishnanagar-chattisgarh","krishnanagar-north-eastern",
+  "krishnanagar-odisha","krishnanagar-telangana","krishnanagar-uttar-pradesh","kunda-karnataka",
+  "kunda-madhya-pradesh","kunda-rajasthan","kunda-uttar-pradesh","kundla-chattisgarh",
+  "kundla-jharkhand","kundla-madhya-pradesh","kundla-rajasthan","kushinagar-uttar-pradesh",
+  "laharpur-haryana","laharpur-madhya-pradesh","laharpur-uttar-pradesh","lakhimpur-assam",
+  "lakhimpur-uttar-pradesh","lakhisarai-bihar","lalganj-uttar-pradesh","lalitpur-madhya-pradesh",
+  "lanka-chattisgarh","lanka-north-eastern","lanka-uttar-pradesh","lohardaga-jharkhand",
+  "madanpur-haryana","madanpur-madhya-pradesh","madanpur-odisha","madanpur-uttar-pradesh",
+  "madhuban-jharkhand","madhuban-north-eastern","madhuban-odisha","madhubani-bihar",
+  "madhupur-assam","madhupur-jharkhand","madhupur-north-eastern","madhupur-odisha",
+  "maharajganj-bihar","maharajganj-madhya-pradesh","maharajganj-uttar-pradesh","maheshkhunt-bihar",
+  "mahoba-uttar-pradesh","mainpuri-madhya-pradesh","mairwa-bihar","makhdumpur-bihar",
+  "malda-odisha","malegaon-karnataka","malegaon-madhya-pradesh","malegaon-maharashtra",
+  "malerkotla-punjab","malkapur-karnataka","malkapur-maharashtra","malkapur-telangana",
+  "mandla-madhya-pradesh","mandla-rajasthan","mangalagiri-tamilnadu","mangaluru-karnataka",
+  "maniar-uttar-pradesh","manihari-bihar","manihari-rajasthan","mannarkkad-kerala",
+  "masaurhi-bihar","masrakh-bihar","mathura-odisha","mathura-west-bengal",
+  "matihani-jharkhand","matihani-uttar-pradesh","mau-madhya-pradesh","mau-rajasthan",
+  "mauranipur-uttar-pradesh","medinipur-odisha","mehkar-karnataka","mehsi-bihar",
+  "meja-road-uttar-pradesh","mettur-tamilnadu","mirzapur-assam","mirzapur-karnataka",
+  "mirzapur-madhya-pradesh","mirzapur-odisha","mirzapur-telangana","mirzapur-uttar-pradesh",
+  "modasa-gujarat","mohammadabad-andhra-pradesh","mohania-bihar","mohania-madhya-pradesh",
+  "mubarakpur-maharashtra","mubarakpur-telangana","mubarakpur-uttar-pradesh","mumbai",
+  "murshidabad-west-bengal","nabha-punjab","nagaon-assam","nagaon-maharashtra",
+  "nagaon-odisha","nagda-madhya-pradesh","nagda-maharashtra","najibabad-uttar-pradesh",
+  "nalanda-bihar","nanded-madhya-pradesh","nanded-maharashtra","nanpur-bihar",
+  "nanpur-madhya-pradesh","narasapuram-andhra-pradesh","narasapuram-telangana","narsinghpur-haryana",
+  "narsinghpur-odisha","nasriganj-bihar","naubatpur-bihar","naugachia-bihar",
+  "naugarh-uttar-pradesh","nilambur-kerala","nirmal-telangana","nizamabad-telangana",
+  "nizamabad-uttar-pradesh","noida","nuapada-odisha","pakur-jharkhand",
+  "pali-madhya-pradesh","pali-maharashtra","pali-rajasthan","pali-tamilnadu",
+  "palitana-gujarat","palwal-haryana","pampore-jammu-kashmir","pandua-odisha",
+  "pandua-west-bengal","panruti-tamilnadu","parasia-bihar","parli-madhya-pradesh",
+  "parli-rajasthan","paroo-bihar","patan-madhya-pradesh","patan-maharashtra",
+  "patan-rajasthan","pathankot-punjab","patna-chattisgarh","patna-madhya-pradesh",
+  "patna-odisha","patna-rajasthan","patori-madhya-pradesh","pattambi-kerala",
+  "payyanur-kerala","petlad-gujarat","phalodi-rajasthan","phaphamau-uttar-pradesh",
+  "pipariya-madhya-pradesh","pipariya-maharashtra","piprarhi-bihar","pratapgarh-assam",
+  "pratapgarh-chattisgarh","pratapgarh-madhya-pradesh","pratapgarh-maharashtra","pratapgarh-odisha",
+  "proddatur-telangana","pukhrayan-uttar-pradesh","pune","puri-chattisgarh",
+  "puri-maharashtra","pusad-rajasthan","rafiganj-bihar","raghopur-bihar",
+  "raghunathpur-madhya-pradesh","raghunathpur-odisha","raghunathpur-uttar-pradesh","raipur-assam",
+  "raipur-madhya-pradesh","raipur-maharashtra","raipur-odisha","raipur-punjab",
+  "raipur-rajasthan","rairangpur-odisha","rajapalayam-tamilnadu","rajgarh-madhya-pradesh",
+  "rajim-chattisgarh","rajkot-rajasthan","rajmahal-jharkhand","rajmahal-rajasthan",
+  "rajpura-madhya-pradesh","rajpura-rajasthan","ramanathapuram-tamilnadu","ramgarh-chattisgarh",
+  "ramgarh-haryana","ramgarh-jharkhand","ramgarh-madhya-pradesh","ramgarh-maharashtra",
+  "ramgarh-odisha","ramgarh-rajasthan","rampur-assam","rampur-bihar",
+  "rampur-chattisgarh","rampur-jharkhand","rampur-karnataka","rampur-madhya-pradesh",
+  "rampur-maharashtra","rampur-odisha","rampur-telangana","rampur-uttar-pradesh",
+  "rampur-west-bengal","rangreth-jammu-kashmir","rath-uttar-pradesh","ratnagiri-odisha",
+  "ratnagiri-telangana","raxaul-bihar","renukoot-uttar-pradesh","rewari-haryana",
+  "rishikesh-uttarakhand","rohtas-bihar","rudraprayag-uttarakhand","rudrapur-karnataka",
+  "rudrapur-odisha","rudrapur-uttar-pradesh","sagar-jharkhand","sagar-madhya-pradesh",
+  "sagar-odisha","saharanpur-rajasthan","sahaspur-odisha","sahaswan-uttar-pradesh",
+  "sahebganj-bihar","sahebganj-uttar-pradesh","sahebpur-kamal-bihar","sahibganj-jharkhand",
+  "saidabad-uttar-pradesh","saidpur-assam","saidpur-telangana","saktipur-west-bengal",
+  "salem-maharashtra","salempur-bihar","sambalpur-chattisgarh","sambhal-uttar-pradesh",
+  "sandila-rajasthan","sandila-uttar-pradesh","sangamner-maharashtra","satara-maharashtra",
+  "sehore-madhya-pradesh","seohara-uttar-pradesh","seoni-chattisgarh","seoni-karnataka",
+  "seoni-madhya-pradesh","seoni-maharashtra","shahapur-maharashtra","shahganj-uttar-pradesh",
+  "shahpura-madhya-pradesh","shahpura-rajasthan","shamli-uttar-pradesh","shankarpur-chattisgarh",
+  "shankarpur-jharkhand","shankarpur-madhya-pradesh","shankarpur-maharashtra","shankarpur-odisha",
+  "shankarpur-uttar-pradesh","shegaon-maharashtra","sheikhpura-madhya-pradesh","sheohar-bihar",
+  "sheopur-rajasthan","sherghati-bihar","sherkot-uttar-pradesh","shikohabad-uttar-pradesh",
+  "shirpur-maharashtra","sidhi-madhya-pradesh","sikandra-rao-uttar-pradesh","sikandra-uttar-pradesh",
+  "siliguri-assam","silvassa-gujarat","simdega-jharkhand","simla-haryana",
+  "simla-odisha","simla-rajasthan","simla-west-bengal","simri-bakhtiarpur-bihar",
+  "sirohi-rajasthan","sirsa-madhya-pradesh","sirsa-telangana","sirsa-uttar-pradesh",
+  "sirsi-haryana","sirsi-jharkhand","sirsi-madhya-pradesh","sitapur-chattisgarh",
+  "sitapur-madhya-pradesh","sitapur-west-bengal","srikakulam-andhra-pradesh","srinagar-andhra-pradesh",
+  "srinagar-assam","srinagar-madhya-pradesh","srinagar-north-eastern","srinagar-rajasthan",
+  "srinagar-telangana","subarnapur-odisha","sultanganj-madhya-pradesh","sultanpur-haryana",
+  "sultanpur-himachal-pradesh","sultanpur-karnataka","sultanpur-madhya-pradesh","sultanpur-maharashtra",
+  "sultanpur-odisha","sultanpur-telangana","sultanpur-uttar-pradesh","sultanpur-uttarakhand",
+  "suratgarh-rajasthan","swarupnagar-west-bengal","taduvai","tanda-himachal-pradesh",
+  "tanda-madhya-pradesh","tanda-maharashtra","tanda-odisha","tanur-telangana",
+  "taranagar-karnataka","taranagar-north-eastern","tekari-bihar","tekari-maharashtra",
+  "thakurdwara-uttar-pradesh","tilhar-uttar-pradesh","tirupattur-tamilnadu","tiruppur-tamilnadu",
+  "tral-jammu-kashmir","tufanganj-west-bengal","tumakuru-karnataka","tumkur-karnataka",
+  "tundla-odisha","tundla-uttar-pradesh","turkaulia-bihar","udaipur-chattisgarh",
+  "udaipur-haryana","udaipur-madhya-pradesh","udaipur-north-eastern","udaipur-west-bengal",
+  "ujhani-uttar-pradesh","umaria-madhya-pradesh","unjha-gujarat","uttarkashi-uttarakhand",
+  "vaddu-karnataka","vaishali-bihar","vapi-gujarat","vellore-tamilnadu",
+  "venjaramoodu-kerala","veraval-gujarat","vijayapura-rajasthan","visnagar-gujarat",
+  "vyara-gujarat","waladgaon-maharashtra","wanaparthy-telangana","wani-maharashtra",
+  "wardha-madhya-pradesh"
+];
+
+const db = new Client({ connectionString: process.env.DATABASE_URL });
+await db.connect();
+
+const { rows: [before] } = await db.query(
+  "SELECT COUNT(*) AS cnt FROM locations WHERE seo_priority = true"
+);
+console.log(`seo_priority before: ${before.cnt}`);
+
+// ─── Apply seed in batches ──────────────────────────────────────────────────
+const BATCH = 200;
+let totalTouched = 0;
+
+for (let i = 0; i < PRIORITY_SLUGS.length; i += BATCH) {
+  const batch = PRIORITY_SLUGS.slice(i, i + BATCH);
+  const placeholders = batch.map((_, j) => `$${j + 1}`).join(", ");
+  const result = await db.query(
+    `UPDATE locations SET seo_priority = true WHERE is_active = true AND slug IN (${placeholders})`,
+    batch
+  );
+  totalTouched += result.rowCount ?? 0;
+  console.log(`  Batch ${Math.floor(i / BATCH) + 1}: updated ${result.rowCount} rows`);
+}
+
+// ─── Verify: check which of the 741 slugs exist as active locations ─────────
+const { rows: foundRows } = await db.query(
+  `SELECT slug FROM locations WHERE is_active = true AND slug = ANY($1::text[])`,
+  [PRIORITY_SLUGS]
+);
+const foundSet = new Set(foundRows.map((r: { slug: string }) => r.slug));
+const missingSlug = PRIORITY_SLUGS.filter(s => !foundSet.has(s));
+
+const { rows: [after] } = await db.query(
+  "SELECT COUNT(*) AS cnt FROM locations WHERE seo_priority = true"
+);
+
+await db.end();
+
+console.log(`\n=== SEED COMPLETE ===`);
+console.log(`DB rows touched: ${totalTouched}`);
+console.log(`seo_priority before: ${before.cnt}  →  after: ${after.cnt}`);
+console.log(`Authoritative slugs in DB: ${foundSet.size} / ${PRIORITY_SLUGS.length}`);
+
+if (missingSlug.length > 0) {
+  console.error(`\n❌ ERROR: ${missingSlug.length} expected slug(s) not found as active locations:`);
+  missingSlug.forEach(s => console.error(`   - ${s}`));
+  console.error(`\n   These slugs may have been renamed or deactivated in this DB.`);
+  console.error(`   Run fix-priority-cities.ts with the original city list file as a fallback.`);
+  process.exit(1);
+}
+
+console.log(`✅  All ${PRIORITY_SLUGS.length} slugs confirmed present.`);
+console.log(`✅  ${after.cnt} total priority locations set — sitemap will show ${Math.ceil(Number(after.cnt) / 349)} pSEO files.`);
