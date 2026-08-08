@@ -1,0 +1,171 @@
+Based on the SEO audit, fix the application architecture only. DO NOT make any VPS/Nginx changes.
+
+### 1. FIX PRODUCTION PRIORITY LOGIC
+
+The audit found:
+
+* Development priority locations: 741
+* Production appears to have approximately 150,497 locations marked `seo_priority = true`
+* This causes approximately 21.5M PSEO URLs to enter the production sitemap.
+
+This is WRONG.
+
+The production database must respect the actual `seo_priority` value.
+
+Do NOT automatically mark all active locations as priority.
+
+Priority locations must be explicitly selected using the existing `seo_priority` field.
+
+Non-priority locations must remain:
+
+`seo_priority = false`
+
+Do not modify the existing priority list unless specifically required.
+
+### 2. PSEO INDEXABILITY
+
+Priority:
+
+`index,follow`
+
+Self-canonical.
+
+Include in Google sitemap.
+
+Non-priority:
+
+`noindex,follow`
+
+Remain crawlable.
+
+Do NOT block them in robots.txt.
+
+Do NOT include them in Google sitemap.
+
+### 3. PSEO SITEMAP
+
+The sitemap must query:
+
+`is_active = true AND seo_priority = true`
+
+Do not generate the 21.5M theoretical combinations.
+
+The sitemap should contain only currently indexable priority PSEO URLs.
+
+Use database batching/streaming.
+
+### 4. MCA COMPANY SITEMAPS
+
+There are approximately 1,048,585 valid MCA company records.
+
+Create paginated company sitemaps with maximum 50,000 URLs per sitemap.
+
+Deploy all company sitemap pagination.
+
+Expected approximately 21–22 company sitemap files.
+
+All valid company profile pages should be:
+
+`index,follow`
+
+and included in the company sitemap.
+
+Do not exclude 998,585 companies because of the legacy 50,000 URL sitemap.
+
+### 5. MAIN SITEMAP
+
+Fix:
+
+`https://legalfilingindia.com/sitemap.xml`
+
+so it returns the actual XML sitemap index.
+
+It must NOT return the React SPA shell.
+
+The sitemap index should reference:
+
+* static sitemap
+* blog sitemap if applicable
+* all company sitemap files
+* all priority PSEO sitemap files
+
+Non-priority PSEO URLs must NOT appear.
+
+### 6. ROBOTS.TXT
+
+Keep SEO pages crawlable.
+
+Do NOT add any robots.txt rule blocking:
+
+`/:serviceSlug/:locationSlug`
+
+Keep:
+
+`noindex,follow`
+
+for non-priority PSEO.
+
+Keep company pages crawlable.
+
+Keep priority PSEO crawlable.
+
+### 7. SSR
+
+Keep the existing SSR endpoint:
+
+`/api/ssr/:serviceSlug/:locationSlug`
+
+Do NOT change or remove the working SSR implementation.
+
+DO NOT configure Nginx on the VPS.
+
+The production web-server routing will be handled separately because the VPS currently uses Apache/Sentora.
+
+### 8. COMPANY CANONICAL
+
+Change company profile canonical URLs from relative:
+
+`/company/{slug}`
+
+to absolute:
+
+`https://legalfilingindia.com/company/{slug}`
+
+### 9. FINAL VERIFICATION
+
+After changes, report:
+
+TOTAL ACTIVE LOCATIONS:
+TOTAL PRIORITY LOCATIONS:
+TOTAL NON-PRIORITY LOCATIONS:
+TOTAL ACTIVE SERVICES:
+
+TOTAL POSSIBLE PSEO URLs:
+TOTAL INDEXABLE PRIORITY PSEO URLs:
+TOTAL NON-PRIORITY PSEO URLs:
+
+TOTAL MCA COMPANIES:
+TOTAL COMPANY SITEMAP FILES:
+TOTAL COMPANY URLs IN SITEMAPS:
+
+TOTAL STATIC URLs:
+TOTAL BLOG URLs:
+
+TOTAL CHILD SITEMAPS:
+
+MAIN SITEMAP:
+`/sitemap.xml`
+
+Confirm:
+
+* `/sitemap.xml` returns valid XML
+* only indexable URLs are in Google sitemap
+* non-priority PSEO URLs are excluded
+* company URLs are included
+* priority PSEO URLs are included
+* robots.txt does not block SEO pages
+
+IMPORTANT:
+Do not modify VPS/Nginx/Apache configuration.
+Do not deploy server configuration.
+Only make application/code/database changes required for the above.
