@@ -169,6 +169,21 @@ export default function AdminLocations() {
     },
   });
 
+  const bulkSeoPriorityMutation = useMutation({
+    mutationFn: ({ ids, value }: { ids: number[]; value: boolean }) =>
+      fetch(`${BASE}/api/admin/locations/bulk-seo-priority`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids, value }),
+      }).then((r) => r.json()),
+    onSuccess: (_data, variables) => {
+      setSelected(new Set());
+      qc.invalidateQueries({ queryKey: ["locations-list"] });
+      qc.invalidateQueries({ queryKey: ["location-stats"] });
+      toast({ title: `${variables.value ? "Marked" : "Removed"} SEO priority for ${variables.ids.length} location${variables.ids.length !== 1 ? "s" : ""}` });
+    },
+  });
+
   const processFile = useCallback(async (file: File) => {
     setUploading(true);
     setUploadProgress(10);
@@ -353,14 +368,34 @@ export default function AdminLocations() {
           <h2 className="font-semibold text-[#0f2044] flex items-center gap-2"><MapPin size={16} /> Location Database</h2>
           <div className="flex items-center gap-2 flex-wrap">
             {selected.size > 0 && (
-              <Button
-                variant="destructive"
-                size="sm"
-                className="gap-1.5"
-                onClick={() => bulkDeleteMutation.mutate(Array.from(selected))}
-              >
-                <Trash2 size={14} /> Delete ({selected.size})
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 border-yellow-300 text-yellow-700 hover:bg-yellow-50"
+                  disabled={bulkSeoPriorityMutation.isPending}
+                  onClick={() => bulkSeoPriorityMutation.mutate({ ids: Array.from(selected), value: true })}
+                >
+                  <Star size={14} className="fill-yellow-400 text-yellow-400" /> Mark Priority ({selected.size})
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 border-gray-300 text-gray-600 hover:bg-gray-50"
+                  disabled={bulkSeoPriorityMutation.isPending}
+                  onClick={() => bulkSeoPriorityMutation.mutate({ ids: Array.from(selected), value: false })}
+                >
+                  <Star size={14} /> Remove Priority ({selected.size})
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => bulkDeleteMutation.mutate(Array.from(selected))}
+                >
+                  <Trash2 size={14} /> Delete ({selected.size})
+                </Button>
+              </>
             )}
             <div className="relative">
               <Search size={14} className="absolute left-2.5 top-2.5 text-gray-400" />

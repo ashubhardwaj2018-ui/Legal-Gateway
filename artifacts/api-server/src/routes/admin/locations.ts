@@ -638,6 +638,16 @@ router.post("/admin/locations/bulk-delete", async (req, res): Promise<void> => {
   res.json({ deleted: numIds.length });
 });
 
+// Bulk SEO priority toggle
+router.post("/admin/locations/bulk-seo-priority", async (req, res): Promise<void> => {
+  const body = req.body as { ids?: unknown; value?: unknown };
+  if (!Array.isArray(body.ids) || body.ids.length === 0) { res.status(400).json({ error: "ids array required" }); return; }
+  if (typeof body.value !== "boolean") { res.status(400).json({ error: "value (boolean) required" }); return; }
+  const numIds = (body.ids as unknown[]).map(Number).filter((n) => !isNaN(n));
+  await db.update(locationsTable).set({ seoPriority: body.value }).where(inArray(locationsTable.id, numIds));
+  res.json({ updated: numIds.length, seoPriority: body.value });
+});
+
 // ─── pSEO: Rebuild service-location relationships ────────────────────────────
 // Creates service_locations rows for top N locations × all services.
 // We cap at 5000 locations to keep the table manageable (dynamic pages work regardless).
