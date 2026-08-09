@@ -99,6 +99,31 @@ function escXml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+/**
+ * Stream an XML urlset response to the client chunk-by-chunk.
+ *
+ * The caller sets all HTTP headers (Content-Type, Cache-Control, etc.) before
+ * calling this function, then provides a `generate` callback that writes URL
+ * lines via the supplied `write` helper.  Batching writes per location (rather
+ * than per URL) keeps syscall count reasonable while bounding peak memory to a
+ * single location's worth of strings at a time.
+ *
+ * Why streaming instead of res.send(bigString):
+ *  - Time-to-first-byte drops to ~milliseconds — Google's crawler sees a live
+ *    response immediately instead of waiting for all ~50 k URLs to be assembled.
+ *  - Peak RSS stays bounded — strings are GC-eligible as soon as each chunk is
+ *    flushed to the socket, rather than the entire file sitting in one array.
+ *  - Avoids request-timeout risk on cold-cache hits for the 427 npseo files.
+ */
+async function streamUrlset(
+  res: import("express").Response,
+  generate: (write: (chunk: string) => void) => void | Promise<void>,
+): Promise<void> {
+  res.write('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n');
+  await generate((chunk) => { res.write(chunk); });
+  res.end('</urlset>');
+}
+
 // ── AJAX location search ──────────────────────────────────────────────────────
 router.get("/locations/search", async (req, res): Promise<void> => {
   const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
@@ -439,7 +464,9 @@ ${blogUrls.join("\n")}
 });
 
 // ── Companies sitemap — paginated (sitemap-companies-N.xml) ──────────────────
-// Each file covers up to COMPANIES_PER_FILE slugs (≤ 50,000 per Google's limit)
+// Each file covers up to COMPANIES_PER_FILE slugs (≤ 50,000 per Google's limit).
+// Streamed: writes one URL line per company as soon as the DB row is available,
+// so peak memory stays at one batch of rows rather than 50k assembled strings.
 router.get("/sitemap-companies-:page.xml", async (req, res): Promise<void> => {
   const page = parseInt(req.params.page as string, 10);
   if (isNaN(page) || page < 1) { res.status(404).send("Not found"); return; }
@@ -454,18 +481,16 @@ router.get("/sitemap-companies-:page.xml", async (req, res): Promise<void> => {
     .limit(COMPANIES_PER_FILE)
     .offset(offset);
 
-  // Return an empty valid urlset (not 404) so Google doesn't report HTTP errors
-  const compUrls = companies.map((c) =>
-    xmlUrl(`${BASE_URL}/company/${c.slug}`, now, "monthly", "0.4")
-  );
-
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${compUrls.join("\n")}\n</urlset>`;
   if (req.query.download !== undefined) {
     res.setHeader("Content-Disposition", `attachment; filename="sitemap-companies-${page}.xml"`);
   }
   res.setHeader("Content-Type", "application/xml; charset=utf-8");
   res.setHeader("Cache-Control", "public, max-age=86400");
-  res.send(xml);
+  await streamUrlset(res, (write) => {
+    for (const c of companies) {
+      write(xmlUrl(`${BASE_URL}/company/${c.slug}`, now, "monthly", "0.4") + "\n");
+    }
+  });
 });
 
 // ── Legacy alias: sitemap-companies.xml — serve page 1 content directly ───────
@@ -478,16 +503,16 @@ router.get("/sitemap-companies.xml", async (req, res): Promise<void> => {
     .orderBy(indianCompaniesTable.id)
     .limit(COMPANIES_PER_FILE);
 
-  const compUrls = companies.map((c) =>
-    xmlUrl(`${BASE_URL}/company/${c.slug}`, now, "monthly", "0.4")
-  );
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${compUrls.join("\n")}\n</urlset>`;
   if (req.query.download !== undefined) {
     res.setHeader("Content-Disposition", 'attachment; filename="sitemap-companies-1.xml"');
   }
   res.setHeader("Content-Type", "application/xml; charset=utf-8");
   res.setHeader("Cache-Control", "public, max-age=86400");
-  res.send(xml);
+  await streamUrlset(res, (write) => {
+    for (const c of companies) {
+      write(xmlUrl(`${BASE_URL}/company/${c.slug}`, now, "monthly", "0.4") + "\n");
+    }
+  });
 });
 
 // ── pSEO sitemap — page N (priority locations × SEO-enabled services only) ────
@@ -496,6 +521,7 @@ router.get("/sitemap-companies.xml", async (req, res): Promise<void> => {
 // Each file covers LOC_PER_PSEO_FILE priority locations × ALL services ≤ 50,000 URLs.
 // ensurePrioritySeeded() is called first so the DB is always seeded before
 // the query runs — guaranteeing sitemap and canonical pages agree on indexability.
+// Streamed: one chunk per location (~143 URL lines) for bounded peak memory.
 router.get("/sitemap-pseo-:page.xml", async (req, res): Promise<void> => {
   const page = parseInt(req.params.page as string, 10);
   if (isNaN(page) || page < 1) { res.status(404).send("Not found"); return; }
@@ -504,7 +530,7 @@ router.get("/sitemap-pseo-:page.xml", async (req, res): Promise<void> => {
   // return `index, follow` for the same locations we're about to serve.
   await ensurePrioritySeeded();
 
-  const now = new Date().toISOString().split("T")[0];
+  const now    = new Date().toISOString().split("T")[0];
   const offset = (page - 1) * LOC_PER_PSEO_FILE;
 
   // ONLY query seo_priority=true locations — critical SEO qualification gate
@@ -516,27 +542,28 @@ router.get("/sitemap-pseo-:page.xml", async (req, res): Promise<void> => {
     .limit(LOC_PER_PSEO_FILE)
     .offset(offset);
 
-  // Return a valid empty urlset (never 404) — Google reports HTTP errors for non-200
-  const entries: string[] = [];
-  for (const loc of locations) {
-    for (const svcSlug of ALL_UNIQUE_SERVICE_SLUGS) {
-      entries.push(`  <url><loc>${escXml(`${BASE_URL}/${svcSlug}/${loc.slug}`)}</loc></url>`);
-    }
-  }
-
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${entries.join("\n")}\n</urlset>`;
   if (req.query.download !== undefined) {
     res.setHeader("Content-Disposition", `attachment; filename="sitemap-pseo-${page}.xml"`);
   }
   res.setHeader("Content-Type", "application/xml; charset=utf-8");
   res.setHeader("Cache-Control", "public, max-age=3600");
-  res.send(xml);
+  // Stream one location's URLs at a time — ~143 lines per write() call
+  await streamUrlset(res, (write) => {
+    for (const loc of locations) {
+      const chunk = ALL_UNIQUE_SERVICE_SLUGS
+        .map((svcSlug) => `  <url><loc>${escXml(`${BASE_URL}/${svcSlug}/${loc.slug}`)}</loc></url>`)
+        .join("\n") + "\n";
+      write(chunk);
+    }
+  });
 });
 
 // ── Non-priority pSEO sitemap — page N (noindex,follow locations) ─────────────
 // Google crawls these pages (follows links) but does not index them.
 // Same density as priority sitemaps: LOC_PER_PSEO_FILE locations × all services.
 // seo_priority = false locations only — priority locations are in sitemap-pseo-N.xml.
+// Streamed: one chunk per location (~143 URL lines) so peak memory stays bounded
+// regardless of file size — critical for cold-cache hits across 427 npseo files.
 router.get("/sitemap-npseo-:page.xml", async (req, res): Promise<void> => {
   const page = parseInt(req.params.page as string, 10);
   if (isNaN(page) || page < 1) { res.status(404).send("Not found"); return; }
@@ -552,21 +579,20 @@ router.get("/sitemap-npseo-:page.xml", async (req, res): Promise<void> => {
     .limit(LOC_PER_PSEO_FILE)
     .offset(offset);
 
-  // Return a valid empty urlset (never 404) — Google reports HTTP errors for non-200
-  const entries: string[] = [];
-  for (const loc of locations) {
-    for (const svcSlug of ALL_UNIQUE_SERVICE_SLUGS) {
-      entries.push(`  <url><loc>${escXml(`${BASE_URL}/${svcSlug}/${loc.slug}`)}</loc></url>`);
-    }
-  }
-
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${entries.join("\n")}\n</urlset>`;
   if (req.query.download !== undefined) {
     res.setHeader("Content-Disposition", `attachment; filename="sitemap-npseo-${page}.xml"`);
   }
   res.setHeader("Content-Type", "application/xml; charset=utf-8");
   res.setHeader("Cache-Control", "public, max-age=86400");
-  res.send(xml);
+  // Stream one location's URLs at a time — ~143 lines per write() call
+  await streamUrlset(res, (write) => {
+    for (const loc of locations) {
+      const chunk = ALL_UNIQUE_SERVICE_SLUGS
+        .map((svcSlug) => `  <url><loc>${escXml(`${BASE_URL}/${svcSlug}/${loc.slug}`)}</loc></url>`)
+        .join("\n") + "\n";
+      write(chunk);
+    }
+  });
 });
 
 export default router;
