@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { 
   ArrowRight, ShieldCheck, Clock, Award, Users, FileText, 
@@ -41,12 +41,87 @@ const categoryIcons: Record<string, React.ElementType> = {
   "lawyers": Users
 };
 
-const lawyers = [
-  { name: "Adv. Rajesh Sharma", spec: "Corporate & M&A", exp: "18 Yrs Exp.", img: "https://api.dicebear.com/7.x/notionists/svg?seed=Rajesh&backgroundColor=f1f5f9" },
-  { name: "Adv. Priya Desai", spec: "Intellectual Property", exp: "12 Yrs Exp.", img: "https://api.dicebear.com/7.x/notionists/svg?seed=Priya&backgroundColor=f1f5f9" },
-  { name: "Adv. Vikram Singh", spec: "Real Estate & Property", exp: "22 Yrs Exp.", img: "https://api.dicebear.com/7.x/notionists/svg?seed=Vikram&backgroundColor=f1f5f9" },
-  { name: "Adv. Neha Gupta", spec: "Family & Civil Law", exp: "15 Yrs Exp.", img: "https://api.dicebear.com/7.x/notionists/svg?seed=Neha&backgroundColor=f1f5f9" }
+interface LawyerProfile { id: number; name: string; role?: string | null; specialization: string; experienceYears: number; photoUrl?: string | null; }
+
+const FALLBACK_EXPERTS: LawyerProfile[] = [
+  { id: 1, name: "Adv. Rajesh Sharma", role: "Senior Partner", specialization: "Corporate Law", experienceYears: 18, photoUrl: "https://api.dicebear.com/7.x/notionists/svg?seed=Rajesh&backgroundColor=f1f5f9" },
+  { id: 2, name: "Adv. Priya Desai", role: "Partner", specialization: "Intellectual Property", experienceYears: 12, photoUrl: "https://api.dicebear.com/7.x/notionists/svg?seed=Priya&backgroundColor=f1f5f9" },
+  { id: 3, name: "Adv. Vikram Singh", role: "Senior Partner", specialization: "Real Estate", experienceYears: 22, photoUrl: "https://api.dicebear.com/7.x/notionists/svg?seed=Vikram&backgroundColor=f1f5f9" },
+  { id: 4, name: "Adv. Neha Gupta", role: "Associate Partner", specialization: "Family Law", experienceYears: 15, photoUrl: "https://api.dicebear.com/7.x/notionists/svg?seed=Neha&backgroundColor=f1f5f9" },
 ];
+
+function useLawyerProfiles() {
+  const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+  const [lawyers, setLawyers] = useState<LawyerProfile[]>(FALLBACK_EXPERTS);
+  useEffect(() => {
+    fetch(`${BASE}/api/lawyer-profiles`)
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then((d: LawyerProfile[]) => { if (Array.isArray(d) && d.length > 0) setLawyers(d.slice(0, 4)); })
+      .catch(() => { /* keep fallback */ });
+  }, [BASE]);
+  return lawyers;
+}
+
+function ExpertsSection() {
+  const lawyers = useLawyerProfiles();
+  return (
+    <section className="py-24 bg-gray-50">
+      <div className="container mx-auto px-4 md:px-6">
+        <div className="flex justify-between items-end mb-12">
+          <div className="max-w-2xl">
+            <h2 className="text-3xl md:text-5xl font-serif font-bold text-primary mb-4">Meet Our Experts</h2>
+            <p className="text-lg text-muted-foreground">
+              Our network comprises seasoned practitioners from top law firms and former corporate counsels.
+            </p>
+          </div>
+          <Link href="/our-lawyers">
+            <Button variant="outline" className="hidden md:flex border-primary text-primary hover:bg-primary hover:text-white">
+              View All Lawyers
+            </Button>
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {lawyers.map((lawyer, i) => {
+            const spec = lawyer.specialization.split(",")[0].trim();
+            const photo = lawyer.photoUrl ?? `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(lawyer.name)}&backgroundColor=f1f5f9`;
+            return (
+              <Link key={lawyer.id} href="/our-lawyers">
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.1 }}
+                  className="bg-white rounded-xl overflow-hidden border border-border hover:shadow-xl transition-all group cursor-pointer"
+                >
+                  <div className="aspect-square bg-muted relative overflow-hidden">
+                    <img src={photo} alt={lawyer.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                    <div className="absolute bottom-3 right-3 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold text-primary flex items-center gap-1 shadow-sm">
+                      <Star size={12} className="fill-secondary text-secondary" /> {lawyer.experienceYears} Yrs
+                    </div>
+                  </div>
+                  <div className="p-5 text-center border-t border-border">
+                    <h4 className="font-serif font-bold text-lg text-primary">{lawyer.name}</h4>
+                    <p className="text-sm text-secondary font-medium mt-1">{spec}</p>
+                    {lawyer.role && <p className="text-xs text-muted-foreground mt-0.5">{lawyer.role}</p>}
+                  </div>
+                </motion.div>
+              </Link>
+            );
+          })}
+        </div>
+
+        <div className="mt-8 text-center md:hidden">
+          <Link href="/our-lawyers">
+            <Button variant="outline" className="border-primary text-primary w-full">
+              View All Lawyers
+            </Button>
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 function LatestBlogSection() {
   const { data } = useListBlogs({ limit: 3 });
@@ -437,50 +512,7 @@ export default function Home() {
       </section>
 
       {/* Lawyers Showcase */}
-      <section className="py-24 bg-gray-50">
-        <div className="container mx-auto px-4 md:px-6">
-          <div className="flex justify-between items-end mb-12">
-            <div className="max-w-2xl">
-              <h2 className="text-3xl md:text-5xl font-serif font-bold text-primary mb-4">Meet Our Experts</h2>
-              <p className="text-lg text-muted-foreground">
-                Our network comprises seasoned practitioners from top law firms and former corporate counsels.
-              </p>
-            </div>
-            <Button variant="outline" className="hidden md:flex border-primary text-primary hover:bg-primary hover:text-white">
-              View All Lawyers
-            </Button>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {lawyers.map((lawyer, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.1 }}
-                className="bg-white rounded-xl overflow-hidden border border-border hover:shadow-xl transition-all group"
-              >
-                <div className="aspect-square bg-muted relative overflow-hidden">
-                  <img src={lawyer.img} alt={lawyer.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                  <div className="absolute bottom-3 right-3 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold text-primary flex items-center gap-1 shadow-sm">
-                    <Star size={12} className="fill-secondary text-secondary" /> {lawyer.exp}
-                  </div>
-                </div>
-                <div className="p-5 text-center border-t border-border">
-                  <h4 className="font-serif font-bold text-lg text-primary">{lawyer.name}</h4>
-                  <p className="text-sm text-secondary font-medium mt-1">{lawyer.spec}</p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-          <div className="mt-8 text-center md:hidden">
-            <Button variant="outline" className="border-primary text-primary w-full">
-              View All Lawyers
-            </Button>
-          </div>
-        </div>
-      </section>
+      <ExpertsSection />
 
       {/* Testimonials */}
       <section className="py-24 bg-white" id="testimonials">

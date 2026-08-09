@@ -5,10 +5,12 @@ import { z } from "zod/v4";
 export const lawyerProfilesTable = pgTable("lawyer_profiles", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
+  role: text("role"),
   specialization: text("specialization").notNull(),
   experienceYears: integer("experience_years").notNull().default(0),
   bio: text("bio"),
   photoUrl: text("photo_url"),
+  email: text("email"),
   languages: text("languages"),
   barCouncilNo: text("bar_council_no"),
   isActive: boolean("is_active").notNull().default(true),

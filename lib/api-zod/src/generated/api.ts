@@ -772,10 +772,12 @@ export const DeleteCompanyRecordParams = zod.object({
 export const ListLawyerProfilesResponseItem = zod.object({
   id: zod.number(),
   name: zod.string(),
+  role: zod.string().nullish(),
   specialization: zod.string(),
   experienceYears: zod.number(),
   bio: zod.string().nullish(),
   photoUrl: zod.string().nullish(),
+  email: zod.string().nullish(),
   languages: zod.string().nullish(),
   barCouncilNo: zod.string().nullish(),
   isActive: zod.boolean(),
@@ -787,10 +789,12 @@ export const ListLawyerProfilesResponse = zod.array(
 
 export const CreateLawyerProfileBody = zod.object({
   name: zod.string(),
+  role: zod.string().nullish(),
   specialization: zod.string(),
   experienceYears: zod.number(),
   bio: zod.string().nullish(),
   photoUrl: zod.string().nullish(),
+  email: zod.string().nullish(),
   languages: zod.string().nullish(),
   barCouncilNo: zod.string().nullish(),
   isActive: zod.boolean().optional(),
@@ -802,10 +806,12 @@ export const UpdateLawyerProfileParams = zod.object({
 
 export const UpdateLawyerProfileBody = zod.object({
   name: zod.string().optional(),
+  role: zod.string().nullish(),
   specialization: zod.string().optional(),
   experienceYears: zod.number().optional(),
   bio: zod.string().nullish(),
   photoUrl: zod.string().nullish(),
+  email: zod.string().nullish(),
   languages: zod.string().nullish(),
   barCouncilNo: zod.string().nullish(),
   isActive: zod.boolean().optional(),
@@ -814,10 +820,12 @@ export const UpdateLawyerProfileBody = zod.object({
 export const UpdateLawyerProfileResponse = zod.object({
   id: zod.number(),
   name: zod.string(),
+  role: zod.string().nullish(),
   specialization: zod.string(),
   experienceYears: zod.number(),
   bio: zod.string().nullish(),
   photoUrl: zod.string().nullish(),
+  email: zod.string().nullish(),
   languages: zod.string().nullish(),
   barCouncilNo: zod.string().nullish(),
   isActive: zod.boolean(),

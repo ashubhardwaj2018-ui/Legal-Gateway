@@ -17,10 +17,12 @@ import { Plus, Pencil, Trash2, User, Briefcase, Award } from "lucide-react";
 
 type FormData = {
   name: string;
+  role: string;
   specialization: string;
   experienceYears: string;
   bio: string;
   photoUrl: string;
+  email: string;
   languages: string;
   barCouncilNo: string;
   isActive: boolean;
@@ -46,6 +48,10 @@ function LawyerForm({ initial, onSave, onCancel, loading }: {
           <Input className="mt-1 h-9 text-sm" value={form.name} onChange={e => set("name", e.target.value)} placeholder="Adv. Name Surname" />
         </div>
         <div>
+          <Label className="text-xs">Title / Role</Label>
+          <Input className="mt-1 h-9 text-sm" value={form.role} onChange={e => set("role", e.target.value)} placeholder="e.g. Senior Partner" />
+        </div>
+        <div>
           <Label className="text-xs">Specialization *</Label>
           <select
             className="w-full mt-1 h-9 rounded-md border border-input bg-background px-3 text-sm"
@@ -60,6 +66,10 @@ function LawyerForm({ initial, onSave, onCancel, loading }: {
         <div>
           <Label className="text-xs">Years of Experience *</Label>
           <Input className="mt-1 h-9 text-sm" type="number" min={0} max={60} value={form.experienceYears} onChange={e => set("experienceYears", e.target.value)} placeholder="e.g., 10" />
+        </div>
+        <div>
+          <Label className="text-xs">Email</Label>
+          <Input className="mt-1 h-9 text-sm" type="email" value={form.email} onChange={e => set("email", e.target.value)} placeholder="name@legalfilingindia.com" />
         </div>
         <div className="col-span-2">
           <Label className="text-xs">Bio / Profile</Label>
@@ -103,13 +113,13 @@ export default function AdminLawyers() {
   const [showForm, setShowForm] = useState(false);
   const [editingItem, setEditingItem] = useState<LawyerProfile | null>(null);
 
-  const emptyForm: FormData = { name: "", specialization: "", experienceYears: "0", bio: "", photoUrl: "", languages: "English, Hindi", barCouncilNo: "", isActive: true };
+  const emptyForm: FormData = { name: "", role: "", specialization: "", experienceYears: "0", bio: "", photoUrl: "", email: "", languages: "English, Hindi", barCouncilNo: "", isActive: true };
 
   const toForm = (l: LawyerProfile): FormData => ({
-    name: l.name, specialization: l.specialization,
+    name: l.name, role: l.role ?? "", specialization: l.specialization,
     experienceYears: l.experienceYears.toString(),
     bio: l.bio ?? "", photoUrl: l.photoUrl ?? "",
-    languages: l.languages ?? "", barCouncilNo: l.barCouncilNo ?? "",
+    email: l.email ?? "", languages: l.languages ?? "", barCouncilNo: l.barCouncilNo ?? "",
     isActive: l.isActive,
   });
 
@@ -117,10 +127,10 @@ export default function AdminLawyers() {
     createMutation.mutate(
       {
         data: {
-          name: data.name, specialization: data.specialization,
+          name: data.name, role: data.role || null, specialization: data.specialization,
           experienceYears: parseInt(data.experienceYears) || 0,
           bio: data.bio || null, photoUrl: data.photoUrl || null,
-          languages: data.languages || null, barCouncilNo: data.barCouncilNo || null,
+          email: data.email || null, languages: data.languages || null, barCouncilNo: data.barCouncilNo || null,
           isActive: data.isActive,
         }
       },
@@ -140,10 +150,10 @@ export default function AdminLawyers() {
       {
         id: editingItem.id,
         data: {
-          name: data.name, specialization: data.specialization,
+          name: data.name, role: data.role || null, specialization: data.specialization,
           experienceYears: parseInt(data.experienceYears) || 0,
           bio: data.bio || null, photoUrl: data.photoUrl || null,
-          languages: data.languages || null, barCouncilNo: data.barCouncilNo || null,
+          email: data.email || null, languages: data.languages || null, barCouncilNo: data.barCouncilNo || null,
           isActive: data.isActive,
         }
       },
