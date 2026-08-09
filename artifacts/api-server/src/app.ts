@@ -51,6 +51,14 @@ if (appUrl) {
   logger.warn("APP_URL is not set — CORS will only permit loopback origins in production");
 }
 
+// Replit deployment domain — automatically added so the deployed app can reach its own API.
+// REPLIT_DOMAINS is set by Replit's runtime for every deployed artifact.
+(process.env.REPLIT_DOMAINS ?? "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean)
+  .forEach((domain) => explicitOrigins.add(`https://${domain}`));
+
 // Additional origins from env (comma-separated exact origin URLs)
 (process.env.CORS_EXTRA_ORIGINS ?? "")
   .split(",")
