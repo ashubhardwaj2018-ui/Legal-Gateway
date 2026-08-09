@@ -247,18 +247,22 @@ router.get("/location-states", async (_req, res): Promise<void> => {
 
 // ── pSEO stats (public) ───────────────────────────────────────────────────────
 router.get("/pseo-stats", async (_req, res): Promise<void> => {
-  const [[{ value: locCount }], [{ value: priorityCount }]] = await Promise.all([
+  const [[{ value: locCount }], [{ value: priorityCount }], [{ value: coCount }]] = await Promise.all([
     db.select({ value: count() }).from(locationsTable).where(eq(locationsTable.isActive, true)),
     db.select({ value: count() }).from(locationsTable)
       .where(and(eq(locationsTable.isActive, true), eq(locationsTable.seoPriority, true))),
+    db.select({ value: count() }).from(indianCompaniesTable),
   ]);
 
-  const totalLocations   = Number(locCount);
+  const totalLocations    = Number(locCount);
   const priorityLocations = Number(priorityCount);
-  const totalServices    = ALL_UNIQUE_SERVICE_SLUGS.length;
-  const totalUrls        = totalLocations * totalServices;
-  const qualifiedUrls    = priorityLocations * totalServices;
-  const pseoFiles        = Math.max(1, Math.ceil(priorityLocations / LOC_PER_PSEO_FILE));
+  const totalServices     = ALL_UNIQUE_SERVICE_SLUGS.length;
+  const totalUrls         = totalLocations * totalServices;
+  const qualifiedUrls     = priorityLocations * totalServices;
+  const pseoFiles         = Math.max(1, Math.ceil(priorityLocations / LOC_PER_PSEO_FILE));
+  const totalCompanies    = Number(coCount);
+  const CO_PER_FILE       = 50_000;
+  const companySitemapFiles = Math.max(1, Math.ceil(totalCompanies / CO_PER_FILE));
 
   res.json({
     totalLocations,
@@ -270,6 +274,8 @@ router.get("/pseo-stats", async (_req, res): Promise<void> => {
     locationsPerFile: LOC_PER_PSEO_FILE,
     serviceCategories: SERVICE_CATEGORY_IDS.length,
     baseDomain: BASE_URL,
+    totalCompanies,
+    companySitemapFiles,
   });
 });
 

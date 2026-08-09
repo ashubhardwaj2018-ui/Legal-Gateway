@@ -649,70 +649,97 @@ router.post("/admin/locations/bulk-seo-priority", async (req, res): Promise<void
 });
 
 // ─── pSEO: Rebuild service-location relationships ────────────────────────────
-// Creates service_locations rows for top N locations × all services.
-// We cap at 5000 locations to keep the table manageable (dynamic pages work regardless).
+// Creates service_locations rows for top N locations × all canonical service slugs.
+// Uses a single bulk INSERT…SELECT for reliability — avoids silent per-batch failures.
+// Canonical slug list mirrors ALL_UNIQUE_SERVICE_SLUGS in routes/locations.ts.
 
-const ALL_SERVICE_SLUGS_FOR_REBUILD = [
-  // Top services for featured relationship tracking
-  "gst-registration","trademark-registration","private-limited-company","limited-liability-partnership",
-  "individual-income-tax-filing","fssai-registration-online","msmessi-registration","one-person-company",
-  "gst-filing","copyright-registration","startup-india-registration","ngo","trademark-renewal",
-  "legal-notice","property-registration","marriage-registration","digital-signature-certificate",
-  "tds-return-filing","accounting-and-book-keeping","rental-agreement","sole-proprietorship",
-  "partnership-firm","name-change","gst-advisory","trademark-infringement","trust-registration",
-  "section-8-company","society-registration","provident-fund-pf-registration","esi-registration",
-  "company-name-search","iso-certification","iec-importexport-code","non-disclosure-agreement-nda",
-  "employment-agreement","make-a-will","power-of-attorney","property-title-verification",
-  "court-marriage","divorce-lawyer","criminal-lawyer","trademark-registration","trademark-infringement",
-  "permanent-patent","provisional-application","copyright-registration","design-registration",
-  "gst-registration","gst-filing","tds-return-filing","income-tax-notice",
+const CANONICAL_SERVICE_SLUGS = [
+  // consult-expert
+  "talk-to-a-lawyer","talk-to-a-ca","talk-to-a-cs","talk-to-an-iptrademark-lawyer",
+  // business-setup
+  "private-limited-company","limited-liability-partnership","one-person-company","sole-proprietorship",
+  "nidhi-company","producer-company","partnership-firm","startup-india-registration",
+  "us-incorporation","singapore-incorporation","uk-incorporation","netherlands-incorporation",
+  "hong-kong-incorporation","dubai-incorporation","company-name-search","business-name-generator",
+  "digital-signature-certificate","msmessi-registration","iso-certification","fssai-registration-online",
+  "iec-importexport-code","legal-metrology","hallmark-registration","bis-registration",
+  "webe-commerce-website-development",
+  // tax-compliance
+  "gst-registration","gst-filing","gst-advisory","indirect-tax","rodtep",
+  "add-a-director","remove-a-director","increase-authorized-capital","close-the-pvt-ltd-company",
+  "change-objectiveactivity","change-address","change-company-name","add-designated-partner",
+  "changes-to-llp-agreement","close-the-llp","private-limited-company-opc-compliance",
+  "limited-liability-partnership-compliance","provident-fund-pf-registration","esi-registration",
+  "professional-tax-registration","shops-and-establishments-license","employee-stock-option-plan-esop",
+  "posh-compliance","accounting-and-book-keeping","payroll-maintenance","tds-return-filing",
+  "individual-income-tax-filing","proprietorship-tax-return-filing","income-tax-notice",
+  "proprietorship-to-pvt-ltd-company","compliance-check-secretarial-audit","due-diligence",
+  "partnership-to-llp","private-to-public-limited-company","private-to-one-person-company","rbi-compliance",
+  // trademark-ip
+  "trademark-registration","search-for-trademark","respond-to-tm-objection","well-known-trademark",
+  "trademark-watch","trademark-renewal","trademark-assignment","usa-trademark","international-trademark",
+  "logo-design","copyright-registration","indian-patent-search","provisional-application","permanent-patent",
+  "copyright-infringement","patent-infringement","trademark-infringement","design-registration",
+  // documentation
+  "non-disclosure-agreement-nda","service-level-agreement","franchise-agreement","master-service-agreement",
+  "shareholders-agreement","joint-venture-agreement","founders-agreement","vendor-agreement",
+  "consultancy-agreement","memorandum-of-understanding","make-a-will","power-of-attorney",
+  "terms-of-service","gdpr","disclaimer","scope-of-work-and-deliverables-agreement",
+  "rental-agreement","sale-deed","legal-notice","legal-notice-for-recovery-of-dues",
+  "cheque-bounce-notice","employment-agreement",
+  // fundraising
+  "fundraising","pitch-deck",
+  // ngo
+  "ngo","section-8-company","trust-registration","society-registration","ngo-compliance",
+  "section-8-compliance","csr-1-filing","sec80g-sec12a","darpan-registration",
+  // property-personal
+  "property-title-verification","property-registration","name-change","religion-change","gender-change",
+  "online-police-complaint","marriage-registration","court-marriage","corporate-immigration",
+  "family-immigration","college-immigration","online-consumer-complaint","e-commerce-consumer-complaint",
+  "insurance-consumer-complaint","consumer-protection-act",
+  // lawyers
+  "criminal-lawyer","labour-lawyer","consumer-court-lawyer","divorce-lawyer","banking-lawyer",
+  "immigration-lawyer","family-lawyer","litigation-lawyer","intellectual-property-lawyer",
+  "trademark-lawyer","technology-media-and-telecom-tmt","risk-management-and-regulatory-risk",
 ];
-const UNIQUE_REBUILD_SLUGS = [...new Set(ALL_SERVICE_SLUGS_FOR_REBUILD)];
 
 router.post("/admin/locations/rebuild-relationships", async (req, res): Promise<void> => {
   const start = Date.now();
   const MAX_LOCATIONS = 5_000;
-  const BATCH = 200;
 
   try {
-    // Fetch top locations by population
-    const locations = await db
-      .select({ id: locationsTable.id })
+    // Count qualifying locations first (for accurate response)
+    const [{ value: locCount }] = await db
+      .select({ value: count() })
       .from(locationsTable)
-      .where(eq(locationsTable.isActive, true))
-      .orderBy(desc(locationsTable.population))
-      .limit(MAX_LOCATIONS);
+      .where(eq(locationsTable.isActive, true));
+    const locationsCovered = Math.min(Number(locCount), MAX_LOCATIONS);
 
-    let inserted = 0;
+    // Single bulk INSERT…SELECT — reliable row count via rowCount, no silent failures.
+    // UNNEST the slug array to cross-join with the top-N active locations.
+    const result = await db.execute(
+      sql`INSERT INTO service_locations (service_id, location_id, is_featured)
+          SELECT s.slug, l.id, true
+          FROM UNNEST(${CANONICAL_SERVICE_SLUGS}::text[]) AS s(slug)
+          CROSS JOIN (
+            SELECT id FROM locations
+            WHERE is_active = true
+            ORDER BY population DESC NULLS LAST
+            LIMIT ${MAX_LOCATIONS}
+          ) AS l
+          ON CONFLICT DO NOTHING`
+    );
 
-    // Insert in batches, ignore duplicates via onConflictDoNothing
-    for (let i = 0; i < locations.length; i += BATCH) {
-      const batch = locations.slice(i, i + BATCH);
-      const rows = batch.flatMap((loc) =>
-        UNIQUE_REBUILD_SLUGS.map((slug) => ({
-          serviceId: slug,
-          locationId: loc.id,
-          isFeatured: true,
-        }))
-      );
-
-      try {
-        const result = await db
-          .insert(serviceLocationsTable)
-          .values(rows)
-          .onConflictDoNothing()
-          .returning({ id: serviceLocationsTable.id });
-        inserted += result.length;
-      } catch { /* skip batch on error */ }
-    }
+    const inserted = Number((result as { rowCount?: number }).rowCount ?? 0);
 
     res.json({
       inserted,
-      locationsCovered: locations.length,
-      serviceCount: UNIQUE_REBUILD_SLUGS.length,
+      locationsCovered,
+      serviceCount: CANONICAL_SERVICE_SLUGS.length,
       elapsed: Date.now() - start,
     });
   } catch (err) {
+    console.error("[rebuild-relationships]", err);
     res.status(500).json({ error: String(err) });
   }
 });

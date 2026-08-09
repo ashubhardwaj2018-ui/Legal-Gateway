@@ -287,8 +287,9 @@ export default function AdminPSEOManager() {
             ))}
           </div>
           <p className="text-xs text-gray-400 mt-4">
-            All sitemap files are generated dynamically and cached for 24 hours. 
-            pSEO sitemaps cover all {(stats?.totalServices ?? "?")} services × all {(stats?.totalLocations ?? "?")} active locations
+            All sitemap files are generated dynamically and cached for 24 hours.
+            pSEO sitemaps cover {stats?.totalServices ?? "?"} services × {stats?.priorityLocations?.toLocaleString("en-IN") ?? "?"} SEO-priority cities
+            (out of {stats?.totalLocations?.toLocaleString("en-IN") ?? "?"} total active locations),
             split into {stats?.pseoSitemapFiles ?? "?"} files of ~{stats?.locationsPerFile ? (stats.locationsPerFile * (stats?.totalServices ?? 0)).toLocaleString("en-IN") : "?"} URLs each.
           </p>
         </div>
