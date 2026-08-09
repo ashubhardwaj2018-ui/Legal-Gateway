@@ -289,7 +289,7 @@ authRouter.post("/admin/auth/login", async (req, res): Promise<void> => {
       res.status(401).json({ error: "Invalid credentials" }); return;
     }
     const token = signToken({ userId: adminUser.id, username: adminUser.username, role: adminUser.role, userType: "admin", exp: Date.now() + TOKEN_TTL_MS });
-    res.cookie(TOKEN_COOKIE, token, { httpOnly: true, sameSite: "lax", maxAge: TOKEN_TTL_MS, path: "/" });
+    res.cookie(TOKEN_COOKIE, token, { httpOnly: true, sameSite: "none", secure: true, maxAge: TOKEN_TTL_MS, path: "/" });
     await db.insert(loginHistoryTable).values({ userId: adminUser.id, username: adminUser.username, userType: "admin", ipAddress: ip, userAgent: ua, status: "success" });
     await logActivity(adminUser.id, adminUser.username, "admin", "auth", "login");
     res.json({ ok: true, user: { id: adminUser.id, username: adminUser.username, email: adminUser.email, role: adminUser.role, userType: "admin" } });
@@ -311,7 +311,7 @@ authRouter.post("/admin/auth/login", async (req, res): Promise<void> => {
       forcePasswordChange: employee.forcePasswordChange,
       exp: Date.now() + TOKEN_TTL_MS,
     });
-    res.cookie(TOKEN_COOKIE, token, { httpOnly: true, sameSite: "lax", maxAge: TOKEN_TTL_MS, path: "/" });
+    res.cookie(TOKEN_COOKIE, token, { httpOnly: true, sameSite: "none", secure: true, maxAge: TOKEN_TTL_MS, path: "/" });
     await db.update(teamMembersTable).set({ lastLoginAt: new Date() }).where(eq(teamMembersTable.id, employee.id));
     await db.insert(loginHistoryTable).values({ userId: employee.id, username: employee.username, userType: "employee", ipAddress: ip, userAgent: ua, status: "success" });
     await logActivity(employee.id, employee.username, "employee", "auth", "login");
@@ -378,7 +378,7 @@ authRouter.post("/admin/auth/change-password", async (req, res): Promise<void> =
   // Re-issue token with forcePasswordChange cleared
   const { forcePasswordChange: _fc, exp: _exp, ...rest } = payload;
   const newToken = signToken({ ...rest, forcePasswordChange: false, exp: Date.now() + TOKEN_TTL_MS });
-  res.cookie(TOKEN_COOKIE, newToken, { httpOnly: true, sameSite: "lax", maxAge: TOKEN_TTL_MS, path: "/" });
+  res.cookie(TOKEN_COOKIE, newToken, { httpOnly: true, sameSite: "none", secure: true, maxAge: TOKEN_TTL_MS, path: "/" });
   await logActivity(userId, typeof payload.username === "string" ? payload.username : "unknown",
     payload.userType === "employee" ? "employee" : "admin", "auth", "password_change");
   res.json({ ok: true });
