@@ -318,15 +318,19 @@ async function buildSitemapIndex(req: import("express").Request): Promise<string
   const host  = req.headers["x-forwarded-host"] ?? req.headers.host ?? "legalfilingindia.com";
   const apiBase = `${proto}://${host}/api`;
 
-  const [[{ value: priorityLocCount }], [{ value: coCount }]] = await Promise.all([
-    // Only count SEO-priority locations for pSEO sitemaps
+  const [[{ value: priorityLocCount }], [{ value: nonPriorityLocCount }], [{ value: coCount }]] = await Promise.all([
+    // SEO-priority locations → indexed pSEO sitemaps
     db.select({ value: count() }).from(locationsTable)
       .where(and(eq(locationsTable.isActive, true), eq(locationsTable.seoPriority, true))),
+    // Non-priority locations → noindex,follow pSEO sitemaps (crawlable but not indexed)
+    db.select({ value: count() }).from(locationsTable)
+      .where(and(eq(locationsTable.isActive, true), eq(locationsTable.seoPriority, false))),
     db.select({ value: count() }).from(indianCompaniesTable),
   ]);
 
-  const numPseoFiles     = Math.max(1, Math.ceil(Number(priorityLocCount) / LOC_PER_PSEO_FILE));
-  const numCompanyFiles  = Math.max(1, Math.ceil(Number(coCount)  / COMPANIES_PER_FILE));
+  const numPseoFiles     = Math.max(1, Math.ceil(Number(priorityLocCount)    / LOC_PER_PSEO_FILE));
+  const numNPseoFiles    = Math.max(0, Math.ceil(Number(nonPriorityLocCount) / LOC_PER_PSEO_FILE));
+  const numCompanyFiles  = Math.max(1, Math.ceil(Number(coCount)             / COMPANIES_PER_FILE));
 
   const entries: string[] = [
     `  <sitemap><loc>${apiBase}/sitemap-static.xml</loc><lastmod>${now}</lastmod></sitemap>`,
@@ -336,6 +340,10 @@ async function buildSitemapIndex(req: import("express").Request): Promise<string
     ),
     ...Array.from({ length: numPseoFiles }, (_, i) =>
       `  <sitemap><loc>${apiBase}/sitemap-pseo-${i + 1}.xml</loc><lastmod>${now}</lastmod></sitemap>`
+    ),
+    // Non-priority pSEO: noindex,follow — Google crawls but does not index
+    ...Array.from({ length: numNPseoFiles }, (_, i) =>
+      `  <sitemap><loc>${apiBase}/sitemap-npseo-${i + 1}.xml</loc><lastmod>${now}</lastmod></sitemap>`
     ),
   ];
 
@@ -522,6 +530,42 @@ router.get("/sitemap-pseo-:page.xml", async (req, res): Promise<void> => {
   }
   res.setHeader("Content-Type", "application/xml; charset=utf-8");
   res.setHeader("Cache-Control", "public, max-age=3600");
+  res.send(xml);
+});
+
+// ── Non-priority pSEO sitemap — page N (noindex,follow locations) ─────────────
+// Google crawls these pages (follows links) but does not index them.
+// Same density as priority sitemaps: LOC_PER_PSEO_FILE locations × all services.
+// seo_priority = false locations only — priority locations are in sitemap-pseo-N.xml.
+router.get("/sitemap-npseo-:page.xml", async (req, res): Promise<void> => {
+  const page = parseInt(req.params.page as string, 10);
+  if (isNaN(page) || page < 1) { res.status(404).send("Not found"); return; }
+
+  const now    = new Date().toISOString().split("T")[0];
+  const offset = (page - 1) * LOC_PER_PSEO_FILE;
+
+  const locations = await db
+    .select({ slug: locationsTable.slug })
+    .from(locationsTable)
+    .where(and(eq(locationsTable.isActive, true), eq(locationsTable.seoPriority, false)))
+    .orderBy(desc(locationsTable.population), asc(locationsTable.state), asc(locationsTable.slug))
+    .limit(LOC_PER_PSEO_FILE)
+    .offset(offset);
+
+  // Return a valid empty urlset (never 404) — Google reports HTTP errors for non-200
+  const entries: string[] = [];
+  for (const loc of locations) {
+    for (const svcSlug of ALL_UNIQUE_SERVICE_SLUGS) {
+      entries.push(`  <url><loc>${escXml(`${BASE_URL}/${svcSlug}/${loc.slug}`)}</loc></url>`);
+    }
+  }
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${entries.join("\n")}\n</urlset>`;
+  if (req.query.download !== undefined) {
+    res.setHeader("Content-Disposition", `attachment; filename="sitemap-npseo-${page}.xml"`);
+  }
+  res.setHeader("Content-Type", "application/xml; charset=utf-8");
+  res.setHeader("Cache-Control", "public, max-age=86400");
   res.send(xml);
 });
 
