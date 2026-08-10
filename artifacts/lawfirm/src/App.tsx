@@ -28,9 +28,10 @@ const OurLawyers        = lazy(() => import("@/pages/our-lawyers"));
 const Sitemap           = lazy(() => import("@/pages/sitemap"));
 
 // ── Admin auth pages ──────────────────────────────────────────────────────────
-const AdminLogin        = lazy(() => import("@/pages/admin/login"));
-const ForgotPassword    = lazy(() => import("@/pages/admin/forgot-password"));
-const ResetPassword     = lazy(() => import("@/pages/admin/reset-password"));
+const AdminLogin          = lazy(() => import("@/pages/admin/login"));
+const AdminChangePassword = lazy(() => import("@/pages/admin/change-password"));
+const ForgotPassword      = lazy(() => import("@/pages/admin/forgot-password"));
+const ResetPassword       = lazy(() => import("@/pages/admin/reset-password"));
 
 // ── Admin pages ───────────────────────────────────────────────────────────────
 const AdminDashboard        = lazy(() => import("@/pages/admin/dashboard"));
@@ -105,6 +106,7 @@ function Router() {
       <Switch>
         {/* Admin auth pages — no layout */}
         <Route path="/admin/login" component={AdminLogin} />
+        <Route path="/admin/change-password" component={AdminChangePassword} />
         <Route path="/admin/forgot-password" component={ForgotPassword} />
         <Route path="/admin/reset-password" component={ResetPassword} />
 

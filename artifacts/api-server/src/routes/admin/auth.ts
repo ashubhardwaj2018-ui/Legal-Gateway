@@ -57,6 +57,7 @@ export async function seedDefaultAdmin() {
     email: "admin@legalfilingindia.com",
     passwordHash: hashPassword("Admin@2026"),
     role: "admin",
+    forcePasswordChange: true,
   });
 }
 
@@ -288,11 +289,12 @@ authRouter.post("/admin/auth/login", async (req, res): Promise<void> => {
       await db.insert(loginHistoryTable).values({ userId: adminUser.id, username: adminUser.username, userType: "admin", ipAddress: ip, userAgent: ua, status: "failed" });
       res.status(401).json({ error: "Invalid credentials" }); return;
     }
-    const token = signToken({ userId: adminUser.id, username: adminUser.username, role: adminUser.role, userType: "admin", exp: Date.now() + TOKEN_TTL_MS });
+    const forcePasswordChange = adminUser.forcePasswordChange ?? false;
+    const token = signToken({ userId: adminUser.id, username: adminUser.username, role: adminUser.role, userType: "admin", forcePasswordChange, exp: Date.now() + TOKEN_TTL_MS });
     res.cookie(TOKEN_COOKIE, token, { httpOnly: true, sameSite: "none", secure: true, maxAge: TOKEN_TTL_MS, path: "/" });
     await db.insert(loginHistoryTable).values({ userId: adminUser.id, username: adminUser.username, userType: "admin", ipAddress: ip, userAgent: ua, status: "success" });
     await logActivity(adminUser.id, adminUser.username, "admin", "auth", "login");
-    res.json({ ok: true, user: { id: adminUser.id, username: adminUser.username, email: adminUser.email, role: adminUser.role, userType: "admin" } });
+    res.json({ ok: true, user: { id: adminUser.id, username: adminUser.username, email: adminUser.email, role: adminUser.role, userType: "admin", forcePasswordChange } });
     return;
   }
 
@@ -371,7 +373,7 @@ authRouter.post("/admin/auth/change-password", async (req, res): Promise<void> =
       .where(eq(teamMembersTable.id, userId));
   } else {
     await db.update(adminUsersTable)
-      .set({ passwordHash: hashPassword(newPassword) })
+      .set({ passwordHash: hashPassword(newPassword), forcePasswordChange: false })
       .where(eq(adminUsersTable.id, userId));
   }
 
@@ -421,14 +423,14 @@ authRouter.get("/admin/auth/users", adminAuthMiddleware, requirePermission("empl
 authRouter.post("/admin/auth/users", adminAuthMiddleware, requirePermission("employees", "create"), async (req, res): Promise<void> => {
   const { username, email, password, role } = req.body as Record<string, string>;
   if (!username || !email || !password) { res.status(400).json({ error: "username, email, password required" }); return; }
-  const [user] = await db.insert(adminUsersTable).values({ username, email, passwordHash: hashPassword(password), role: role ?? "staff" }).returning({ id: adminUsersTable.id, username: adminUsersTable.username, email: adminUsersTable.email, role: adminUsersTable.role });
+  const [user] = await db.insert(adminUsersTable).values({ username, email, passwordHash: hashPassword(password), role: role ?? "staff", forcePasswordChange: true }).returning({ id: adminUsersTable.id, username: adminUsersTable.username, email: adminUsersTable.email, role: adminUsersTable.role });
   res.status(201).json(user);
 });
 
 authRouter.patch("/admin/auth/users/:id/password", adminAuthMiddleware, requirePermission("employees", "edit"), async (req, res): Promise<void> => {
   const { password } = req.body as { password?: string };
   if (!password || password.length < 6) { res.status(400).json({ error: "Password must be at least 6 characters" }); return; }
-  await db.update(adminUsersTable).set({ passwordHash: hashPassword(password) }).where(eq(adminUsersTable.id, parseInt(String(req.params["id"]), 10)));
+  await db.update(adminUsersTable).set({ passwordHash: hashPassword(password), forcePasswordChange: true }).where(eq(adminUsersTable.id, parseInt(String(req.params["id"]), 10)));
   res.json({ ok: true });
 });
 

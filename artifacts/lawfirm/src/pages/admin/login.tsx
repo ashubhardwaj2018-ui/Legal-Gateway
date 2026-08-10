@@ -34,7 +34,14 @@ export default function AdminLogin() {
       // next full HTTP request — avoids the "need to refresh" issue that occurs
       // when a client-side navigate() fires the AdminLayout auth check before
       // the cookie is fully committed in the proxied/iframe environment.
-      const dest = user?.userType === "employee" ? "/admin/my-dashboard" : "/admin";
+      let dest: string;
+      if (user?.forcePasswordChange) {
+        dest = "/admin/change-password";
+      } else if (user?.userType === "employee") {
+        dest = "/admin/my-dashboard";
+      } else {
+        dest = "/admin";
+      }
       window.location.href = dest;
     }
     else setError(d.error ?? "Login failed");
