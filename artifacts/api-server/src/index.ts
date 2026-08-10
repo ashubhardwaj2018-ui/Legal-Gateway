@@ -4,6 +4,7 @@ import { logger } from "./lib/logger";
 import { and, lte, gte, eq } from "drizzle-orm";
 import { db, consultationsTable, notificationsTable, adminUsersTable } from "@workspace/db";
 import { createNotification } from "./routes/admin/notifications";
+import { hashPassword } from "./routes/admin/auth";
 
 const rawPort = process.env["PORT"];
 
@@ -84,6 +85,16 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+
+  // One-time admin password reset via env var (set ADMIN_RESET_PASSWORD, deploy, then unset)
+  const resetPw = process.env["ADMIN_RESET_PASSWORD"];
+  if (resetPw) {
+    db.update(adminUsersTable)
+      .set({ passwordHash: hashPassword(resetPw) })
+      .where(eq(adminUsersTable.username, "admin"))
+      .then(() => logger.info("Admin password reset from ADMIN_RESET_PASSWORD env var"))
+      .catch((e: unknown) => logger.error({ err: e }, "Admin password reset failed"));
+  }
 
   // Run follow-up check after short startup delay, then every 15 minutes
   setTimeout(() => { void checkFollowUpReminders(); }, 10_000);
