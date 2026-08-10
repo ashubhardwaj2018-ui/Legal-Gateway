@@ -116,10 +116,14 @@ export default function AdminLogin() {
                 Forgot your password?
               </a>
             </div>
-            <p className="text-white/25 text-xs text-center">
-              Default: <code className="text-white/40">admin</code> / <code className="text-white/40">Admin@2026</code>
-            </p>
-            <p className="text-white/20 text-[10px] text-center">Change password in Admin → Settings after first login</p>
+            {import.meta.env.DEV && (
+              <>
+                <p className="text-white/25 text-xs text-center">
+                  Default: <code className="text-white/40">admin</code> / <code className="text-white/40">Admin@2026</code>
+                </p>
+                <p className="text-white/20 text-[10px] text-center">Change password in Admin → Settings after first login</p>
+              </>
+            )}
           </div>
         </div>
 
