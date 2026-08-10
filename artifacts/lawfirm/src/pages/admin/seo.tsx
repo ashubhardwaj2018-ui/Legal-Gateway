@@ -213,6 +213,7 @@ import {
   Save, Globe, Eye, EyeOff, Link2, FileCode2, Map, Tag,
   Plus, Trash2, ExternalLink, RefreshCw, Search,
   AlertTriangle, AlertCircle, CheckCircle2, Wrench,
+  Copy, Check, Upload,
 } from "lucide-react";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -1015,6 +1016,9 @@ const GROUP_LABELS: Record<string, string> = {
   other:            "Other",
 };
 
+// ── GSC helpers ───────────────────────────────────────────────────────────────
+const GSC_SITEMAPS_URL = "https://search.google.com/search-console/sitemaps";
+
 // ── Sitemap Tab ──────────────────────────────────────────────────────────────
 function SitemapTab() {
   const { toast } = useToast();
@@ -1023,6 +1027,7 @@ function SitemapTab() {
   const [loading, setLoading]   = useState(false);
   const [pinging, setPinging]   = useState(false);
   const [pingResult, setPingResult] = useState<{ google: boolean; bing: boolean; message: string } | null>(null);
+  const [copied, setCopied]     = useState<string | null>(null); // filename currently showing ✓
 
   const fetchAll = async () => {
     setLoading(true);
@@ -1078,6 +1083,27 @@ function SitemapTab() {
     } catch {
       toast({ title: "Ping failed", description: "Check server logs", variant: "destructive" });
     } finally { setPinging(false); }
+  };
+
+  const copyAndOpenGSC = async (url: string, filename: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(filename);
+      setTimeout(() => setCopied(f => f === filename ? null : f), 3000);
+    } catch { /* ignore — URL still opens */ }
+    window.open(GSC_SITEMAPS_URL, "_blank", "noopener,noreferrer");
+    toast({ title: "URL copied — GSC opened", description: "Paste the sitemap URL into the Search Console sitemaps field." });
+  };
+
+  const copyUrl = async (url: string, filename: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(filename);
+      setTimeout(() => setCopied(f => f === filename ? null : f), 2000);
+      toast({ title: "Sitemap URL copied", description: "Paste it in Google Search Console → Sitemaps." });
+    } catch {
+      toast({ title: "Copy failed", description: "Please copy the URL manually.", variant: "destructive" });
+    }
   };
 
   useEffect(() => { fetchAll(); }, []);
@@ -1168,6 +1194,19 @@ function SitemapTab() {
                     <p className="text-[10px] text-gray-300 font-mono mt-0.5 truncate">{e.filename}</p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => copyUrl(e.url, e.filename)}
+                      title="Copy sitemap URL to paste in Google Search Console"
+                      className="flex items-center gap-1 text-xs text-gray-600 hover:text-[#0f2044] border border-gray-200 px-2.5 py-1.5 rounded-lg hover:border-[#0f2044] hover:bg-gray-50 transition-all font-medium">
+                      {copied === e.filename ? <Check size={11} className="text-green-600" /> : <Copy size={11} />}
+                      {copied === e.filename ? "Copied!" : "Copy URL"}
+                    </button>
+                    <button
+                      onClick={() => copyAndOpenGSC(e.url, e.filename)}
+                      title="Copies this sitemap URL and opens Google Search Console — paste the URL to submit"
+                      className="flex items-center gap-1 text-xs text-white bg-[#0f2044] hover:bg-[#c9a227] hover:text-[#0f2044] border border-[#0f2044] hover:border-[#c9a227] px-2.5 py-1.5 rounded-lg transition-all font-medium">
+                      <Upload size={11} /> Copy &amp; Open GSC
+                    </button>
                     <a href={e.url} download={e.filename}
                       className="flex items-center gap-1 text-xs text-gray-600 hover:text-[#0f2044] border border-gray-200 px-2.5 py-1.5 rounded-lg hover:border-[#0f2044] hover:bg-gray-50 transition-all font-medium">
                       ↓ Download
@@ -1197,12 +1236,21 @@ function SitemapTab() {
       </div>
 
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800 space-y-2">
-        <p><strong>Submit to Google Search Console:</strong> Use <code className="bg-amber-100 px-1 rounded text-xs">/api/sitemap-index.xml</code> — it references priority pSEO, company, blog, and static sitemaps. Hit <strong>Ping Google &amp; Bing</strong> after importing new data or publishing posts.</p>
+        <p><strong>Submit to Google Search Console:</strong> Click <strong>Copy URL</strong> next to any sitemap file, then open{" "}
+          <a href={GSC_SITEMAPS_URL} target="_blank" rel="noopener noreferrer" className="underline font-medium">
+            search.google.com/search-console/sitemaps
+          </a>{" "}and paste the URL. Or click <strong>Submit to GSC</strong> — it opens Search Console for you and remembers the date. For fastest indexing, submit the index (<code className="bg-amber-100 px-1 rounded text-xs">/api/sitemap-index.xml</code>) plus any large individual files (companies, pSEO) separately.
+        </p>
+        <p className="text-xs text-amber-700 border-t border-amber-200 pt-2">
+          <strong>Sitemap URL format to paste in GSC:</strong>{" "}
+          <code className="bg-amber-100 px-1 rounded">https://yourdomain.com/api/sitemap-index.xml</code>
+          {" "}— replace the domain with your verified property. Use <strong>Ping Google &amp; Bing</strong> after importing new data or publishing posts.
+        </p>
         <p className="text-xs text-amber-700 border-t border-amber-200 pt-2">
           <strong>Sitemap JSON API:</strong>{" "}
           <a href={`${BASE}/api/sitemap-all.json`} target="_blank" rel="noopener noreferrer"
             className="underline font-mono">/api/sitemap-all.json</a>
-          {" "}— machine-readable index of every sitemap file grouped by type (index, static, blogs, companies, pseo-priority, pseo-nonpriority).
+          {" "}— machine-readable index of every sitemap file grouped by type.
         </p>
       </div>
     </div>
