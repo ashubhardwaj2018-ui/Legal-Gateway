@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Static sitemap index for legalfilingindia.com
+  Served directly by the web server at /sitemap.xml
+  Child sitemaps are generated dynamically by the API server at /api/sitemap-*.xml
+
+  Last generated: 2026-08-10
+  Priority locations: 1560  → 5 pSEO sitemap files
+  Companies:         1048585 → 21 company sitemap files
+
+  Regenerate: node scripts/generate-sitemap-index.mjs
+-->
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <sitemap><loc>https://legalfilingindia.com/api/sitemap-static.xml</loc></sitemap>
+  <sitemap><loc>https://legalfilingindia.com/api/sitemap-blogs.xml</loc></sitemap>
+  <sitemap><loc>https://legalfilingindia.com/api/sitemap-companies-1.xml</loc></sitemap>
+  <sitemap><loc>https://legalfilingindia.com/api/sitemap-companies-2.xml</loc></sitemap>
+  <sitemap><loc>https://legalfilingindia.com/api/sitemap-companies-3.xml</loc></sitemap>
+  <sitemap><loc>https://legalfilingindia.com/api/sitemap-companies-4.xml</loc></sitemap>
+  <sitemap><loc>https://legalfilingindia.com/api/sitemap-companies-5.xml</loc></sitemap>
+  <sitemap><loc>https://legalfilingindia.com/api/sitemap-companies-6.xml</loc></sitemap>
+  <sitemap><loc>https://legalfilingindia.com/api/sitemap-companies-7.xml</loc></sitemap>
+  <sitemap><loc>https://legalfilingindia.com/api/sitemap-companies-8.xml</loc></sitemap>
+  <sitemap><loc>https://legalfilingindia.com/api/sitemap-companies-9.xml</loc></sitemap>
+  <sitemap><loc>https://legalfilingindia.com/api/sitemap-companies-10.xml</loc></sitemap>
+  <sitemap><loc>https://legalfilingindia.com/api/sitemap-companies-11.xml</loc></sitemap>
+  <sitemap><loc>https://legalfilingindia.com/api/sitemap-companies-12.xml</loc></sitemap>
+  <sitemap><loc>https://legalfilingindia.com/api/sitemap-companies-13.xml</loc></sitemap>
+  <sitemap><loc>https://legalfilingindia.com/api/sitemap-companies-14.xml</loc></sitemap>
+  <sitemap><loc>https://legalfilingindia.com/api/sitemap-companies-15.xml</loc></sitemap>
+  <sitemap><loc>https://legalfilingindia.com/api/sitemap-companies-16.xml</loc></sitemap>
+  <sitemap><loc>https://legalfilingindia.com/api/sitemap-companies-17.xml</loc></sitemap>
+  <sitemap><loc>https://legalfilingindia.com/api/sitemap-companies-18.xml</loc></sitemap>
+  <sitemap><loc>https://legalfilingindia.com/api/sitemap-companies-19.xml</loc></sitemap>
+  <sitemap><loc>https://legalfilingindia.com/api/sitemap-companies-20.xml</loc></sitemap>
+  <sitemap><loc>https://legalfilingindia.com/api/sitemap-companies-21.xml</loc></sitemap>
+  <sitemap><loc>https://legalfilingindia.com/api/sitemap-pseo-1.xml</loc></sitemap>
+  <sitemap><loc>https://legalfilingindia.com/api/sitemap-pseo-2.xml</loc></sitemap>
+  <sitemap><loc>https://legalfilingindia.com/api/sitemap-pseo-3.xml</loc></sitemap>
+  <sitemap><loc>https://legalfilingindia.com/api/sitemap-pseo-4.xml</loc></sitemap>
+  <sitemap><loc>https://legalfilingindia.com/api/sitemap-pseo-5.xml</loc></sitemap>
+</sitemapindex>

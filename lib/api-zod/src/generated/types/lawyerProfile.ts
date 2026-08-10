@@ -9,12 +9,16 @@
 export interface LawyerProfile {
   id: number;
   name: string;
+  /** @nullable */
+  role?: string | null;
   specialization: string;
   experienceYears: number;
   /** @nullable */
   bio?: string | null;
   /** @nullable */
   photoUrl?: string | null;
+  /** @nullable */
+  email?: string | null;
   /** @nullable */
   languages?: string | null;
   /** @nullable */

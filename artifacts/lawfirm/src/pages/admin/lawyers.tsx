@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, User, Briefcase, Award } from "lucide-react";
+import { Plus, Pencil, Trash2, User, Briefcase, Award, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 
 
 type FormData = {
@@ -104,7 +104,7 @@ function LawyerForm({ initial, onSave, onCancel, loading }: {
 
 export default function AdminLawyers() {
   const queryClient = useQueryClient();
-  const { data: lawyers, isLoading } = useListLawyerProfiles();
+  const { data: lawyers, isLoading, isError, error, refetch } = useListLawyerProfiles();
   const createMutation = useCreateLawyerProfile();
   const updateMutation = useUpdateLawyerProfile();
   const deleteMutation = useDeleteLawyerProfile();
@@ -116,10 +116,15 @@ export default function AdminLawyers() {
   const emptyForm: FormData = { name: "", role: "", specialization: "", experienceYears: "0", bio: "", photoUrl: "", email: "", languages: "English, Hindi", barCouncilNo: "", isActive: true };
 
   const toForm = (l: LawyerProfile): FormData => ({
-    name: l.name, role: l.role ?? "", specialization: l.specialization,
+    name: l.name,
+    role: (l as unknown as { role?: string | null }).role ?? "",
+    specialization: l.specialization,
     experienceYears: l.experienceYears.toString(),
-    bio: l.bio ?? "", photoUrl: l.photoUrl ?? "",
-    email: l.email ?? "", languages: l.languages ?? "", barCouncilNo: l.barCouncilNo ?? "",
+    bio: l.bio ?? "",
+    photoUrl: l.photoUrl ?? "",
+    email: (l as unknown as { email?: string | null }).email ?? "",
+    languages: l.languages ?? "",
+    barCouncilNo: l.barCouncilNo ?? "",
     isActive: l.isActive,
   });
 
@@ -127,10 +132,15 @@ export default function AdminLawyers() {
     createMutation.mutate(
       {
         data: {
-          name: data.name, role: data.role || null, specialization: data.specialization,
+          name: data.name,
+          role: data.role || null,
+          specialization: data.specialization,
           experienceYears: parseInt(data.experienceYears) || 0,
-          bio: data.bio || null, photoUrl: data.photoUrl || null,
-          email: data.email || null, languages: data.languages || null, barCouncilNo: data.barCouncilNo || null,
+          bio: data.bio || null,
+          photoUrl: data.photoUrl || null,
+          email: data.email || null,
+          languages: data.languages || null,
+          barCouncilNo: data.barCouncilNo || null,
           isActive: data.isActive,
         }
       },
@@ -150,10 +160,15 @@ export default function AdminLawyers() {
       {
         id: editingItem.id,
         data: {
-          name: data.name, role: data.role || null, specialization: data.specialization,
+          name: data.name,
+          role: data.role || null,
+          specialization: data.specialization,
           experienceYears: parseInt(data.experienceYears) || 0,
-          bio: data.bio || null, photoUrl: data.photoUrl || null,
-          email: data.email || null, languages: data.languages || null, barCouncilNo: data.barCouncilNo || null,
+          bio: data.bio || null,
+          photoUrl: data.photoUrl || null,
+          email: data.email || null,
+          languages: data.languages || null,
+          barCouncilNo: data.barCouncilNo || null,
           isActive: data.isActive,
         }
       },
@@ -180,41 +195,36 @@ export default function AdminLawyers() {
     );
   };
 
-  return (
-    <AdminLayout
-      title="Lawyer Profiles"
-      subtitle="Manage your team of legal experts"
-      actions={
-        <Button size="sm" onClick={() => setShowForm(true)} className="gap-1.5 bg-[#0f2044] hover:bg-[#0f2044]/90 text-white">
-          <Plus size={14} /> Add Lawyer
-        </Button>
-      }
-    >
-      <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="font-serif text-[#0f2044]">Add Lawyer Profile</DialogTitle>
-          </DialogHeader>
-          <div className="mt-4">
-            <LawyerForm initial={emptyForm} onSave={handleCreate} onCancel={() => setShowForm(false)} loading={createMutation.isPending} />
+  function renderContent() {
+    if (isLoading) {
+      return (
+        <div className="flex items-center justify-center py-24">
+          <div className="text-center">
+            <Loader2 size={32} className="animate-spin text-[#0f2044] mx-auto mb-3" />
+            <p className="text-gray-400 text-sm">Loading lawyer profiles…</p>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      );
+    }
 
-      <Dialog open={!!editingItem} onOpenChange={() => setEditingItem(null)}>
-        <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="font-serif text-[#0f2044]">Edit Lawyer Profile</DialogTitle>
-          </DialogHeader>
-          {editingItem && (
-            <div className="mt-4">
-              <LawyerForm initial={toForm(editingItem)} onSave={handleUpdate} onCancel={() => setEditingItem(null)} loading={updateMutation.isPending} />
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+    if (isError) {
+      const msg = error instanceof Error ? error.message : String(error);
+      return (
+        <div className="bg-white rounded-xl border border-red-200 p-12 text-center">
+          <AlertCircle size={36} className="text-red-400 mx-auto mb-3" />
+          <p className="text-gray-700 font-medium mb-1">Failed to load lawyer profiles</p>
+          <p className="text-gray-400 text-sm mb-5 max-w-xs mx-auto">{msg || "An unexpected error occurred. Please try again."}</p>
+          <Button onClick={() => refetch()} variant="outline" className="gap-2">
+            <RefreshCw size={14} /> Retry
+          </Button>
+        </div>
+      );
+    }
 
-      {(lawyers ?? []).length === 0 && !isLoading ? (
+    const list = lawyers ?? [];
+
+    if (list.length === 0) {
+      return (
         <div className="bg-white rounded-xl border border-gray-200 p-16 text-center">
           <User size={40} className="text-gray-300 mx-auto mb-3" />
           <p className="text-gray-400 mb-2">No lawyer profiles yet</p>
@@ -223,9 +233,14 @@ export default function AdminLawyers() {
             <Plus size={14} /> Add First Lawyer
           </Button>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-          {(lawyers ?? []).map(l => (
+      );
+    }
+
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+        {list.map(l => {
+          const lawyerRole = (l as unknown as { role?: string | null }).role;
+          return (
             <div key={l.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
               <div className="p-5">
                 <div className="flex items-start justify-between gap-3">
@@ -239,6 +254,9 @@ export default function AdminLawyers() {
                     )}
                     <div className="min-w-0">
                       <div className="font-semibold text-[#0f2044] text-sm truncate">{l.name}</div>
+                      {lawyerRole && (
+                        <div className="text-xs text-gray-500 font-medium mt-0.5">{lawyerRole}</div>
+                      )}
                       <div className="text-xs text-[#c9a227] font-medium mt-0.5">{l.specialization}</div>
                     </div>
                   </div>
@@ -276,9 +294,47 @@ export default function AdminLawyers() {
                 </Button>
               </div>
             </div>
-          ))}
-        </div>
-      )}
+          );
+        })}
+      </div>
+    );
+  }
+
+  return (
+    <AdminLayout
+      title="Lawyer Profiles"
+      subtitle="Manage your team of legal experts"
+      actions={
+        <Button size="sm" onClick={() => setShowForm(true)} className="gap-1.5 bg-[#0f2044] hover:bg-[#0f2044]/90 text-white">
+          <Plus size={14} /> Add Lawyer
+        </Button>
+      }
+    >
+      <Dialog open={showForm} onOpenChange={setShowForm}>
+        <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-[#0f2044]">Add Lawyer Profile</DialogTitle>
+          </DialogHeader>
+          <div className="mt-4">
+            <LawyerForm initial={emptyForm} onSave={handleCreate} onCancel={() => setShowForm(false)} loading={createMutation.isPending} />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editingItem} onOpenChange={() => setEditingItem(null)}>
+        <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-[#0f2044]">Edit Lawyer Profile</DialogTitle>
+          </DialogHeader>
+          {editingItem && (
+            <div className="mt-4">
+              <LawyerForm initial={toForm(editingItem)} onSave={handleUpdate} onCancel={() => setEditingItem(null)} loading={updateMutation.isPending} />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {renderContent()}
     </AdminLayout>
   );
 }
