@@ -2,7 +2,7 @@ import { Router, type IRouter, type Request, type Response, type NextFunction } 
 import crypto from "crypto";
 import nodemailer from "nodemailer";
 import { eq, or, and, isNull, lt } from "drizzle-orm";
-import { db, adminUsersTable, teamMembersTable, rolesTable, rolePermissionsTable, loginHistoryTable, activityLogsTable, passwordResetTokensTable, siteSettingsTable } from "@workspace/db";
+import { db, adminUsersTable, teamMembersTable, rolesTable, rolePermissionsTable, loginHistoryTable, activityLogsTable, passwordResetTokensTable, siteSettingsTable, lawyerProfilesTable } from "@workspace/db";
 
 export const authRouter: IRouter = Router();
 
@@ -59,6 +59,46 @@ export async function seedDefaultAdmin() {
     role: "admin",
     forcePasswordChange: true,
   });
+}
+
+// ── Seed default lawyer profiles ──────────────────────────────────────────────
+export async function seedLawyerProfiles() {
+  const existing = await db.select().from(lawyerProfilesTable).limit(1);
+  if (existing.length > 0) return;
+  await db.insert(lawyerProfilesTable).values([
+    {
+      name: "Adv. Rajesh Sharma",
+      role: "Senior Partner",
+      specialization: "Corporate Law",
+      experienceYears: 18,
+      photoUrl: "https://api.dicebear.com/7.x/notionists/svg?seed=Rajesh&backgroundColor=f1f5f9",
+      isActive: true,
+    },
+    {
+      name: "Adv. Priya Desai",
+      role: "Partner",
+      specialization: "Intellectual Property",
+      experienceYears: 12,
+      photoUrl: "https://api.dicebear.com/7.x/notionists/svg?seed=Priya&backgroundColor=f1f5f9",
+      isActive: true,
+    },
+    {
+      name: "Adv. Vikram Singh",
+      role: "Senior Partner",
+      specialization: "Real Estate",
+      experienceYears: 22,
+      photoUrl: "https://api.dicebear.com/7.x/notionists/svg?seed=Vikram&backgroundColor=f1f5f9",
+      isActive: true,
+    },
+    {
+      name: "Adv. Neha Gupta",
+      role: "Associate Partner",
+      specialization: "Family Law",
+      experienceYears: 15,
+      photoUrl: "https://api.dicebear.com/7.x/notionists/svg?seed=Neha&backgroundColor=f1f5f9",
+      isActive: true,
+    },
+  ]);
 }
 
 // ── Seed default roles ────────────────────────────────────────────────────────

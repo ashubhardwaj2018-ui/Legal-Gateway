@@ -4,7 +4,7 @@ import { logger } from "./lib/logger";
 import { and, lte, gte, eq } from "drizzle-orm";
 import { db, consultationsTable, notificationsTable, adminUsersTable } from "@workspace/db";
 import { createNotification } from "./routes/admin/notifications";
-import { hashPassword } from "./routes/admin/auth";
+import { hashPassword, seedLawyerProfiles } from "./routes/admin/auth";
 
 const rawPort = process.env["PORT"];
 
@@ -95,6 +95,9 @@ app.listen(port, (err) => {
       .then(() => logger.info("Admin password reset from ADMIN_RESET_PASSWORD env var"))
       .catch((e: unknown) => logger.error({ err: e }, "Admin password reset failed"));
   }
+
+  // Seed lawyer profiles if the table is empty (runs once, safe to re-run)
+  void seedLawyerProfiles().catch((e: unknown) => logger.warn({ err: e }, "seedLawyerProfiles failed (non-fatal)"));
 
   // Run follow-up check after short startup delay, then every 15 minutes
   setTimeout(() => { void checkFollowUpReminders(); }, 10_000);
