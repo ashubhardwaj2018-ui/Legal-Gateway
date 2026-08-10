@@ -995,35 +995,30 @@ function classifyUrl(url: string): { label: string; desc: string; group: string 
     return { label: "Blog Posts", desc: "All published blog articles", group: "core" };
   const coMatch = file.match(/^sitemap-companies-(\d+)\.xml$/);
   if (coMatch)
-    return { label: `Companies — part ${coMatch[1]}`, desc: "Up to 50,000 company pages", group: "companies" };
+    return { label: `Companies — Part ${coMatch[1]}`, desc: "Up to 50,000 Indian company pages per file", group: "companies" };
   const pseoMatch = file.match(/^sitemap-pseo-(\d+)\.xml$/);
   if (pseoMatch)
-    return { label: `pSEO — part ${pseoMatch[1]}`, desc: "Service × location pages (up to 50,000 URLs)", group: "pseo" };
+    return { label: `Priority pSEO — Part ${pseoMatch[1]}`, desc: "Priority locations × services (indexed by Google)", group: "pseo-priority" };
+  const npseoMatch = file.match(/^sitemap-npseo-(\d+)\.xml$/);
+  if (npseoMatch)
+    return { label: `Non-Priority pSEO — Part ${npseoMatch[1]}`, desc: "All other locations × services (crawlable, noindex)", group: "pseo-nonpriority" };
   return { label: file, desc: "", group: "other" };
 }
 
-/** Parse <loc> values out of a sitemapindex XML string */
-function parseSitemapIndex(xml: string): string[] {
-  const locs: string[] = [];
-  const re = /<loc>\s*([^<]+)\s*<\/loc>/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(xml)) !== null) locs.push(m[1].trim());
-  return locs;
-}
-
-const GROUP_ORDER = ["index", "core", "companies", "pseo", "other"];
+const GROUP_ORDER = ["index", "core", "companies", "pseo-priority", "pseo-nonpriority", "other"];
 const GROUP_LABELS: Record<string, string> = {
-  index: "Sitemap Index",
-  core: "Core Files",
-  companies: "Company Sitemaps",
-  pseo: "pSEO Sitemaps (Service × Location)",
-  other: "Other",
+  index:            "Sitemap Index (Submit to Search Console)",
+  core:             "Core Files — Static Pages & Blog Posts",
+  companies:        "Company Sitemaps — Indian Companies",
+  "pseo-priority":  "Priority pSEO Sitemaps — Indexed Locations × Services",
+  "pseo-nonpriority": "Non-Priority pSEO Sitemaps — Crawlable, Not Indexed",
+  other:            "Other",
 };
 
 // ── Sitemap Tab ──────────────────────────────────────────────────────────────
 function SitemapTab() {
   const { toast } = useToast();
-  const [stats, setStats]       = useState<{ priorityLocations: number; pseoUrls: number; blogs: number; companies: number } | null>(null);
+  const [stats, setStats]       = useState<{ priorityLocations: number; pseoUrls: number; totalPseoUrls: number; blogs: number; companies: number; totalFiles: number } | null>(null);
   const [entries, setEntries]   = useState<SitemapEntry[]>([]);
   const [loading, setLoading]   = useState(false);
   const [pinging, setPinging]   = useState(false);
@@ -1032,46 +1027,43 @@ function SitemapTab() {
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [pseoStats, blog, co, indexXml] = await Promise.all([
-        fetch(`${BASE}/api/pseo-stats`).then(r => r.json()).catch(() => ({ priorityLocations: 0, totalServices: 0, qualifiedPseoUrls: 0 })),
+      const [pseoStats, blog, sitemapAll] = await Promise.all([
+        fetch(`${BASE}/api/pseo-stats`).then(r => r.json()).catch(() => ({})),
         fetch(`${BASE}/api/blogs?limit=1`, { credentials: "include" }).then(r => r.json()).then(d => Number(d.total ?? 0)).catch(() => 0),
-        fetch(`${BASE}/api/companies?limit=1`).then(r => r.json()).then(d => Number(d.total ?? 0)).catch(() => 0),
-        fetch(`${BASE}/api/sitemap-index.xml`).then(r => r.text()).catch(() => ""),
+        fetch(`${BASE}/api/sitemap-all.json`).then(r => r.json()).catch(() => ({ sitemaps: {}, totalFiles: 0 })),
       ]);
+
       setStats({
         priorityLocations: Number(pseoStats.priorityLocations ?? 0),
-        pseoUrls: Number(pseoStats.qualifiedPseoUrls ?? 0),
-        blogs: blog,
-        companies: co,
+        pseoUrls:          Number(pseoStats.qualifiedPseoUrls ?? 0),
+        totalPseoUrls:     Number(pseoStats.totalPseoUrls ?? 0),
+        blogs:             blog,
+        companies:         Number(pseoStats.totalCompanies ?? 0),
+        totalFiles:        Number(sitemapAll.totalFiles ?? 0),
       });
 
-      // Parse every <loc> from the index, then add the index itself at the front
-      const locs = parseSitemapIndex(indexXml);
-      const built: SitemapEntry[] = [
-        // Index file itself (always first)
-        (() => {
-          const u = `${BASE}/api/sitemap-index.xml`;
-          const { label, desc, group } = classifyUrl(u);
-          return { url: u, filename: "sitemap-index.xml", label, desc, group };
-        })(),
-        // Static + blogs (always present, may or may not be in the index)
-        ...([`${BASE}/api/sitemap-static.xml`, `${BASE}/api/sitemap-blogs.xml`].map(u => {
-          const { label, desc, group } = classifyUrl(u);
-          return { url: u, filename: u.split("/").pop()!, label, desc, group };
-        })),
-        // Everything from the parsed index (companies, pseo, …)
-        ...locs.map(rawUrl => {
-          // Rewrite the hostname to the current origin so links work in dev
-          const filename = rawUrl.split("/").pop() ?? rawUrl;
-          const url = `${BASE}/api/${filename}`;
-          const { label, desc, group } = classifyUrl(url);
-          return { url, filename, label, desc, group };
-        }),
+      // Build entries directly from sitemap-all.json — no XML parsing needed
+      const sm = sitemapAll.sitemaps ?? {};
+      const ordered: string[] = [
+        ...(sm.index            ?? []),
+        ...(sm.static           ?? []),
+        ...(sm.blogs            ?? []),
+        ...(sm.companies        ?? []),
+        ...(sm.pseo_priority    ?? []),
+        ...(sm.pseo_nonpriority ?? []),
       ];
 
-      // Deduplicate by filename, preserve order
       const seen = new Set<string>();
-      setEntries(built.filter(e => { if (seen.has(e.filename)) return false; seen.add(e.filename); return true; }));
+      const built: SitemapEntry[] = [];
+      for (const rawUrl of ordered) {
+        const filename = rawUrl.split("/").pop() ?? rawUrl;
+        if (seen.has(filename)) continue;
+        seen.add(filename);
+        const url = `${BASE}/api/${filename}`;
+        const { label, desc, group } = classifyUrl(url);
+        built.push({ url, filename, label, desc, group });
+      }
+      setEntries(built);
     } finally { setLoading(false); }
   };
 
@@ -1098,16 +1090,29 @@ function SitemapTab() {
 
   return (
     <div className="space-y-5">
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      {/* Stats row 1 */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         {[
-          { label: "Priority Locations", value: stats?.priorityLocations, color: "bg-blue-50   border-blue-100   text-blue-700",   sub: "in sitemap" },
-          { label: "pSEO URLs",          value: stats?.pseoUrls,          color: "bg-amber-50  border-amber-100  text-amber-700",  sub: "loc × service" },
-          { label: "Blog Posts",         value: stats?.blogs,             color: "bg-green-50  border-green-100  text-green-700",  sub: "published" },
-          { label: "Companies",          value: stats?.companies,         color: "bg-purple-50 border-purple-100 text-purple-700", sub: "indexed" },
+          { label: "Priority Locations", value: stats?.priorityLocations, color: "bg-blue-50   border-blue-100   text-blue-700",   sub: "indexed by Google" },
+          { label: "Priority pSEO URLs", value: stats?.pseoUrls,          color: "bg-amber-50  border-amber-100  text-amber-700",  sub: "priority loc × service" },
+          { label: "Total pSEO URLs",    value: stats?.totalPseoUrls,     color: "bg-orange-50 border-orange-100 text-orange-700", sub: "all loc × service" },
         ].map(s => (
           <div key={s.label} className={`rounded-xl border p-4 text-center ${s.color}`}>
-            <div className="text-2xl font-bold">{loading ? "…" : (s.value ?? "—").toLocaleString()}</div>
+            <div className="text-2xl font-bold">{loading ? "…" : (s.value?.toLocaleString() ?? "—")}</div>
+            <div className="text-xs font-medium mt-0.5">{s.label}</div>
+            <div className="text-[10px] opacity-60 mt-0.5">{s.sub}</div>
+          </div>
+        ))}
+      </div>
+      {/* Stats row 2 */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        {[
+          { label: "Blog Posts",     value: stats?.blogs,       color: "bg-green-50  border-green-100  text-green-700",  sub: "published" },
+          { label: "Companies",      value: stats?.companies,   color: "bg-purple-50 border-purple-100 text-purple-700", sub: "Indian companies" },
+          { label: "Sitemap Files",  value: stats?.totalFiles,  color: "bg-slate-50  border-slate-100  text-slate-700",  sub: "total XML files" },
+        ].map(s => (
+          <div key={s.label} className={`rounded-xl border p-4 text-center ${s.color}`}>
+            <div className="text-2xl font-bold">{loading ? "…" : (s.value?.toLocaleString() ?? "—")}</div>
             <div className="text-xs font-medium mt-0.5">{s.label}</div>
             <div className="text-[10px] opacity-60 mt-0.5">{s.sub}</div>
           </div>
@@ -1191,10 +1196,14 @@ function SitemapTab() {
         </a>
       </div>
 
-      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
-        <strong>Tip:</strong> Submit <code className="bg-amber-100 px-1 rounded text-xs">/api/sitemap-index.xml</code> to
-        Google Search Console — it automatically references all company, pSEO, blog, and static sitemaps.
-        Hit <strong>Ping Google &amp; Bing</strong> after importing new data or publishing blog posts.
+      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800 space-y-2">
+        <p><strong>Submit to Google Search Console:</strong> Use <code className="bg-amber-100 px-1 rounded text-xs">/api/sitemap-index.xml</code> — it references priority pSEO, company, blog, and static sitemaps. Hit <strong>Ping Google &amp; Bing</strong> after importing new data or publishing posts.</p>
+        <p className="text-xs text-amber-700 border-t border-amber-200 pt-2">
+          <strong>Sitemap JSON API:</strong>{" "}
+          <a href={`${BASE}/api/sitemap-all.json`} target="_blank" rel="noopener noreferrer"
+            className="underline font-mono">/api/sitemap-all.json</a>
+          {" "}— machine-readable index of every sitemap file grouped by type (index, static, blogs, companies, pseo-priority, pseo-nonpriority).
+        </p>
       </div>
     </div>
   );

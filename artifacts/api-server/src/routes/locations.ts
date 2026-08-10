@@ -405,6 +405,52 @@ router.get("/sitemap-index.xml", async (req, res): Promise<void> => {
   res.send(xml);
 });
 
+// ── Sitemap All JSON — machine-readable index of every sitemap file ───────────
+router.get("/sitemap-all.json", async (req, res): Promise<void> => {
+  await ensurePrioritySeeded();
+
+  const proto   = req.headers["x-forwarded-proto"]  ?? "https";
+  const host    = req.headers["x-forwarded-host"]   ?? req.headers.host ?? "legalfilingindia.com";
+  const apiBase = `${proto}://${host}/api`;
+
+  const [[{ value: priorityCount }], [{ value: nonPriorityCount }], [{ value: coCount }]] = await Promise.all([
+    db.select({ value: count() }).from(locationsTable)
+      .where(and(eq(locationsTable.isActive, true), eq(locationsTable.seoPriority, true))),
+    db.select({ value: count() }).from(locationsTable)
+      .where(and(eq(locationsTable.isActive, true), eq(locationsTable.seoPriority, false))),
+    db.select({ value: count() }).from(indianCompaniesTable),
+  ]);
+
+  const numPseoFiles    = Math.max(1, Math.ceil(Number(priorityCount)    / LOC_PER_PSEO_FILE));
+  const numNPseoFiles   = Math.max(0, Math.ceil(Number(nonPriorityCount) / LOC_PER_PSEO_FILE));
+  const numCompanyFiles = Math.max(1, Math.ceil(Number(coCount)          / COMPANIES_PER_FILE));
+
+  const totalFiles =
+    2 /* static + blogs */ +
+    numCompanyFiles +
+    numPseoFiles +
+    numNPseoFiles;
+
+  res.setHeader("Cache-Control", "public, max-age=300");
+  res.json({
+    generated: new Date().toISOString(),
+    totalFiles,
+    sitemaps: {
+      index:            [`${apiBase}/sitemap-index.xml`],
+      static:           [`${apiBase}/sitemap-static.xml`],
+      blogs:            [`${apiBase}/sitemap-blogs.xml`],
+      companies:        Array.from({ length: numCompanyFiles },  (_, i) => `${apiBase}/sitemap-companies-${i + 1}.xml`),
+      pseo_priority:    Array.from({ length: numPseoFiles },     (_, i) => `${apiBase}/sitemap-pseo-${i + 1}.xml`),
+      pseo_nonpriority: Array.from({ length: numNPseoFiles },    (_, i) => `${apiBase}/sitemap-npseo-${i + 1}.xml`),
+    },
+    counts: {
+      priorityLocations:    Number(priorityCount),
+      nonPriorityLocations: Number(nonPriorityCount),
+      companies:            Number(coCount),
+    },
+  });
+});
+
 // ── Static + service pages sitemap ───────────────────────────────────────────
 router.get("/sitemap-static.xml", async (req, res): Promise<void> => {
   const now = new Date().toISOString().split("T")[0];
