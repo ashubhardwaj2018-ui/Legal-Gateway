@@ -201,7 +201,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useListSeoSettings, useUpsertSeoSetting, getListSeoSettingsQueryKey } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { AdminLayout } from "./AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1022,30 +1022,44 @@ const GSC_SITEMAPS_URL = "https://search.google.com/search-console/sitemaps";
 // ── Sitemap Tab ──────────────────────────────────────────────────────────────
 function SitemapTab() {
   const { toast } = useToast();
-  const [stats, setStats]       = useState<{ priorityLocations: number; pseoUrls: number; totalPseoUrls: number; blogs: number; companies: number; totalFiles: number } | null>(null);
   const [entries, setEntries]   = useState<SitemapEntry[]>([]);
-  const [loading, setLoading]   = useState(false);
+  const [entriesLoading, setEntriesLoading] = useState(false);
+  const [supplemental, setSupplemental] = useState<{ blogs: number; totalFiles: number } | null>(null);
   const [pinging, setPinging]   = useState(false);
   const [pingResult, setPingResult] = useState<{ google: boolean; bing: boolean; message: string } | null>(null);
   const [copied, setCopied]     = useState<string | null>(null); // filename currently showing ✓
 
+  // Live-updating stats — same query key as pseo-manager; invalidated by locations.tsx after priority changes
+  const { data: pseoStats, isLoading: statsLoading } = useQuery<{
+    priorityLocations: number; qualifiedPseoUrls: number; totalPseoUrls: number; totalCompanies: number;
+  }>({
+    queryKey: ["pseo-public-stats"],
+    queryFn: () => fetch(`${BASE}/api/pseo-stats`).then(r => r.json()),
+    staleTime: 30_000,
+  });
+
+  const stats = pseoStats && supplemental
+    ? {
+        priorityLocations: Number(pseoStats.priorityLocations ?? 0),
+        pseoUrls:          Number(pseoStats.qualifiedPseoUrls ?? 0),
+        totalPseoUrls:     Number(pseoStats.totalPseoUrls ?? 0),
+        blogs:             supplemental.blogs,
+        companies:         Number(pseoStats.totalCompanies ?? 0),
+        totalFiles:        supplemental.totalFiles,
+      }
+    : null;
+
+  const loading = statsLoading || entriesLoading;
+
   const fetchAll = async () => {
-    setLoading(true);
+    setEntriesLoading(true);
     try {
-      const [pseoStats, blog, sitemapAll] = await Promise.all([
-        fetch(`${BASE}/api/pseo-stats`).then(r => r.json()).catch(() => ({})),
+      const [blog, sitemapAll] = await Promise.all([
         fetch(`${BASE}/api/blogs?limit=1`, { credentials: "include" }).then(r => r.json()).then(d => Number(d.total ?? 0)).catch(() => 0),
         fetch(`${BASE}/api/sitemap-all.json`).then(r => r.json()).catch(() => ({ sitemaps: {}, totalFiles: 0 })),
       ]);
 
-      setStats({
-        priorityLocations: Number(pseoStats.priorityLocations ?? 0),
-        pseoUrls:          Number(pseoStats.qualifiedPseoUrls ?? 0),
-        totalPseoUrls:     Number(pseoStats.totalPseoUrls ?? 0),
-        blogs:             blog,
-        companies:         Number(pseoStats.totalCompanies ?? 0),
-        totalFiles:        Number(sitemapAll.totalFiles ?? 0),
-      });
+      setSupplemental({ blogs: blog, totalFiles: Number(sitemapAll.totalFiles ?? 0) });
 
       // Build entries directly from sitemap-all.json — no XML parsing needed
       const sm = sitemapAll.sitemaps ?? {};
@@ -1069,7 +1083,7 @@ function SitemapTab() {
         built.push({ url, filename, label, desc, group });
       }
       setEntries(built);
-    } finally { setLoading(false); }
+    } finally { setEntriesLoading(false); }
   };
 
   const pingSearchEngines = async () => {

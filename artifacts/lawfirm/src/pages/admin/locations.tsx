@@ -156,6 +156,7 @@ export default function AdminLocations() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["locations-list"] });
       qc.invalidateQueries({ queryKey: ["location-stats"] });
+      qc.invalidateQueries({ queryKey: ["pseo-public-stats"] });
     },
   });
 
@@ -180,6 +181,7 @@ export default function AdminLocations() {
       setSelected(new Set());
       qc.invalidateQueries({ queryKey: ["locations-list"] });
       qc.invalidateQueries({ queryKey: ["location-stats"] });
+      qc.invalidateQueries({ queryKey: ["pseo-public-stats"] });
       toast({ title: `${variables.value ? "Marked" : "Removed"} SEO priority for ${variables.ids.length} location${variables.ids.length !== 1 ? "s" : ""}` });
     },
   });
