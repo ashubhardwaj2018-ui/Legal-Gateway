@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, ilike, or, count, desc, and, inArray } from "drizzle-orm";
+import { eq, ilike, or, count, desc, and, sql } from "drizzle-orm";
 import { db, indianCompaniesTable } from "@workspace/db";
 import * as XLSX from "xlsx";
 import multer from "multer";
@@ -217,53 +217,62 @@ async function runCompanyImportJob(jobId: string, fileName: string, rows: Normal
   const job = importJobs.get(jobId)!;
   job.status = "running";
 
-  // Pre-fetch existing CINs to determine insert vs update
-  const allCins = rows.map((r) => r.cin).filter(Boolean);
-  const existingCinRows = allCins.length
-    ? await db.select({ cin: indianCompaniesTable.cin })
-        .from(indianCompaniesTable)
-        .where(inArray(indianCompaniesTable.cin, allCins))
-    : [];
-  const existingCins = new Set(existingCinRows.map((r) => r.cin));
-
-  const BATCH = 200;
+  const BATCH = 1000; // bulk insert 1000 rows per query — ~20x faster than row-by-row
   for (let i = 0; i < rows.length; i += BATCH) {
-    const batch = rows.slice(i, i + BATCH);
-    for (const row of batch) {
-      if (!row.cin || !row.companyName) { job.skipped++; job.processed++; continue; }
-      const payload = {
-        cin: row.cin,
-        companyName: row.companyName,
-        slug: row.slug,
-        incorporationDate: row.incorporationDate,
-        companyStatus: row.companyStatus,
-        companyType: row.companyType,
-        authorizedCapital: row.authorizedCapital,
-        paidUpCapital: row.paidUpCapital,
-        registeredOffice: row.registeredOffice,
-        state: row.state,
-        district: row.district,
-        city: row.city,
-        pincode: row.pincode,
-        industry: row.industry,
-        roc: row.roc,
-        email: row.email,
-        updatedAt: new Date(),
-      };
-      try {
-        if (existingCins.has(row.cin)) {
-          await db.update(indianCompaniesTable).set(payload).where(eq(indianCompaniesTable.cin, row.cin));
-          job.updated++;
-        } else {
-          await db.insert(indianCompaniesTable).values(payload);
-          job.imported++;
-          existingCins.add(row.cin); // prevent dupes within batch
-        }
-      } catch {
-        job.errors++;
-      }
-      job.processed++;
+    const batch = rows.slice(i, i + BATCH).filter((r) => r.cin && r.companyName);
+    job.skipped += rows.slice(i, i + BATCH).length - batch.length;
+
+    if (batch.length === 0) { job.processed += BATCH; continue; }
+
+    const values = batch.map((row) => ({
+      cin: row.cin,
+      companyName: row.companyName,
+      slug: row.slug,
+      incorporationDate: row.incorporationDate,
+      companyStatus: row.companyStatus,
+      companyType: row.companyType,
+      authorizedCapital: row.authorizedCapital,
+      paidUpCapital: row.paidUpCapital,
+      registeredOffice: row.registeredOffice,
+      state: row.state,
+      district: row.district,
+      city: row.city,
+      pincode: row.pincode,
+      industry: row.industry,
+      roc: row.roc,
+      email: row.email,
+      updatedAt: new Date(),
+    }));
+
+    try {
+      await db.insert(indianCompaniesTable)
+        .values(values)
+        .onConflictDoUpdate({
+          target: indianCompaniesTable.cin,
+          set: {
+            companyName: sql`excluded.company_name`,
+            slug: sql`excluded.slug`,
+            incorporationDate: sql`excluded.incorporation_date`,
+            companyStatus: sql`excluded.company_status`,
+            companyType: sql`excluded.company_type`,
+            authorizedCapital: sql`excluded.authorized_capital`,
+            paidUpCapital: sql`excluded.paid_up_capital`,
+            registeredOffice: sql`excluded.registered_office`,
+            state: sql`excluded.state`,
+            district: sql`excluded.district`,
+            city: sql`excluded.city`,
+            pincode: sql`excluded.pincode`,
+            industry: sql`excluded.industry`,
+            roc: sql`excluded.roc`,
+            email: sql`excluded.email`,
+            updatedAt: sql`excluded.updated_at`,
+          },
+        });
+      job.imported += batch.length;
+    } catch {
+      job.errors += batch.length;
     }
+    job.processed += batch.length;
   }
   job.status = "done";
 }
@@ -310,6 +319,80 @@ router.get("/admin/indian-companies/import-status/:jobId", (req, res): void => {
     errors: job.errors,
     message: job.message,
   });
+});
+
+// ─── Fast JSON bulk-upsert (for server-side migration / seeding) ──────────────
+// POST /admin/indian-companies/bulk-upsert
+// Body: { records: [{ cin, companyName, slug, incorporationDate, companyStatus, companyType,
+//   authorizedCapital, paidUpCapital, registeredOffice, state, district, city, pincode,
+//   industry, roc, email }] }
+// Returns: { inserted, updated, errors }
+router.post("/admin/indian-companies/bulk-upsert", async (req, res): Promise<void> => {
+  const body = req.body as { records?: unknown[] };
+  if (!Array.isArray(body.records) || body.records.length === 0) {
+    res.status(400).json({ error: "records array is required" });
+    return;
+  }
+
+  const raw = body.records as Record<string, unknown>[];
+  const valid = raw.filter((r) => r.cin && r.companyName && r.slug);
+  if (valid.length === 0) { res.json({ inserted: 0, updated: 0, errors: raw.length }); return; }
+
+  const BATCH = 1000;
+  let inserted = 0, errors = 0;
+
+  for (let i = 0; i < valid.length; i += BATCH) {
+    const batch = valid.slice(i, i + BATCH).map((r) => ({
+      cin: String(r.cin),
+      companyName: String(r.companyName),
+      slug: String(r.slug),
+      incorporationDate: r.incorporationDate ? String(r.incorporationDate) : null,
+      companyStatus: r.companyStatus ? String(r.companyStatus) : null,
+      companyType: r.companyType ? String(r.companyType) : null,
+      authorizedCapital: r.authorizedCapital ? String(r.authorizedCapital) : null,
+      paidUpCapital: r.paidUpCapital ? String(r.paidUpCapital) : null,
+      registeredOffice: r.registeredOffice ? String(r.registeredOffice) : null,
+      state: r.state ? String(r.state) : null,
+      district: r.district ? String(r.district) : null,
+      city: r.city ? String(r.city) : null,
+      pincode: r.pincode ? String(r.pincode) : null,
+      industry: r.industry ? String(r.industry) : null,
+      roc: r.roc ? String(r.roc) : null,
+      email: r.email ? String(r.email) : null,
+      updatedAt: new Date(),
+    }));
+
+    try {
+      await db.insert(indianCompaniesTable)
+        .values(batch)
+        .onConflictDoUpdate({
+          target: indianCompaniesTable.cin,
+          set: {
+            companyName: sql`excluded.company_name`,
+            slug: sql`excluded.slug`,
+            incorporationDate: sql`excluded.incorporation_date`,
+            companyStatus: sql`excluded.company_status`,
+            companyType: sql`excluded.company_type`,
+            authorizedCapital: sql`excluded.authorized_capital`,
+            paidUpCapital: sql`excluded.paid_up_capital`,
+            registeredOffice: sql`excluded.registered_office`,
+            state: sql`excluded.state`,
+            district: sql`excluded.district`,
+            city: sql`excluded.city`,
+            pincode: sql`excluded.pincode`,
+            industry: sql`excluded.industry`,
+            roc: sql`excluded.roc`,
+            email: sql`excluded.email`,
+            updatedAt: sql`excluded.updated_at`,
+          },
+        });
+      inserted += batch.length;
+    } catch {
+      errors += batch.length;
+    }
+  }
+
+  res.json({ inserted, updated: 0, errors });
 });
 
 // ─── Browse / list ────────────────────────────────────────────────────────────
