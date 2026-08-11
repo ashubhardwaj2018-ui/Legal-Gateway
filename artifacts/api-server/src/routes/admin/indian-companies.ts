@@ -3,9 +3,25 @@ import { eq, ilike, or, count, desc, and, sql } from "drizzle-orm";
 import { db, indianCompaniesTable } from "@workspace/db";
 import * as XLSX from "xlsx";
 import multer from "multer";
+import * as fs from "fs";
+import * as readline from "readline";
+import * as path from "path";
 
 const router: IRouter = Router();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 200 * 1024 * 1024 } });
+
+// Temp directory for uploaded files — disk storage avoids loading huge CSVs into RAM
+const UPLOAD_DIR = "/tmp/ic-uploads";
+fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: UPLOAD_DIR,
+    filename: (_req, file, cb) => {
+      cb(null, `ic_${Date.now()}_${Math.random().toString(36).slice(2)}_${path.basename(file.originalname)}`);
+    },
+  }),
+  limits: { fileSize: 2 * 1024 * 1024 * 1024 }, // 2 GB
+});
 
 // ─── Slug generation ──────────────────────────────────────────────────────────
 function makeSlug(name: string, cin: string): string {
@@ -137,8 +153,8 @@ function normaliseCompanyRow(raw: Record<string, unknown>, idx: number): Normali
 }
 
 // In-memory store for parsed rows (keyed by parseId, expires after 2 hours)
+// Only stores validRows — preview is returned in the HTTP response, not re-stored here
 interface ParsedBatch {
-  rows: NormalisedRow[];
   validRows: NormalisedRow[];
   createdAt: number;
 }
@@ -152,48 +168,151 @@ setInterval(() => {
   }
 }, 30 * 60 * 1000);
 
+// ── CSV field parser (handles quoted fields with embedded commas/quotes) ────────
+function csvParseLine(line: string): string[] {
+  const fields: string[] = [];
+  let cur = "";
+  let inQuote = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuote) {
+      if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+      else if (ch === '"') { inQuote = false; }
+      else { cur += ch; }
+    } else {
+      if (ch === '"') { inQuote = true; }
+      else if (ch === ",") { fields.push(cur); cur = ""; }
+      else { cur += ch; }
+    }
+  }
+  fields.push(cur);
+  return fields;
+}
+
+// ── Streaming CSV parse — processes line-by-line, never loads whole file ────────
+// Returns normalised + deduplicated rows without holding the full raw text in RAM.
+async function streamParseCsv(filePath: string): Promise<{
+  validRows: NormalisedRow[];
+  preview: NormalisedRow[];   // first 200 rows (valid + invalid) for UI display
+  totalRows: number;
+  validCount: number;
+  errorCount: number;
+  detectedColumns: string[];
+}> {
+  const rl = readline.createInterface({
+    input: fs.createReadStream(filePath, { encoding: "utf-8" }),
+    crlfDelay: Infinity,
+  });
+
+  const validRows: NormalisedRow[] = [];
+  const preview: NormalisedRow[] = [];
+  const cinSeen = new Map<string, number>();
+  let headers: string[] = [];
+  let rowIdx = 0;
+  let validCount = 0;
+  let errorCount = 0;
+
+  for await (const rawLine of rl) {
+    const line = rawLine.trimEnd();
+    if (!line) continue;
+    const fields = csvParseLine(line);
+
+    if (rowIdx === 0) {
+      // Header row
+      headers = fields.map(h => h.trim());
+      rowIdx++;
+      continue;
+    }
+
+    const raw: Record<string, unknown> = {};
+    headers.forEach((h, j) => { raw[h] = fields[j]?.trim() ?? ""; });
+
+    const norm = normaliseCompanyRow(raw, rowIdx);
+    rowIdx++;
+
+    // Dedup by CIN within file
+    if (norm.cin) {
+      if (cinSeen.has(norm.cin)) {
+        norm.errors.push(`Duplicate CIN in file (first at row ${cinSeen.get(norm.cin)})`);
+        norm.isValid = false;
+      } else {
+        cinSeen.set(norm.cin, norm.rowIndex);
+      }
+    }
+
+    if (preview.length < 200) preview.push(norm);
+
+    if (norm.isValid) { validRows.push(norm); validCount++; }
+    else { errorCount++; }
+  }
+
+  return {
+    validRows,
+    preview,
+    totalRows: rowIdx - 1,
+    validCount,
+    errorCount,
+    detectedColumns: headers,
+  };
+}
+
 router.post(
   "/admin/indian-companies/parse-preview",
   upload.single("file"),
-  (req, res): void => {
+  async (req, res): Promise<void> => {
     const file = req.file;
     if (!file) { res.status(400).json({ error: "No file uploaded" }); return; }
+
+    const cleanup = () => { try { fs.unlinkSync(file.path); } catch { /* ignore */ } };
+
     try {
-      const wb = XLSX.read(file.buffer, { type: "buffer" });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "" });
-      if (rawRows.length === 0) { res.status(422).json({ error: "File contains no data rows" }); return; }
+      const ext = (file.originalname ?? "").split(".").pop()?.toLowerCase();
+      let validRows: NormalisedRow[];
+      let preview: NormalisedRow[];
+      let totalRows: number;
+      let validCount: number;
+      let errorCount: number;
+      let detectedColumns: string[];
 
-      const rows = rawRows.map((r, i) => normaliseCompanyRow(r, i + 1));
+      if (ext === "csv") {
+        // Streaming line-by-line — no buffer overflow, works for any file size
+        const result = await streamParseCsv(file.path);
+        ({ validRows, preview, totalRows, validCount, errorCount, detectedColumns } = result);
+      } else {
+        // Excel: read from disk (file is on disk via diskStorage)
+        const buf = fs.readFileSync(file.path);
+        const wb = XLSX.read(buf, { type: "buffer" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "" });
 
-      // Flag duplicate CINs within file
-      const cinSeen = new Map<string, number>();
-      for (const row of rows) {
-        if (!row.cin) continue;
-        if (cinSeen.has(row.cin)) {
-          row.errors.push(`Duplicate CIN in file (first at row ${cinSeen.get(row.cin)})`);
-          row.isValid = false;
-        } else {
-          cinSeen.set(row.cin, row.rowIndex);
+        const rows = rawRows.map((r, i) => normaliseCompanyRow(r, i + 1));
+        const cinSeen = new Map<string, number>();
+        for (const row of rows) {
+          if (!row.cin) continue;
+          if (cinSeen.has(row.cin)) {
+            row.errors.push(`Duplicate CIN in file (first at row ${cinSeen.get(row.cin)})`);
+            row.isValid = false;
+          } else cinSeen.set(row.cin, row.rowIndex);
         }
+        validRows = rows.filter(r => r.isValid);
+        preview = rows.slice(0, 200);
+        totalRows = rows.length;
+        validCount = validRows.length;
+        errorCount = rows.length - validCount;
+        detectedColumns = Object.keys(rawRows[0] ?? {});
       }
 
-      const validRows = rows.filter((r) => r.isValid);
+      cleanup(); // temp file no longer needed — rows are in memory
+
+      if (totalRows === 0) { res.status(422).json({ error: "File contains no data rows" }); return; }
+
       const parseId = `ic_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-      parsedStore.set(parseId, { rows, validRows, createdAt: Date.now() });
+      parsedStore.set(parseId, { validRows, createdAt: Date.now() });
 
-      const detectedColumns = Object.keys(rawRows[0] ?? {});
-
-      res.json({
-        parseId,
-        totalRows: rows.length,
-        validCount: validRows.length,
-        errorCount: rows.filter((r) => !r.isValid).length,
-        detectedColumns,
-        preview: rows.slice(0, 200),
-      });
-    } catch {
-      res.status(422).json({ error: "Failed to parse file — check it is a valid Excel or CSV" });
+      res.json({ parseId, totalRows, validCount, errorCount, detectedColumns, preview });
+    } catch (err) {
+      cleanup();
+      res.status(422).json({ error: String(err instanceof Error ? err.message : err) });
     }
   },
 );

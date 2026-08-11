@@ -92,10 +92,13 @@ export default function AdminIndianCompanies() {
   const [dragOver, setDragOver] = useState(false);
   const [fileName, setFileName] = useState("");
   const [parsing, setParsing] = useState(false);
+  const [uploadPct, setUploadPct] = useState(0);
+  const [uploadPhase, setUploadPhase] = useState<"upload" | "parse" | null>(null);
   const [parseData, setParseData] = useState<ParseResponse | null>(null);
   const [jobStatus, setJobStatus] = useState<JobStatus | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const xhrRef = useRef<XMLHttpRequest | null>(null);
 
   useEffect(() => {
     clearTimeout(debounceRef.current);
@@ -123,8 +126,8 @@ export default function AdminIndianCompanies() {
     loadCompanies();
   };
 
-  // ── Server-side parse ────────────────────────────────────────────────────────
-  const uploadForPreview = useCallback(async (file: File) => {
+  // ── Server-side parse (XHR so we get upload progress events) ────────────────
+  const uploadForPreview = useCallback((file: File) => {
     const ext = file.name.split(".").pop()?.toLowerCase();
     if (!["xlsx", "xls", "csv"].includes(ext ?? "")) {
       alert("Unsupported file. Please upload .xlsx, .xls or .csv");
@@ -132,27 +135,56 @@ export default function AdminIndianCompanies() {
     }
     setFileName(file.name);
     setParsing(true);
+    setUploadPct(0);
+    setUploadPhase("upload");
     setParseData(null);
     setImportResult(null);
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch("/api/admin/indian-companies/parse-preview", {
-        method: "POST",
-        body: fd,
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({})) as { error?: string };
-        alert(err.error ?? "Server could not parse the file.");
-        return;
+
+    const fd = new FormData();
+    fd.append("file", file);
+
+    const xhr = new XMLHttpRequest();
+    xhrRef.current = xhr;
+
+    xhr.upload.addEventListener("progress", (e) => {
+      if (e.lengthComputable) {
+        const pct = Math.round((e.loaded / e.total) * 100);
+        setUploadPct(pct);
+        if (pct >= 100) setUploadPhase("parse");
       }
-      const data = await res.json() as ParseResponse;
-      if (data.totalRows === 0) { alert("No data rows found in file."); return; }
-      setParseData(data);
-      setStep("preview");
-    } catch {
+    });
+
+    xhr.addEventListener("load", () => {
+      xhrRef.current = null;
+      try {
+        const data = JSON.parse(xhr.responseText) as ParseResponse & { error?: string };
+        if (xhr.status !== 200) { alert(data.error ?? "Server could not parse the file."); return; }
+        if (data.totalRows === 0) { alert("No data rows found in file."); return; }
+        setParseData(data);
+        setStep("preview");
+      } catch {
+        alert("Upload failed — unexpected server response.");
+      } finally {
+        setParsing(false);
+        setUploadPhase(null);
+      }
+    });
+
+    xhr.addEventListener("error", () => {
+      xhrRef.current = null;
       alert("Upload failed — could not connect to server.");
-    } finally { setParsing(false); }
+      setParsing(false);
+      setUploadPhase(null);
+    });
+
+    xhr.addEventListener("abort", () => {
+      xhrRef.current = null;
+      setParsing(false);
+      setUploadPhase(null);
+    });
+
+    xhr.open("POST", "/api/admin/indian-companies/parse-preview");
+    xhr.send(fd);
   }, []);
 
   const handleDrop = (e: React.DragEvent) => {
@@ -210,7 +242,10 @@ export default function AdminIndianCompanies() {
     setFileName("");
     setImportResult(null);
     setJobStatus(null);
+    setUploadPct(0);
+    setUploadPhase(null);
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+    if (xhrRef.current) { xhrRef.current.abort(); xhrRef.current = null; }
   }
 
   const total = data?.total ?? 0;
@@ -389,7 +424,7 @@ export default function AdminIndianCompanies() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
               <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 p-6 space-y-5">
                 <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-xs text-blue-700">
-                  <strong>Supported formats:</strong> .xlsx, .xls, .csv · Up to 200 MB · The system auto-detects column headers.
+                  <strong>Supported formats:</strong> .xlsx, .xls, .csv · Up to 2 GB · The system auto-detects column headers.
                   Duplicate CINs are updated (upsert). <a href="/api/admin/indian-companies/template" download className="underline font-semibold">Download template</a> for the correct format.
                 </div>
 
@@ -401,16 +436,33 @@ export default function AdminIndianCompanies() {
                   className={`border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-all ${dragOver ? "border-[#c9a227] bg-[#c9a227]/5" : "border-gray-300 hover:border-[#0f2044] hover:bg-gray-50"}`}
                 >
                   {parsing ? (
-                    <div>
-                      <div className="w-10 h-10 border-3 border-[#c9a227] border-t-transparent rounded-full animate-spin mx-auto mb-3" style={{ borderWidth: 3 }} />
-                      <p className="font-medium text-gray-700">Parsing file on server…</p>
-                      <p className="text-xs text-gray-400 mt-1">Validating rows and checking for duplicates</p>
+                    <div className="w-full">
+                      <div className="w-10 h-10 border-[3px] border-[#c9a227] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                      {uploadPhase === "upload" ? (
+                        <>
+                          <p className="font-medium text-gray-700 mb-3">Uploading file…</p>
+                          <div className="max-w-xs mx-auto">
+                            <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden mb-1.5">
+                              <div
+                                className="bg-[#c9a227] h-2.5 rounded-full transition-all duration-300"
+                                style={{ width: `${uploadPct}%` }}
+                              />
+                            </div>
+                            <p className="text-xs text-gray-500 text-center">{uploadPct}% uploaded</p>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <p className="font-medium text-gray-700">Parsing file on server…</p>
+                          <p className="text-xs text-gray-400 mt-1">Validating rows and checking for duplicates</p>
+                        </>
+                      )}
                     </div>
                   ) : (
                     <div>
                       <FileSpreadsheet size={40} className="mx-auto mb-3 text-gray-300" />
                       <p className="font-semibold text-gray-700 mb-1">Drop your Excel or CSV file here</p>
-                      <p className="text-xs text-gray-400 mb-4">or click to browse · Max 200 MB</p>
+                      <p className="text-xs text-gray-400 mb-4">or click to browse · Up to 2 GB</p>
                       <span className="inline-block bg-[#0f2044] text-white text-sm font-medium px-6 py-2 rounded-lg hover:bg-[#1a3060] transition-colors">Browse File</span>
                     </div>
                   )}
@@ -440,7 +492,7 @@ export default function AdminIndianCompanies() {
                   {[
                     "Download the template Excel file",
                     "Fill in your company data (CIN + Company Name required)",
-                    "Upload the file here — up to 200 MB",
+                    "Upload the file here — up to 2 GB",
                     "Review the preview and fix any errors",
                     "Click Import — runs in background with live progress",
                   ].map((s, i) => (
